@@ -254,3 +254,4 @@ the pinned Flutter/Mapbox versions in this repository.
 
 ## Collabrators
 - Khoi Do: [@Ben2104](https://github.com/Ben2104)
+- Jan Kirvey Montemayor: [@Kura-Yami](https://github.com/Kura-Yami)
