@@ -2,7 +2,7 @@
 
 Date: 2026-08-24
 
-Status: Approved in chat; awaiting written-spec review
+Status: Revised in chat; awaiting written-spec review
 
 ## Purpose
 
@@ -20,7 +20,6 @@ The public `Ben2104/NavipetBackend` repository will own:
 - Future Supabase migrations, RLS policies, triggers, and server-only database
   infrastructure.
 - Backend environment documentation and server deployment instructions.
-- Existing backend-specific design and implementation documents.
 
 The `Ben2104/NaviPetFlutter` repository will continue to own:
 
@@ -40,21 +39,19 @@ server-only secret.
 Use `git filter-repo` in a temporary clone of `NaviPetFlutter`. Never rewrite
 the source repository's history.
 
-The filtered repository will retain:
+The filtered repository will retain only:
 
 - `backend/`, rewritten so its contents become the new repository root.
 - `supabase/`, retained at the repository root.
-- Backend-specific documents under `docs/superpowers/`, retained under
-  `docs/superpowers/`.
 
 Filtering preserves relevant commits, authors, dates, and blame information
 while dropping unrelated Flutter paths. After filtering, one cleanup commit
 will add or adjust repository-level metadata and links.
 
 `git subtree split` is rejected because it handles one prefix cleanly but does
-not preserve the combined history of `backend/`, `supabase/`, and selected
-documents without extra history manipulation. A fresh copy is rejected because
-it loses the audit trail.
+not preserve the combined history of `backend/` and `supabase/` without extra
+history manipulation. A fresh copy is rejected because it loses the audit
+trail.
 
 ## Backend Repository Layout
 
@@ -66,8 +63,6 @@ NavipetBackend/
 ├── tests/
 ├── supabase/
 │   └── schema.sql
-├── docs/
-│   └── superpowers/
 ├── package.json
 ├── package-lock.json
 ├── tsconfig.json
@@ -96,13 +91,15 @@ The cleanup will:
 
 - Delete the tracked `backend/` directory.
 - Delete the tracked `supabase/` directory.
+- Delete `docs/superpowers/plans/` and `docs/superpowers/specs/`, including
+  this temporary extraction design after it has guided implementation.
+- Add `/docs/superpowers/` to `.gitignore` so future local Superpowers planning
+  artifacts stay untracked.
 - Remove backend-only ignore rules from the root `.gitignore`.
 - Update `README.md` so backend setup and schema instructions link to
   `https://github.com/Ben2104/NavipetBackend`.
 - Update `docs/PROJECT_MAP.md` so backend ownership points to the external
   repository.
-- Remove backend-specific design and implementation documents after they are
-  retained in the backend repository.
 - Keep Flutter source, tests, public environment configuration, and direct
   Supabase runtime behavior unchanged.
 
