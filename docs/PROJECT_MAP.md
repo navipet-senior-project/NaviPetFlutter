@@ -41,16 +41,18 @@ serialization, and converting backend data for the UI.
 
 ## Backend
 
-Supabase owns authentication, persisted application data, and authorization.
+The external backend repository owns server code and database infrastructure.
+Supabase provides authentication, persisted application data, and
+authorization.
 
-| Path or service | Responsibility |
+| Repository or service | Responsibility |
 | --- | --- |
-| `supabase/schema.sql` | Tables, triggers, indexes, constraints, and RLS policies |
+| [`Ben2104/NavipetBackend`](https://github.com/Ben2104/NavipetBackend) | Fastify API, Supabase schema, migrations, RLS policies, and server configuration |
 | Supabase Authentication | Accounts, sessions, password reset, and anonymous users |
 | Supabase project | Hosted PostgreSQL data and backend configuration |
 
-Any future privileged operation should be implemented as a Supabase Edge
-Function or another server-side service, never directly inside `lib/`.
+Privileged operations and server-only integrations belong in
+`Ben2104/NavipetBackend`, never directly inside `lib/`.
 
 ## Platform and build configuration
 
@@ -71,7 +73,7 @@ adapter and localization models belong under `lib/data/`.
 | Change | Primary label | Usually touches |
 | --- | --- | --- |
 | Change a screen design | Frontend | `lib/screens/`, `lib/widgets/`, `lib/theme/` |
-| Add a Supabase field or table | Backend | `supabase/schema.sql` |
+| Add a Supabase field or table | Backend | `Ben2104/NavipetBackend/supabase/schema.sql` |
 | Display new Supabase data | Client Services + Frontend | `lib/data/`, then UI |
 | Change Mapbox routing | Client Services | `lib/data/mapbox_navigation_service.dart` |
 | Add Android/iOS permissions | Platform | `android/`, `ios/` |
@@ -86,4 +88,3 @@ adapter and localization models belong under `lib/data/`.
    widgets.
 4. Run `flutter analyze` and `flutter test` before handing work to another
    collaborator.
-

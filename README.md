@@ -38,8 +38,8 @@ lib/
     mapbox_navigation_service.dart  Search Box + Directions API client
     navigation_models.dart          Destination, route, and maneuver models
 
-BACKEND
-supabase/schema.sql                 Profiles, classes, completions, and RLS
+EXTERNAL BACKEND
+Ben2104/NavipetBackend              Fastify API and Supabase schema
 Supabase Auth                       Accounts, sessions, and password recovery
 
 PLATFORM + BUILD
@@ -51,16 +51,10 @@ test/                               Automated tests
 
 ## Fastify backend
 
-The independently configured Node.js backend lives in [`backend/`](backend/).
-See [`backend/README.md`](backend/README.md) for server setup, environment
-boundaries, authentication, health endpoints, OpenAPI, and verification.
-
-### Test Swagger first
-
-The backend can run with non-secret local placeholders when you only need to
-inspect its API documentation. Follow the
-[Swagger-first backend setup](backend/README.md#test-swagger-first), then open
-<http://127.0.0.1:3000/docs/> while `npm run dev` is running.
+The Fastify API and Supabase schema live in the public
+[`Ben2104/NavipetBackend`](https://github.com/Ben2104/NavipetBackend)
+repository. Its README documents server setup, environment boundaries,
+authentication, health endpoints, OpenAPI, and verification.
 
 ## Prerequisites
 
@@ -101,8 +95,9 @@ MAPBOX_DOWNLOADS_TOKEN=sk.your_download_token
 ## Supabase setup
 
 1. Create a Supabase project.
-2. Open **SQL Editor**, paste [supabase/schema.sql](supabase/schema.sql), and run
-   it once. This creates the profile, class, and completion tables, the
+2. Open **SQL Editor**, paste
+   [`supabase/schema.sql`](https://github.com/Ben2104/NavipetBackend/blob/main/supabase/schema.sql),
+   and run it once. This creates the profile, class, and completion tables, the
    new-user trigger, and Row Level Security policies. If you ran an older copy,
    run the entire file again; it is safe to re-run and adds the new tables.
 3. In **Authentication > Providers**, keep Email enabled.
