@@ -15,4 +15,11 @@ abstract final class AppConfig {
       supabasePublishableKey.isNotEmpty &&
       !supabaseUrl.contains('your-project') &&
       !supabasePublishableKey.contains('your_key');
+
+  static String get backendBaseUrl =>
+      dotenv.maybeGet('BACKEND_BASE_URL')?.trim() ?? '';
+
+  static bool get hasBackend =>
+      Uri.tryParse(backendBaseUrl)?.hasScheme == true &&
+      backendBaseUrl.isNotEmpty;
 }

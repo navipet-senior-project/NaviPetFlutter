@@ -13,15 +13,12 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _showPassword = false;
-  bool _creatingAccount = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -31,32 +28,19 @@ class _SignInScreenState extends State<SignInScreen> {
     final appState = context.read<AppState>();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final name = _nameController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
       _showMessage('Enter your email and password.');
       return;
     }
-    if (_creatingAccount && name.isEmpty) {
-      _showMessage('Enter your full name.');
-      return;
-    }
-    if (_creatingAccount && password.length < 8) {
-      _showMessage('Use a password with at least 8 characters.');
-      return;
-    }
 
-    final result = _creatingAccount
-        ? await appState.signUp(name: name, email: email, password: password)
-        : await appState.signIn(email: email, password: password);
+    final result = await appState.signIn(email: email, password: password);
     if (!mounted) return;
 
     switch (result.status) {
       case AuthActionStatus.authenticated:
         context.go('/map');
       case AuthActionStatus.emailConfirmationRequired:
-        setState(() => _creatingAccount = false);
-        _showMessage('Check your email to confirm your account, then sign in.');
       case AuthActionStatus.passwordResetSent:
         break;
       case AuthActionStatus.failure:
@@ -136,16 +120,6 @@ class _SignInScreenState extends State<SignInScreen> {
                     _configurationNotice(),
                     const SizedBox(height: 16),
                   ],
-                  if (_creatingAccount) ...[
-                    _field(
-                      label: 'FULL NAME',
-                      controller: _nameController,
-                      icon: Icons.person_outline,
-                      hint: 'Alex Rivera',
-                      action: TextInputAction.next,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
                   _field(
                     label: 'EMAIL ADDRESS',
                     controller: _emailController,
@@ -174,16 +148,13 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                     ),
                   ),
-                  if (!_creatingAccount)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: appState.isBusy ? null : _resetPassword,
-                        child: const Text('Forgot password?'),
-                      ),
-                    )
-                  else
-                    const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: appState.isBusy ? null : _resetPassword,
+                      child: const Text('Forgot password?'),
+                    ),
+                  ),
                   _primaryButton(appState),
                   const SizedBox(height: 12),
                   _modeButton(appState),
@@ -253,12 +224,9 @@ class _SignInScreenState extends State<SignInScreen> {
                   color: Colors.white,
                 ),
               )
-            : Text(
-                _creatingAccount ? 'Create Account' : 'Sign In',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
+            : const Text(
+                'Sign In',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
       ),
     );
@@ -268,22 +236,17 @@ class _SignInScreenState extends State<SignInScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: appState.isBusy
-            ? null
-            : () => setState(() => _creatingAccount = !_creatingAccount),
+        onPressed: appState.isBusy ? null : () => context.go('/register'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.amber,
           foregroundColor: AppColors.amberInk,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: const StadiumBorder(),
         ),
-        icon: Icon(
-          _creatingAccount ? Icons.arrow_back : Icons.person_add_alt_1_outlined,
-          size: 18,
-        ),
-        label: Text(
-          _creatingAccount ? 'Back to Sign In' : 'Create Account',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+        label: const Text(
+          'Create Account',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
     );

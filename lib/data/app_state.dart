@@ -4,13 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'course_class.dart';
+import 'registration_gateway.dart';
 import 'user_account.dart';
 
 /// App-wide authentication and profile state backed by Supabase.
 class AppState extends ChangeNotifier {
-  AppState({SupabaseClient? supabase}) : this._(supabase);
+  AppState({SupabaseClient? supabase, RegistrationGateway? registrationGateway})
+    : this._(supabase, registrationGateway);
 
-  AppState._(this._supabase) {
+  AppState._(this._supabase, this._registrationGateway) {
     if (_supabase == null) return;
 
     _applyUser(_supabase.auth.currentUser);
@@ -20,6 +22,7 @@ class AppState extends ChangeNotifier {
   }
 
   final SupabaseClient? _supabase;
+  final RegistrationGateway? _registrationGateway;
   StreamSubscription<AuthState>? _authSubscription;
 
   UserAccount? _activeUser;
@@ -164,22 +167,20 @@ class AppState extends ChangeNotifier {
   }
 
   Future<AuthActionResult> signUp({
-    required String name,
+    required String firstName,
+    required String lastName,
     required String email,
     required String password,
   }) async {
     return _runAuthAction(() async {
-      final client = _requireClient();
-      final response = await client.auth.signUp(
+      final gateway = _requireRegistrationGateway();
+      final result = await gateway.register(
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email: email.trim(),
         password: password,
-        data: {'display_name': name.trim()},
       );
-      await _applyUser(response.user);
-      if (response.session == null) {
-        return const AuthActionResult.emailConfirmationRequired();
-      }
-      return const AuthActionResult.authenticated();
+      return AuthActionResult.emailConfirmationRequired(result.message);
     });
   }
 
@@ -227,6 +228,9 @@ class AppState extends ChangeNotifier {
     } on PostgrestException catch (error) {
       _errorMessage = error.message;
       return AuthActionResult.failure(error.message);
+    } on RegistrationException catch (error) {
+      _errorMessage = error.message;
+      return AuthActionResult.failure(error.message);
     } catch (error) {
       _errorMessage = error.toString();
       return AuthActionResult.failure(
@@ -248,6 +252,16 @@ class AppState extends ChangeNotifier {
       );
     }
     return client;
+  }
+
+  RegistrationGateway _requireRegistrationGateway() {
+    final gateway = _registrationGateway;
+    if (gateway == null) {
+      throw StateError(
+        'The NaviPet backend is not configured. Add BACKEND_BASE_URL to .env.',
+      );
+    }
+    return gateway;
   }
 
   Future<void> _applyUser(User? user) async {
@@ -302,8 +316,8 @@ class AuthActionResult {
   const AuthActionResult.authenticated()
     : this._(AuthActionStatus.authenticated);
 
-  const AuthActionResult.emailConfirmationRequired()
-    : this._(AuthActionStatus.emailConfirmationRequired);
+  const AuthActionResult.emailConfirmationRequired([String? message])
+    : this._(AuthActionStatus.emailConfirmationRequired, message);
 
   const AuthActionResult.passwordResetSent()
     : this._(AuthActionStatus.passwordResetSent);
