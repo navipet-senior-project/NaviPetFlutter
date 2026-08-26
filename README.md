@@ -297,4 +297,4 @@ forward-compatibility warning from those plugins; the Android build succeeds on
 the pinned Flutter/Mapbox versions in this repository.
 
 ## Collaborators
-
+Jomar Hernandez @thejomar
