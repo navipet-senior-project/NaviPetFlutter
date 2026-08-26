@@ -74,11 +74,14 @@ Copy `.env.example` to `.env`. The `.env` file is git-ignored.
 MAPBOX_PUBLIC_TOKEN=pk.your_public_token
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
+BACKEND_BASE_URL=
 ```
 
 Use only Supabase's publishable/anon client key. Never place a Supabase
 `service_role` or secret key in the app.
 
+`BACKEND_BASE_URL` points at the Fastify API in
+[`Ben2104/NavipetBackend`](https://github.com/navipet-senior-project/NavipetBackend) 
 ### Mapbox Android download token
 
 Android builds also require a secret Mapbox token with `DOWNLOADS:READ`. Put it
@@ -105,14 +108,57 @@ MAPBOX_DOWNLOADS_TOKEN=sk.your_download_token
 5. Decide whether new users must confirm their email. NaviPet handles both
    configurations: with confirmation enabled it asks users to check their email;
    without it they enter the app immediately.
-6. Copy the Project URL and publishable key from Supabase's **Connect** panel into
+6. If email confirmation is enabled, open **Authentication > URL Configuration**
+   and add `navipet://auth-callback` to **Redirect URLs**. The confirmation
+   email links back to that scheme; without it registered on this list, tapping
+   the link will not complete sign-in on the device (see
+   [`register_screen.dart`](lib/screens/register_screen.dart)).
+7. Copy the Project URL and publishable key from Supabase's **Connect** panel into
    `.env`.
 
 Supabase Auth owns passwords and sessions. `profiles` stores app-facing account
 data, `classes` stores each user's schedule and locations, and
 `task_completions` stores daily progress. Owner-only policies protect each row.
 
-## Run on an Android phone
+## Run on Android
+
+Make sure `.env` contains the Mapbox and Supabase values described above, and
+that the user-level `MAPBOX_DOWNLOADS_TOKEN` from
+[Mapbox Android download token](#mapbox-android-download-token) is set — the
+Android build fails without it.
+
+### Android Emulator
+
+1. In Android Studio, open **Tools > Device Manager** and create a virtual
+   device (a Pixel profile with a recent API level works well) if none exists.
+2. Start the emulator, then run from the project root:
+
+   ```bash
+   flutter pub get
+   flutter devices
+   flutter run
+   ```
+
+3. If Flutter lists multiple targets, select the emulator explicitly:
+
+   ```bash
+   flutter run -d emulator-5554
+   ```
+
+The first build can take several minutes while Gradle resolves the native
+Mapbox packages. GPS on an emulator is a fixed or manually-set mock location
+(**Extended controls > Location**), not live movement — an emulator can test
+UI, authentication, search, and a static route preview, but a physical phone
+is needed for real turn-by-turn navigation.
+
+To test the email-confirmation deep link on the emulator without an email
+client configured on it, trigger the link directly:
+
+```bash
+adb shell am start -W -a android.intent.action.VIEW -d "navipet://auth-callback"
+```
+
+### Physical Android phone
 
 1. Enable Developer options and USB debugging on the phone.
 2. Connect it with a data-capable USB cable and approve the debugging prompt.
@@ -234,11 +280,14 @@ build\app\outputs\flutter-apk\app-debug.apk
 | Supabase setup notice on sign-in | Add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` to `.env`, then fully restart the app. |
 | Guest sign-in fails | Enable anonymous sign-ins in Supabase Authentication settings. |
 | New account cannot sign in immediately | Check the inbox and confirm the account, or disable Confirm email in Supabase for development. |
+| "Backend not configured" error on sign-up | Add `BACKEND_BASE_URL` to `.env` and restart the app. |
+| Confirmation email link does not open NaviPet | Add `navipet://auth-callback` to Supabase **Authentication > URL Configuration > Redirect URLs**. |
 | Map is blank or destination search fails | Verify `MAPBOX_PUBLIC_TOKEN` is a valid `pk.*` token. |
 | Android Mapbox dependency returns 401 | Verify the global `MAPBOX_DOWNLOADS_TOKEN` starts with `sk.` and has `DOWNLOADS:READ`. |
 | Current location is unavailable | Enable precise location for NaviPet and turn on the phone's Location Services. |
 | Route is not found | Walking directions require a Mapbox-routable origin and destination; try a nearby street entrance. |
 | `cmdline-tools` is missing | Install Android SDK Command-line Tools in Android Studio, then run `flutter doctor --android-licenses`. |
+| No Android emulators are listed | Open Android Studio's Device Manager, create a virtual device, start it, then run `flutter devices`. |
 | No iPhones or simulators are listed | Open Xcode, install an iOS runtime in **Xcode > Settings > Platforms**, then run `open -a Simulator` and `flutter devices`. |
 | Xcode reports a signing error | Select a development team under **Runner > Signing & Capabilities** and use a unique bundle identifier. |
 | iOS reports resource-fork/Finder metadata errors | Move the repository out of an iCloud-synced Desktop or Documents folder, then run `flutter clean` and try again. |
