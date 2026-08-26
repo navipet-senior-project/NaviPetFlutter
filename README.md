@@ -296,5 +296,3 @@ The Kotlin Gradle Plugin warning currently emitted by Mapbox/Flutter TTS is a
 forward-compatibility warning from those plugins; the Android build succeeds on
 the pinned Flutter/Mapbox versions in this repository.
 
-## Collabrators
-- Khoi Do: [@Ben2104](https://github.com/Ben2104)
