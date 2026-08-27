@@ -298,3 +298,4 @@ the pinned Flutter/Mapbox versions in this repository.
 
 ## Collaborators
 Jomar Hernandez @thejomar
+Will Chhuor @will-chhuor
