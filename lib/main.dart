@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'data/app_config.dart';
 import 'data/app_state.dart';
 import 'data/mapbox_config.dart';
+import 'data/registration_gateway.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
@@ -28,12 +29,23 @@ Future<void> main() async {
     supabase = Supabase.instance.client;
   }
 
+  final registrationGateway = AppConfig.hasBackend
+      ? HttpRegistrationGateway(baseUrl: AppConfig.backendBaseUrl)
+      : null;
+
   // Hand the public token to the native Mapbox SDK.
   MapboxOptions.setAccessToken(mapboxPublicToken);
 
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
 
-  runApp(NaviPetApp(appState: AppState(supabase: supabase)));
+  runApp(
+    NaviPetApp(
+      appState: AppState(
+        supabase: supabase,
+        registrationGateway: registrationGateway,
+      ),
+    ),
+  );
 }
 
 class NaviPetApp extends StatefulWidget {
