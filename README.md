@@ -74,13 +74,15 @@ Copy `.env.example` to `.env`. The `.env` file is git-ignored.
 MAPBOX_PUBLIC_TOKEN=pk.your_public_token
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
-BACKEND_BASE_URL=
+BACKEND_BASE_URL=https://navipetbackend.onrender.com
 ```
 
 Use only Supabase's publishable/anon client key. Never place a Supabase
 `service_role` or secret key in the app.
 
-`BACKEND_BASE_URL` points at the Fastify API in
+`BACKEND_BASE_URL` points at the hosted Fastify API used for registration,
+login, OTP verification, and password recovery. Its interactive API reference
+is available at <https://navipetbackend.onrender.com/docs>. The server source is
 [`Ben2104/NavipetBackend`](https://github.com/navipet-senior-project/NavipetBackend) 
 ### Mapbox Android download token
 

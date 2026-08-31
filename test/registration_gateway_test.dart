@@ -13,8 +13,8 @@ void main() {
         capturedRequest = request;
         return http.Response(
           jsonEncode({
-            'message': 'Confirmation email sent. Check your inbox.',
-            'confirmation_required': true,
+            'message': 'Verification code sent. Check your inbox.',
+            'otp_required': true,
           }),
           200,
           headers: {'content-type': 'application/json'},
@@ -44,7 +44,7 @@ void main() {
         'email': 'person@example.com',
         'password': 'Password1!',
       });
-      expect(result.message, 'Confirmation email sent. Check your inbox.');
+      expect(result.message, 'Verification code sent. Check your inbox.');
       expect(result.confirmationRequired, isTrue);
     });
 
@@ -118,5 +118,69 @@ void main() {
         );
       },
     );
+  });
+
+  group('HttpRegistrationGateway authentication flow', () {
+    test('uses the documented login and recovery endpoints', () async {
+      final requests = <http.Request>[];
+      final client = MockClient((request) async {
+        requests.add(request);
+        if (request.url.path == '/auth/reset-password') {
+          return http.Response('', 204);
+        }
+        if (request.url.path == '/auth/forgot-password') {
+          return http.Response(
+            jsonEncode({
+              'message': 'Verification code sent. Check your inbox.',
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'access_token': 'access-token',
+            'refresh_token': 'refresh-token',
+          }),
+          200,
+        );
+      });
+      final gateway = HttpRegistrationGateway(
+        baseUrl: 'https://navipetbackend.onrender.com/',
+        client: client,
+      );
+
+      final login = await gateway.login(
+        email: 'person@example.com',
+        password: 'Password1!',
+      );
+      await gateway.requestPasswordReset('person@example.com');
+      final recovery = await gateway.verifyOtp(
+        email: 'person@example.com',
+        code: '123456',
+        isPasswordRecovery: true,
+      );
+      await gateway.resetPassword(
+        accessToken: recovery.accessToken,
+        newPassword: 'NewPassword1',
+      );
+
+      expect(login.refreshToken, 'refresh-token');
+      expect(requests.map((request) => request.url.path), [
+        '/auth/login',
+        '/auth/forgot-password',
+        '/auth/verify-otp',
+        '/auth/reset-password',
+      ]);
+      expect(jsonDecode(requests[2].body), {
+        'email': 'person@example.com',
+        'code': '123456',
+        'type': 'recovery',
+      });
+      expect(requests[3].headers['authorization'], 'Bearer access-token');
+      expect(jsonDecode(requests[3].body), {
+        'newPassword': 'NewPassword1',
+        'confirmPassword': 'NewPassword1',
+      });
+    });
   });
 }
