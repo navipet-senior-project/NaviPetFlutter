@@ -83,7 +83,8 @@ Use only Supabase's publishable/anon client key. Never place a Supabase
 `BACKEND_BASE_URL` points at the hosted Fastify API used for registration,
 login, OTP verification, and password recovery. Its interactive API reference
 is available at <https://navipetbackend.onrender.com/docs>. The server source is
-[`Ben2104/NavipetBackend`](https://github.com/navipet-senior-project/NavipetBackend) 
+[`navipet-senior-project/NavipetBackend`](https://github.com/navipet-senior-project/NavipetBackend).
+
 ### Mapbox Android download token
 
 Android builds also require a secret Mapbox token with `DOWNLOADS:READ`. Put it
@@ -302,8 +303,5 @@ the pinned Flutter/Mapbox versions in this repository.
 
 - [@will-chhuor](https://github.com/will-chhuor)
 - [@thejomar](https://github.com/thejomar)
-- [@Ben2104](https://github.com/Ben2104)
-
-## Collabrators
-- Khoi Do: [@Ben2104](https://github.com/Ben2104)
-- Jan Kirvey Montemayor: [@Kura-Yami](https://github.com/Kura-Yami)
+- Khoi Do ([@Ben2104](https://github.com/Ben2104))
+- Jan Kirvey Montemayor ([@Kura-Yami](https://github.com/Kura-Yami))

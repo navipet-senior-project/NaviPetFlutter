@@ -31,7 +31,9 @@ GoRouter createAppRouter(AppState appState) => GoRouter(
       '/verify-code',
       '/password-reset-success',
     }.contains(location);
-    if (appState.isPasswordRecovery && location != '/new-password') {
+    if (appState.isAuthenticated &&
+        appState.isPasswordRecovery &&
+        location != '/new-password') {
       return '/new-password';
     }
     if (!appState.isAuthenticated && !onPublicRoute) return '/signin';
@@ -57,16 +59,14 @@ GoRouter createAppRouter(AppState appState) => GoRouter(
       path: '/check-email',
       builder: (context, state) => CheckEmailScreen(
         email: state.uri.queryParameters['email'] ?? '',
-        isPasswordRecovery:
-            state.uri.queryParameters['purpose'] == 'recovery',
+        isPasswordRecovery: state.uri.queryParameters['purpose'] == 'recovery',
       ),
     ),
     GoRoute(
       path: '/verify-code',
       builder: (context, state) => VerificationCodeScreen(
         email: state.uri.queryParameters['email'] ?? '',
-        isPasswordRecovery:
-            state.uri.queryParameters['purpose'] == 'recovery',
+        isPasswordRecovery: state.uri.queryParameters['purpose'] == 'recovery',
       ),
     ),
     GoRoute(
