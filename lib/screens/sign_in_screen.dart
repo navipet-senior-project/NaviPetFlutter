@@ -42,6 +42,7 @@ class _SignInScreenState extends State<SignInScreen> {
         context.go('/map');
       case AuthActionStatus.emailConfirmationRequired:
       case AuthActionStatus.passwordResetSent:
+      case AuthActionStatus.passwordUpdated:
         break;
       case AuthActionStatus.failure:
         _showMessage(result.message ?? 'Authentication failed.');
@@ -59,21 +60,6 @@ class _SignInScreenState extends State<SignInScreen> {
             'Guest sign-in failed. Enable anonymous sign-ins in Supabase Auth.',
       );
     }
-  }
-
-  Future<void> _resetPassword() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      _showMessage('Enter your email first.');
-      return;
-    }
-    final result = await context.read<AppState>().sendPasswordReset(email);
-    if (!mounted) return;
-    _showMessage(
-      result.status == AuthActionStatus.passwordResetSent
-          ? 'Password reset email sent.'
-          : result.message ?? 'Could not send the reset email.',
-    );
   }
 
   void _showMessage(String message) {
@@ -151,7 +137,9 @@ class _SignInScreenState extends State<SignInScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: appState.isBusy ? null : _resetPassword,
+                      onPressed: appState.isBusy
+                          ? null
+                          : () => context.push('/forgot-password'),
                       child: const Text('Forgot password?'),
                     ),
                   ),

@@ -46,6 +46,12 @@ Widget _harness(AppState appState) {
       ),
       GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
       GoRoute(
+        path: '/check-email',
+        builder: (_, state) => Scaffold(
+          body: Text('Check email: ${state.uri.queryParameters['email']}'),
+        ),
+      ),
+      GoRoute(
         path: '/map',
         builder: (_, _) => const Scaffold(body: Text('Map screen')),
       ),
@@ -66,9 +72,17 @@ Future<void> _fillValidForm(WidgetTester tester) async {
   await tester.pump();
 }
 
-ElevatedButton _submitButton(WidgetTester tester) => tester.widget<ElevatedButton>(
-  find.widgetWithText(ElevatedButton, 'Create Account'),
-);
+ElevatedButton _submitButton(WidgetTester tester) =>
+    tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, 'Create account'),
+    );
+
+Future<void> _acceptTerms(WidgetTester tester) async {
+  await tester.ensureVisible(find.byType(Checkbox));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byType(Checkbox));
+  await tester.pump();
+}
 
 void main() {
   group('RegisterScreen validation', () {
@@ -104,8 +118,7 @@ void main() {
         );
         await tester.enterText(find.byType(TextField).at(3), 'Password1!');
         await tester.enterText(find.byType(TextField).at(4), 'Password2!');
-        await tester.tap(find.byType(Checkbox));
-        await tester.pump();
+        await _acceptTerms(tester);
 
         expect(find.text('Passwords do not match.'), findsOneWidget);
         expect(_submitButton(tester).onPressed, isNull);
@@ -136,8 +149,7 @@ void main() {
         await tester.pumpWidget(_harness(appState));
 
         await _fillValidForm(tester);
-        await tester.tap(find.byType(Checkbox));
-        await tester.pump();
+        await _acceptTerms(tester);
 
         expect(_submitButton(tester).onPressed, isNotNull);
       },
@@ -159,7 +171,7 @@ void main() {
 
   group('RegisterScreen submission', () {
     testWidgets(
-      'shows the confirmation message and does not navigate to /map on success',
+      'opens the check-email screen and does not navigate to /map on success',
       (tester) async {
         final gateway = _FakeRegistrationGateway(
           result: const RegistrationSuccess(
@@ -172,20 +184,17 @@ void main() {
         await tester.pumpWidget(_harness(appState));
 
         await _fillValidForm(tester);
-        await tester.tap(find.byType(Checkbox));
-        await tester.pump();
-        await tester.tap(find.widgetWithText(ElevatedButton, 'Create Account'));
+        await _acceptTerms(tester);
+        final submit = find.widgetWithText(ElevatedButton, 'Create account');
+        await tester.ensureVisible(submit);
+        await tester.pumpAndSettle();
+        await tester.tap(submit);
         await tester.pumpAndSettle();
 
         expect(gateway.callCount, 1);
         expect(gateway.capturedFirstName, 'Elbee');
         expect(gateway.capturedLastName, 'Shark');
-        expect(
-          find.text(
-            'Confirmation email sent. Open it on this device to finish signing in.',
-          ),
-          findsOneWidget,
-        );
+        expect(find.text('Check email: person@example.com'), findsOneWidget);
         expect(find.text('Map screen'), findsNothing);
         expect(appState.isAuthenticated, isFalse);
       },

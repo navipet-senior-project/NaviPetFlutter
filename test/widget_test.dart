@@ -26,6 +26,25 @@ void main() {
       expect(result.status, AuthActionStatus.failure);
       expect(result.message, contains('Supabase is not configured'));
     });
+
+    test(
+      'reports missing signup configuration instead of a generic error',
+      () async {
+        final state = AppState();
+        addTearDown(state.dispose);
+
+        final result = await state.signUp(
+          firstName: 'Elbee',
+          lastName: 'Shark',
+          email: 'person@example.com',
+          password: 'Password1!',
+        );
+
+        expect(result.status, AuthActionStatus.failure);
+        expect(result.message, contains('Supabase is not configured'));
+        expect(result.message, isNot(contains('Something went wrong')));
+      },
+    );
   });
 
   group('NavigationRoute labels', () {

@@ -17,6 +17,7 @@ class AppState extends ChangeNotifier {
 
     _applyUser(_supabase.auth.currentUser);
     _authSubscription = _supabase.auth.onAuthStateChange.listen((event) {
+      _isPasswordRecovery = event.event == AuthChangeEvent.passwordRecovery;
       _applyUser(event.session?.user);
     });
   }
@@ -27,6 +28,8 @@ class AppState extends ChangeNotifier {
 
   UserAccount? _activeUser;
   bool _busy = false;
+  bool _isPasswordRecovery = false;
+  String? _passwordRecoveryAccessToken;
   String? _errorMessage;
   List<CourseClass> _classes = const [];
   Set<String> _completionKeys = const {};
@@ -36,6 +39,7 @@ class AppState extends ChangeNotifier {
   bool get isSupabaseConfigured => _supabase != null;
   bool get isAuthenticated => _supabase?.auth.currentSession != null;
   bool get isBusy => _busy;
+  bool get isPasswordRecovery => _isPasswordRecovery;
   String? get errorMessage => _errorMessage;
   UserAccount? get activeUser => _activeUser;
   List<CourseClass> get classes => List.unmodifiable(_classes);
@@ -129,7 +133,8 @@ class AppState extends ChangeNotifier {
     final client = _requireClient();
     final user = client.auth.currentUser;
     if (user == null) return;
-    final dateText = '${date.year.toString().padLeft(4, '0')}-'
+    final dateText =
+        '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
     if (task.done) {
@@ -157,11 +162,27 @@ class AppState extends ChangeNotifier {
   }) async {
     return _runAuthAction(() async {
       final client = _requireClient();
+      final gateway = _registrationGateway;
+      if (gateway is BackendAuthGateway) {
+        final tokens = await gateway.login(
+          email: email.trim(),
+          password: password,
+        );
+        final response = await client.auth.setSession(tokens.refreshToken);
+        if (response.user == null) {
+          return const AuthActionResult.failure(
+            'Sign in did not return a user.',
+          );
+        }
+        return const AuthActionResult.authenticated();
+      }
       final response = await client.auth.signInWithPassword(
         email: email.trim(),
         password: password,
       );
-      await _applyUser(response.user);
+      if (response.user == null) {
+        return const AuthActionResult.failure('Sign in did not return a user.');
+      }
       return const AuthActionResult.authenticated();
     });
   }
@@ -173,14 +194,32 @@ class AppState extends ChangeNotifier {
     required String password,
   }) async {
     return _runAuthAction(() async {
-      final gateway = _requireRegistrationGateway();
-      final result = await gateway.register(
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+      final gateway = _registrationGateway;
+      if (gateway != null) {
+        final result = await gateway.register(
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          password: password,
+        );
+        return AuthActionResult.emailConfirmationRequired(result.message);
+      }
+
+      final response = await _requireClient().auth.signUp(
         email: email.trim(),
         password: password,
+        emailRedirectTo: 'navipet://auth-callback',
+        data: {
+          'first_name': firstName.trim(),
+          'last_name': lastName.trim(),
+          'display_name': '${firstName.trim()} ${lastName.trim()}'.trim(),
+        },
       );
-      return AuthActionResult.emailConfirmationRequired(result.message);
+      return response.session == null
+          ? const AuthActionResult.emailConfirmationRequired(
+              'Confirmation email sent. Check your inbox.',
+            )
+          : const AuthActionResult.authenticated();
     });
   }
 
@@ -189,15 +228,104 @@ class AppState extends ChangeNotifier {
       final response = await _requireClient().auth.signInAnonymously(
         data: {'display_name': 'Guest Explorer'},
       );
-      await _applyUser(response.user);
+      if (response.user == null) {
+        return const AuthActionResult.failure(
+          'Guest sign in did not return a user.',
+        );
+      }
       return const AuthActionResult.authenticated();
     });
   }
 
   Future<AuthActionResult> sendPasswordReset(String email) async {
     return _runAuthAction(() async {
-      await _requireClient().auth.resetPasswordForEmail(email.trim());
+      final gateway = _registrationGateway;
+      if (gateway is BackendAuthGateway) {
+        await gateway.requestPasswordReset(email.trim());
+        return const AuthActionResult.passwordResetSent();
+      }
+      await _requireClient().auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: 'navipet://auth-callback',
+      );
       return const AuthActionResult.passwordResetSent();
+    });
+  }
+
+  Future<AuthActionResult> verifyEmailCode({
+    required String email,
+    required String code,
+    required bool isPasswordRecovery,
+  }) async {
+    return _runAuthAction(() async {
+      final gateway = _registrationGateway;
+      if (gateway is BackendAuthGateway) {
+        final tokens = await gateway.verifyOtp(
+          email: email.trim(),
+          code: code.trim(),
+          isPasswordRecovery: isPasswordRecovery,
+        );
+        if (isPasswordRecovery) {
+          _passwordRecoveryAccessToken = tokens.accessToken;
+        }
+        final response = await _requireClient().auth.setSession(
+          tokens.refreshToken,
+        );
+        _isPasswordRecovery = isPasswordRecovery;
+        if (response.user == null) {
+          return const AuthActionResult.failure(
+            'Verification did not return a user.',
+          );
+        }
+        return const AuthActionResult.authenticated();
+      }
+      final response = await _requireClient().auth.verifyOTP(
+        email: email.trim(),
+        token: code.trim(),
+        type: isPasswordRecovery ? OtpType.recovery : OtpType.signup,
+      );
+      _isPasswordRecovery = isPasswordRecovery;
+      if (response.user == null) {
+        return const AuthActionResult.failure(
+          'Verification did not return a user.',
+        );
+      }
+      return const AuthActionResult.authenticated();
+    });
+  }
+
+  Future<AuthActionResult> resendVerificationCode({
+    required String email,
+    required bool isPasswordRecovery,
+  }) async {
+    if (isPasswordRecovery) return sendPasswordReset(email);
+    return _runAuthAction(() async {
+      await _requireClient().auth.resend(
+        type: OtpType.signup,
+        email: email.trim(),
+      );
+      return const AuthActionResult.emailConfirmationRequired();
+    });
+  }
+
+  Future<AuthActionResult> updatePassword(String password) async {
+    return _runAuthAction(() async {
+      final gateway = _registrationGateway;
+      final recoveryAccessToken = _passwordRecoveryAccessToken;
+      if (gateway is BackendAuthGateway && recoveryAccessToken != null) {
+        await gateway.resetPassword(
+          accessToken: recoveryAccessToken,
+          newPassword: password,
+        );
+      } else {
+        await _requireClient().auth.updateUser(
+          UserAttributes(password: password),
+        );
+      }
+      _passwordRecoveryAccessToken = null;
+      _isPasswordRecovery = false;
+      await _requireClient().auth.signOut();
+      return const AuthActionResult.passwordUpdated();
     });
   }
 
@@ -205,6 +333,8 @@ class AppState extends ChangeNotifier {
     _setBusy(true);
     try {
       await _requireClient().auth.signOut();
+      _isPasswordRecovery = false;
+      _passwordRecoveryAccessToken = null;
       _activeUser = null;
       _errorMessage = null;
     } on AuthException catch (error) {
@@ -231,6 +361,15 @@ class AppState extends ChangeNotifier {
     } on RegistrationException catch (error) {
       _errorMessage = error.message;
       return AuthActionResult.failure(error.message);
+    } on TimeoutException {
+      const message =
+          'The request timed out. Check your connection and try again.';
+      _errorMessage = message;
+      return const AuthActionResult.failure(message);
+    } on StateError catch (error) {
+      final message = error.message.toString();
+      _errorMessage = message;
+      return AuthActionResult.failure(message);
     } catch (error) {
       _errorMessage = error.toString();
       return AuthActionResult.failure(
@@ -254,17 +393,7 @@ class AppState extends ChangeNotifier {
     return client;
   }
 
-  RegistrationGateway _requireRegistrationGateway() {
-    final gateway = _registrationGateway;
-    if (gateway == null) {
-      throw StateError(
-        'The NaviPet backend is not configured. Add BACKEND_BASE_URL to .env.',
-      );
-    }
-    return gateway;
-  }
-
-  Future<void> _applyUser(User? user) async {
+  void _applyUser(User? user) {
     if (user == null) {
       _activeUser = null;
       _classes = const [];
@@ -274,6 +403,15 @@ class AppState extends ChangeNotifier {
       return;
     }
 
+    // Authentication should never wait for optional profile or class queries.
+    // User metadata gives the UI an immediate account while those records load.
+    _activeUser = UserAccount.fromSupabase(user);
+    notifyListeners();
+    unawaited(_hydrateUserProfile(user));
+    unawaited(refreshClasses());
+  }
+
+  Future<void> _hydrateUserProfile(User user) async {
     Map<String, dynamic>? profile;
     try {
       profile = await _supabase
@@ -286,9 +424,9 @@ class AppState extends ChangeNotifier {
       // been installed. User metadata supplies a useful fallback.
     }
 
+    if (_supabase?.auth.currentUser?.id != user.id) return;
     _activeUser = UserAccount.fromSupabase(user, profile: profile);
     notifyListeners();
-    await refreshClasses();
   }
 
   void _setBusy(bool value) {
@@ -307,6 +445,7 @@ enum AuthActionStatus {
   authenticated,
   emailConfirmationRequired,
   passwordResetSent,
+  passwordUpdated,
   failure,
 }
 
@@ -321,6 +460,9 @@ class AuthActionResult {
 
   const AuthActionResult.passwordResetSent()
     : this._(AuthActionStatus.passwordResetSent);
+
+  const AuthActionResult.passwordUpdated()
+    : this._(AuthActionStatus.passwordUpdated);
 
   const AuthActionResult.failure(String message)
     : this._(AuthActionStatus.failure, message);
