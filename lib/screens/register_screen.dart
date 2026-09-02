@@ -103,6 +103,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       case AuthActionStatus.authenticated:
         context.go('/map');
       case AuthActionStatus.passwordResetSent:
+      case AuthActionStatus.passwordRecoveryReady:
       case AuthActionStatus.passwordUpdated:
         break;
     }

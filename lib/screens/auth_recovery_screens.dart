@@ -319,7 +319,9 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
       isPasswordRecovery: widget.isPasswordRecovery,
     );
     if (!mounted) return;
-    if (result.status == AuthActionStatus.authenticated) {
+    if (result.status == AuthActionStatus.passwordRecoveryReady) {
+      context.go('/new-password');
+    } else if (result.status == AuthActionStatus.authenticated) {
       context.go(widget.isPasswordRecovery ? '/new-password' : '/map');
     } else {
       setState(() {
@@ -510,7 +512,13 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
   bool _showConfirm = false;
   String? _error;
 
-  bool get _hasLength => _passwordController.text.length >= 8;
+  // Mirrors the backend's rules so the API's 422 is the exception, not the norm.
+  static const _minPasswordLength = 8;
+  static const _maxPasswordLength = 128;
+
+  bool get _hasLength =>
+      _passwordController.text.length >= _minPasswordLength &&
+      _passwordController.text.length <= _maxPasswordLength;
   bool get _hasUppercase => RegExp(r'[A-Z]').hasMatch(_passwordController.text);
   bool get _hasNumber => RegExp(r'\d').hasMatch(_passwordController.text);
   bool get _matches => _passwordController.text == _confirmController.text;
@@ -524,13 +532,33 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
   }
 
   Future<void> _submit() async {
-    final result = await context.read<AppState>().updatePassword(_passwordController.text);
+    final appState = context.read<AppState>();
+    // A second submit with the same password comes back as a 422 even though
+    // the first one succeeded, so never let one start while one is in flight.
+    if (appState.isBusy) return;
+    final result = await appState.updatePassword(_passwordController.text);
     if (!mounted) return;
     if (result.status == AuthActionStatus.passwordUpdated) {
       context.go('/password-reset-success');
-    } else {
-      setState(() => _error = result.message ?? 'Unable to reset password.');
+      return;
     }
+    // An expired or non-recovery session cannot be retried here — the reset has
+    // to restart from the "Forgot password" screen.
+    if (result.code == 'INVALID_ACCESS_TOKEN') {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              result.message ??
+                  'Your password reset session has expired. Request a new code.',
+            ),
+          ),
+        );
+      context.go('/forgot-password');
+      return;
+    }
+    setState(() => _error = result.message ?? 'Unable to reset password.');
   }
 
   @override
@@ -547,7 +575,14 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SecurityHeader(onBack: () => context.go('/signin')),
+                  SecurityHeader(
+                    onBack: () {
+                      // Without dropping the recovery session the router would
+                      // pin the user right back to this screen.
+                      appState.discardPasswordRecovery();
+                      context.go('/signin');
+                    },
+                  ),
                   const SizedBox(height: 24),
                   const Text(
                     'Create a new\npassword',
@@ -571,6 +606,7 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
                     controller: _passwordController,
                     hint: 'Enter new password',
                     obscureText: !_showPassword,
+                    maxLength: _maxPasswordLength,
                     textInputAction: TextInputAction.next,
                     onChanged: (_) => setState(() => _error = null),
                     suffixIcon: IconButton(
@@ -584,10 +620,11 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
                     controller: _confirmController,
                     hint: 'Confirm new password',
                     obscureText: !_showConfirm,
+                    maxLength: _maxPasswordLength,
                     textInputAction: TextInputAction.done,
                     errorText: _confirmController.text.isNotEmpty && !_matches ? 'Passwords do not match.' : null,
                     onChanged: (_) => setState(() => _error = null),
-                    onSubmitted: (_) { if (_valid) _submit(); },
+                    onSubmitted: (_) { if (_valid && !appState.isBusy) _submit(); },
                     suffixIcon: IconButton(
                       onPressed: () => setState(() => _showConfirm = !_showConfirm),
                       icon: Icon(_showConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined),

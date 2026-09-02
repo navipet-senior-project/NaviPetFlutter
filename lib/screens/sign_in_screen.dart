@@ -42,6 +42,7 @@ class _SignInScreenState extends State<SignInScreen> {
         context.go('/map');
       case AuthActionStatus.emailConfirmationRequired:
       case AuthActionStatus.passwordResetSent:
+      case AuthActionStatus.passwordRecoveryReady:
       case AuthActionStatus.passwordUpdated:
         break;
       case AuthActionStatus.failure:
