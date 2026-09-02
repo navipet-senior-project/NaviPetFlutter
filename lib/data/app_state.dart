@@ -29,7 +29,7 @@ class AppState extends ChangeNotifier {
   UserAccount? _activeUser;
   bool _busy = false;
   bool _isPasswordRecovery = false;
-  String? _passwordRecoveryAccessToken;
+  AuthTokens? _passwordRecoveryTokens;
   String? _errorMessage;
   List<CourseClass> _classes = const [];
   Set<String> _completionKeys = const {};
@@ -40,6 +40,14 @@ class AppState extends ChangeNotifier {
   bool get isAuthenticated => _supabase?.auth.currentSession != null;
   bool get isBusy => _busy;
   bool get isPasswordRecovery => _isPasswordRecovery;
+
+  /// True while the backend recovery session from `/auth/verify-otp` is held.
+  ///
+  /// This session deliberately lives outside the Supabase SDK, so it is not
+  /// reflected by [isAuthenticated] and the router has to gate `/new-password`
+  /// on this flag instead.
+  bool get hasPasswordRecoverySession => _passwordRecoveryTokens != null;
+
   String? get errorMessage => _errorMessage;
   UserAccount? get activeUser => _activeUser;
   List<CourseClass> get classes => List.unmodifiable(_classes);
@@ -266,12 +274,20 @@ class AppState extends ChangeNotifier {
           isPasswordRecovery: isPasswordRecovery,
         );
         if (isPasswordRecovery) {
-          _passwordRecoveryAccessToken = tokens.accessToken;
+          // The recovery session belongs to `/auth/reset-password` and nothing
+          // else. Handing its refresh token to the Supabase SDK rotates the
+          // token, which retires the session the recovery *access* token names,
+          // and step 3 then fails with:
+          //   Session from session_id claim in JWT does not exist
+          // So hold the tokens here and make no Supabase call until the reset
+          // has completed.
+          _passwordRecoveryTokens = tokens;
+          return const AuthActionResult.passwordRecoveryReady();
         }
         final response = await _requireClient().auth.setSession(
           tokens.refreshToken,
         );
-        _isPasswordRecovery = isPasswordRecovery;
+        _isPasswordRecovery = false;
         if (response.user == null) {
           return const AuthActionResult.failure(
             'Verification did not return a user.',
@@ -311,22 +327,50 @@ class AppState extends ChangeNotifier {
   Future<AuthActionResult> updatePassword(String password) async {
     return _runAuthAction(() async {
       final gateway = _registrationGateway;
-      final recoveryAccessToken = _passwordRecoveryAccessToken;
-      if (gateway is BackendAuthGateway && recoveryAccessToken != null) {
-        await gateway.resetPassword(
-          accessToken: recoveryAccessToken,
-          newPassword: password,
-        );
-      } else {
-        await _requireClient().auth.updateUser(
-          UserAttributes(password: password),
-        );
+      if (gateway is BackendAuthGateway) {
+        final recovery = _passwordRecoveryTokens;
+        if (recovery == null) {
+          return const AuthActionResult.failure(
+            'Your password reset session has expired. Request a new code.',
+            code: 'INVALID_ACCESS_TOKEN',
+          );
+        }
+        try {
+          await gateway.resetPassword(
+            accessToken: recovery.accessToken,
+            newPassword: password,
+          );
+        } on RegistrationException catch (error) {
+          // A rejected token cannot be retried on the same screen — the flow
+          // has to restart at `/auth/forgot-password`. Every other code
+          // (422 / 429 / 500) keeps the session so the user can correct the
+          // password in place.
+          if (error.code == 'INVALID_ACCESS_TOKEN') _clearPasswordRecovery();
+          rethrow;
+        }
+        // A 204 leaves the recovery session alive, but this app sends the user
+        // to the sign-in screen with the new password, so the tokens are simply
+        // dropped. No Supabase call belongs here: the reset flow never gave the
+        // SDK a session to sign out of.
+        _clearPasswordRecovery();
+        return const AuthActionResult.passwordUpdated();
       }
-      _passwordRecoveryAccessToken = null;
-      _isPasswordRecovery = false;
+
+      await _requireClient().auth.updateUser(UserAttributes(password: password));
+      _clearPasswordRecovery();
       await _requireClient().auth.signOut();
       return const AuthActionResult.passwordUpdated();
     });
+  }
+
+  /// Abandons an in-progress reset. The backend session simply expires on its
+  /// own after an hour; nothing needs to be revoked here.
+  void discardPasswordRecovery() => _clearPasswordRecovery();
+
+  void _clearPasswordRecovery() {
+    _passwordRecoveryTokens = null;
+    _isPasswordRecovery = false;
+    notifyListeners();
   }
 
   Future<void> signOut() async {
@@ -334,7 +378,7 @@ class AppState extends ChangeNotifier {
     try {
       await _requireClient().auth.signOut();
       _isPasswordRecovery = false;
-      _passwordRecoveryAccessToken = null;
+      _passwordRecoveryTokens = null;
       _activeUser = null;
       _errorMessage = null;
     } on AuthException catch (error) {
@@ -360,7 +404,7 @@ class AppState extends ChangeNotifier {
       return AuthActionResult.failure(error.message);
     } on RegistrationException catch (error) {
       _errorMessage = error.message;
-      return AuthActionResult.failure(error.message);
+      return AuthActionResult.failure(error.message, code: error.code);
     } on TimeoutException {
       const message =
           'The request timed out. Check your connection and try again.';
@@ -445,12 +489,16 @@ enum AuthActionStatus {
   authenticated,
   emailConfirmationRequired,
   passwordResetSent,
+
+  /// A recovery code was verified and the reset session is held in memory.
+  /// The user is *not* signed in — only `/auth/reset-password` may be called.
+  passwordRecoveryReady,
   passwordUpdated,
   failure,
 }
 
 class AuthActionResult {
-  const AuthActionResult._(this.status, [this.message]);
+  const AuthActionResult._(this.status, [this.message, this.code]);
 
   const AuthActionResult.authenticated()
     : this._(AuthActionStatus.authenticated);
@@ -461,12 +509,19 @@ class AuthActionResult {
   const AuthActionResult.passwordResetSent()
     : this._(AuthActionStatus.passwordResetSent);
 
+  const AuthActionResult.passwordRecoveryReady()
+    : this._(AuthActionStatus.passwordRecoveryReady);
+
   const AuthActionResult.passwordUpdated()
     : this._(AuthActionStatus.passwordUpdated);
 
-  const AuthActionResult.failure(String message)
-    : this._(AuthActionStatus.failure, message);
+  const AuthActionResult.failure(String message, {String? code})
+    : this._(AuthActionStatus.failure, message, code);
 
   final AuthActionStatus status;
   final String? message;
+
+  /// The backend's `error.code`, when the failure came from the NaviPet API.
+  /// Branch on this rather than on [message].
+  final String? code;
 }

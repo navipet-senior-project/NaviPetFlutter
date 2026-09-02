@@ -113,6 +113,7 @@ class AuthTextField extends StatelessWidget {
     this.errorText,
     this.onChanged,
     this.onSubmitted,
+    this.maxLength,
   });
 
   final String label;
@@ -126,6 +127,7 @@ class AuthTextField extends StatelessWidget {
   final String? errorText;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final int? maxLength;
 
   @override
   Widget build(BuildContext context) {
@@ -159,8 +161,10 @@ class AuthTextField extends StatelessWidget {
           enableSuggestions: !obscureText,
           onChanged: onChanged,
           onSubmitted: onSubmitted,
+          maxLength: maxLength,
           style: const TextStyle(fontSize: 16, color: AppColors.labelInk),
           decoration: InputDecoration(
+            counterText: '',
             hintText: hint,
             hintStyle: const TextStyle(color: Color(0xFF747B8B)),
             prefixIcon: prefixIcon == null

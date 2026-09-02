@@ -31,6 +31,12 @@ GoRouter createAppRouter(AppState appState) => GoRouter(
       '/verify-code',
       '/password-reset-success',
     }.contains(location);
+    // A backend recovery session is not a Supabase session, so `/new-password`
+    // has to be reachable while signed out. Pin the user there until the reset
+    // finishes or the session is discarded.
+    if (appState.hasPasswordRecoverySession) {
+      return location == '/new-password' ? null : '/new-password';
+    }
     if (appState.isAuthenticated &&
         appState.isPasswordRecovery &&
         location != '/new-password') {
