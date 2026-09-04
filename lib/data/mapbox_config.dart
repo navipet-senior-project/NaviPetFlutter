@@ -11,8 +11,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 /// (sk.*) configured at build time — that is NOT this value. See README.
 String get mapboxPublicToken => dotenv.maybeGet('MAPBOX_PUBLIC_TOKEN') ?? '';
 
-/// Default 2D street map style — matches the RN "Maps (2D)" frame.
-const String mapboxStyle = 'mapbox://styles/mapbox/streets-v12';
+/// Mapbox Standard is the base for the pitched 3D campus experience.
+const String mapboxStyle = 'mapbox://styles/mapbox/standard';
 
 /// California State University, Long Beach — campus center. The focus point the
 /// map opens on and where the "You" pet marker is dropped.
