@@ -4,14 +4,13 @@ import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/password_requirements.dart';
 
-/// Dedicated sign-up screen backed by the NaviPet backend's confirmation-email
+/// Dedicated sign-up screen backed by the NaviPet backend's email-code
 /// registration flow (`AppState.signUp` -> `RegistrationGateway`).
 ///
-/// Deliberately does not sign the user in or navigate to `/map` on success:
-/// the backend never returns a session from `/auth/register`, so the user
-/// stays signed out until they confirm their email and the Supabase deep
-/// link (`navipet://auth-callback`) completes the session on this device.
+/// Registration continues on `/verify-email`, where the six-digit code creates
+/// a Supabase session through the backend's `/auth/verify-otp` endpoint.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -20,11 +19,12 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  static const _passwordHelper =
-      'At least 8 characters, 1 number, and 1 special character';
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+<<<<<<< Updated upstream
   static final _digitPattern = RegExp(r'\d');
   static final _specialCharPattern = RegExp(r'[^A-Za-z0-9]');
+=======
+>>>>>>> Stashed changes
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -50,12 +50,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isValidEmail(String value) => _emailPattern.hasMatch(value);
 
-  bool _isValidPassword(String value) =>
-      value.length >= 8 &&
-      value.length <= 128 &&
-      _digitPattern.hasMatch(value) &&
-      _specialCharPattern.hasMatch(value);
-
   String? get _emailError {
     final value = _emailController.text.trim();
     if (value.isEmpty || _isValidEmail(value)) return null;
@@ -68,7 +62,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return 'Passwords do not match.';
   }
 
-  bool get _passwordMeetsRules => _isValidPassword(_passwordController.text);
+  bool get _passwordMeetsRules =>
+      PasswordRules.isValid(_passwordController.text);
 
   bool get _isFormValid =>
       _firstNameController.text.trim().isNotEmpty &&
@@ -81,6 +76,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _goToSignIn() => context.go('/signin');
 
+  void _goToVerification() {
+    final email = _emailController.text.trim();
+    if (!_isValidEmail(email)) {
+      setState(() {
+        _statusMessage = 'Enter your email address to verify its code.';
+        _statusIsError = true;
+      });
+      return;
+    }
+    context.go(
+      Uri(path: '/verify-email', queryParameters: {'email': email}).toString(),
+    );
+  }
+
   Future<void> _submit() async {
     final appState = context.read<AppState>();
     final result = await appState.signUp(
@@ -92,19 +101,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
 
     switch (result.status) {
+<<<<<<< Updated upstream
       case AuthActionStatus.emailConfirmationRequired:
         final email = Uri.encodeQueryComponent(_emailController.text.trim());
         context.go('/check-email?email=$email&purpose=signup');
+=======
+      case AuthActionStatus.emailVerificationRequired:
+        final email = _emailController.text.trim();
+        context.go(
+          Uri(
+            path: '/verify-email',
+            queryParameters: {'email': email},
+          ).toString(),
+        );
+>>>>>>> Stashed changes
       case AuthActionStatus.failure:
         setState(() {
           _statusMessage = result.message ?? 'Registration failed.';
           _statusIsError = true;
         });
       case AuthActionStatus.authenticated:
+<<<<<<< Updated upstream
         context.go('/map');
       case AuthActionStatus.passwordResetSent:
       case AuthActionStatus.passwordRecoveryReady:
       case AuthActionStatus.passwordUpdated:
+=======
+      case AuthActionStatus.passwordResetCodeSent:
+      case AuthActionStatus.passwordRecoveryVerified:
+      case AuthActionStatus.codeResent:
+>>>>>>> Stashed changes
         break;
     }
   }
@@ -202,10 +228,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hint: '••••••••',
                     obscureText: !_showPassword,
                     textInputAction: TextInputAction.next,
-                    helperText: _passwordHelper,
-                    helperIsError:
-                        _passwordController.text.isNotEmpty &&
-                        !_passwordMeetsRules,
                     trailing: IconButton(
                       padding: EdgeInsets.zero,
                       onPressed: () =>
@@ -218,7 +240,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ),
+<<<<<<< Updated upstream
                   const SizedBox(height: 16),
+=======
+                  const SizedBox(height: 6),
+                  PasswordRequirements(password: _passwordController.text),
+                  const SizedBox(height: 6),
+>>>>>>> Stashed changes
                   _field(
                     label: 'Confirm Password',
                     controller: _confirmPasswordController,
@@ -246,7 +274,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _termsRow(),
                   const SizedBox(height: 20),
                   _submitButton(appState),
+<<<<<<< Updated upstream
                   const SizedBox(height: 18),
+=======
+                  TextButton(
+                    onPressed: appState.isBusy ? null : _goToVerification,
+                    child: const Text('Already have a verification code?'),
+                  ),
+>>>>>>> Stashed changes
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
