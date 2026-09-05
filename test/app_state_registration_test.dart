@@ -14,6 +14,23 @@ class _FakeRegistrationGateway implements RegistrationGateway {
   String? capturedEmail;
   String? capturedPassword;
   int callCount = 0;
+  String? capturedVerificationEmail;
+  String? capturedCode;
+
+  RegistrationVerificationSuccess get _tokens =>
+      const RegistrationVerificationSuccess(
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+      );
+
+  @override
+  Future<RegistrationVerificationSuccess> signIn({
+    required String email,
+    required String password,
+  }) async {
+    if (_error != null) throw _error;
+    return _tokens;
+  }
 
   @override
   Future<RegistrationSuccess> register({
@@ -30,6 +47,45 @@ class _FakeRegistrationGateway implements RegistrationGateway {
     if (_error != null) throw _error;
     return _result!;
   }
+
+  @override
+  Future<RegistrationVerificationSuccess> verifyRegistrationCode({
+    required String email,
+    required String code,
+  }) async {
+    capturedVerificationEmail = email;
+    capturedCode = code;
+    if (_error != null) throw _error;
+    return _tokens;
+  }
+
+  @override
+  Future<PasswordResetRequestSuccess> requestPasswordReset({
+    required String email,
+  }) async {
+    if (_error != null) throw _error;
+    return const PasswordResetRequestSuccess(
+      message: 'Verification code sent. Check your inbox.',
+    );
+  }
+
+  @override
+  Future<RegistrationVerificationSuccess> verifyPasswordRecoveryCode({
+    required String email,
+    required String code,
+  }) async {
+    if (_error != null) throw _error;
+    return _tokens;
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String accessToken,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    if (_error != null) throw _error;
+  }
 }
 
 void main() {
@@ -39,8 +95,8 @@ void main() {
       () async {
         final gateway = _FakeRegistrationGateway.success(
           const RegistrationSuccess(
-            message: 'Confirmation email sent. Check your inbox.',
-            confirmationRequired: true,
+            message: 'Verification code sent. Check your inbox.',
+            otpRequired: true,
           ),
         );
         final state = AppState(registrationGateway: gateway);
@@ -59,8 +115,8 @@ void main() {
         expect(gateway.capturedEmail, 'person@example.com');
         expect(gateway.capturedPassword, 'Password1!');
 
-        expect(result.status, AuthActionStatus.emailConfirmationRequired);
-        expect(result.message, 'Confirmation email sent. Check your inbox.');
+        expect(result.status, AuthActionStatus.emailVerificationRequired);
+        expect(result.message, 'Verification code sent. Check your inbox.');
         expect(state.isAuthenticated, isFalse);
       },
     );
@@ -86,6 +142,34 @@ void main() {
       expect(result.status, AuthActionStatus.failure);
       expect(result.message, 'Too many requests. Try again later.');
       expect(state.isAuthenticated, isFalse);
+    });
+
+    test('verifies the code and establishes the returned session', () async {
+      final gateway = _FakeRegistrationGateway.success(
+        const RegistrationSuccess(
+          message: 'Verification code sent. Check your inbox.',
+          otpRequired: true,
+        ),
+      );
+      RegistrationVerificationSuccess? capturedTokens;
+      final state = AppState(
+        registrationGateway: gateway,
+        verificationSessionHandler: (tokens) async {
+          capturedTokens = tokens;
+        },
+      );
+      addTearDown(state.dispose);
+
+      final result = await state.verifyRegistrationCode(
+        email: ' person@example.com ',
+        code: ' 123456 ',
+      );
+
+      expect(result.status, AuthActionStatus.authenticated);
+      expect(gateway.capturedVerificationEmail, 'person@example.com');
+      expect(gateway.capturedCode, '123456');
+      expect(capturedTokens?.accessToken, 'access-token');
+      expect(capturedTokens?.refreshToken, 'refresh-token');
     });
   });
 }

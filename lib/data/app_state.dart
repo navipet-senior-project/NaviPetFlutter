@@ -9,10 +9,34 @@ import 'user_account.dart';
 
 /// App-wide authentication and profile state backed by Supabase.
 class AppState extends ChangeNotifier {
-  AppState({SupabaseClient? supabase, RegistrationGateway? registrationGateway})
-    : this._(supabase, registrationGateway);
+  AppState({
+    SupabaseClient? supabase,
+    RegistrationGateway? registrationGateway,
+    Future<void> Function(RegistrationVerificationSuccess tokens)?
+    verificationSessionHandler,
+    Future<void> Function(String email)? signupCodeResender,
+    Future<RegistrationVerificationSuccess> Function(
+      RegistrationVerificationSuccess tokens,
+    )?
+    recoverySessionRefresher,
+    Future<void> Function(String newPassword)? recoveryPasswordFallback,
+  }) : this._(
+         supabase,
+         registrationGateway,
+         verificationSessionHandler,
+         signupCodeResender,
+         recoverySessionRefresher,
+         recoveryPasswordFallback,
+       );
 
-  AppState._(this._supabase, this._registrationGateway) {
+  AppState._(
+    this._supabase,
+    this._registrationGateway,
+    this._verificationSessionHandler,
+    this._signupCodeResender,
+    this._recoverySessionRefresher,
+    this._recoveryPasswordFallback,
+  ) {
     if (_supabase == null) return;
 
     _applyUser(_supabase.auth.currentUser);
@@ -24,7 +48,17 @@ class AppState extends ChangeNotifier {
 
   final SupabaseClient? _supabase;
   final RegistrationGateway? _registrationGateway;
+  final Future<void> Function(RegistrationVerificationSuccess tokens)?
+  _verificationSessionHandler;
+  final Future<void> Function(String email)? _signupCodeResender;
+  final Future<RegistrationVerificationSuccess> Function(
+    RegistrationVerificationSuccess tokens,
+  )?
+  _recoverySessionRefresher;
+  final Future<void> Function(String newPassword)? _recoveryPasswordFallback;
   StreamSubscription<AuthState>? _authSubscription;
+  RegistrationVerificationSuccess? _pendingRecoverySession;
+  bool _passwordRecoveryInProgress = false;
 
   UserAccount? _activeUser;
   bool _busy = false;
@@ -37,7 +71,11 @@ class AppState extends ChangeNotifier {
   bool _classesBusy = false;
 
   bool get isSupabaseConfigured => _supabase != null;
-  bool get isAuthenticated => _supabase?.auth.currentSession != null;
+  bool get isAuthenticationConfigured =>
+      _registrationGateway != null &&
+      (_supabase != null || _verificationSessionHandler != null);
+  bool get isAuthenticated =>
+      !_passwordRecoveryInProgress && _supabase?.auth.currentSession != null;
   bool get isBusy => _busy;
   bool get isPasswordRecovery => _isPasswordRecovery;
 
@@ -52,6 +90,7 @@ class AppState extends ChangeNotifier {
   UserAccount? get activeUser => _activeUser;
   List<CourseClass> get classes => List.unmodifiable(_classes);
   bool get classesBusy => _classesBusy;
+  bool get hasPendingPasswordRecovery => _pendingRecoverySession != null;
 
   List<DailyClassTask> dailyTasks([DateTime? day]) {
     final date = day ?? DateTime.now();
@@ -169,6 +208,7 @@ class AppState extends ChangeNotifier {
     required String password,
   }) async {
     return _runAuthAction(() async {
+<<<<<<< Updated upstream
       final client = _requireClient();
       final gateway = _registrationGateway;
       if (gateway is BackendAuthGateway) {
@@ -191,6 +231,13 @@ class AppState extends ChangeNotifier {
       if (response.user == null) {
         return const AuthActionResult.failure('Sign in did not return a user.');
       }
+=======
+      final tokens = await _requireRegistrationGateway().signIn(
+        email: email.trim(),
+        password: password,
+      );
+      await _establishSession(tokens);
+>>>>>>> Stashed changes
       return const AuthActionResult.authenticated();
     });
   }
@@ -202,14 +249,22 @@ class AppState extends ChangeNotifier {
     required String password,
   }) async {
     return _runAuthAction(() async {
+<<<<<<< Updated upstream
       final gateway = _registrationGateway;
       if (gateway != null) {
         final result = await gateway.register(
+=======
+      final gateway = _requireRegistrationGateway();
+      late final RegistrationSuccess result;
+      try {
+        result = await gateway.register(
+>>>>>>> Stashed changes
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           email: email.trim(),
           password: password,
         );
+<<<<<<< Updated upstream
         return AuthActionResult.emailConfirmationRequired(result.message);
       }
 
@@ -228,6 +283,132 @@ class AppState extends ChangeNotifier {
               'Confirmation email sent. Check your inbox.',
             )
           : const AuthActionResult.authenticated();
+=======
+      } on RegistrationException catch (error) {
+        if (_isExistingAccountError(error)) {
+          throw const RegistrationException(
+            message:
+                'An account with this email already exists. Please log in or use a different email.',
+            statusCode: 409,
+            code: 'EMAIL_ALREADY_EXISTS',
+          );
+        }
+        rethrow;
+      }
+      if (!result.otpRequired) {
+        throw const RegistrationException(
+          message: 'The backend did not request an email verification code.',
+          statusCode: 502,
+          code: 'OTP_NOT_REQUIRED',
+        );
+      }
+      return AuthActionResult.emailVerificationRequired(result.message);
+    });
+  }
+
+  Future<AuthActionResult> verifyRegistrationCode({
+    required String email,
+    required String code,
+  }) async {
+    return _runAuthAction(() async {
+      final gateway = _requireRegistrationGateway();
+      final tokens = await gateway.verifyRegistrationCode(
+        email: email.trim(),
+        code: code.trim(),
+      );
+      await _establishSession(tokens);
+      return const AuthActionResult.authenticated();
+    });
+  }
+
+  Future<AuthActionResult> resendRegistrationCode(String email) async {
+    return _runAuthAction(() async {
+      final normalizedEmail = email.trim();
+      final resender = _signupCodeResender;
+      if (resender != null) {
+        await resender(normalizedEmail);
+      } else {
+        await _requireClient().auth.resend(
+          type: OtpType.signup,
+          email: normalizedEmail,
+        );
+      }
+      return const AuthActionResult.codeResent(
+        'A new verification code was sent.',
+      );
+    });
+  }
+
+  Future<AuthActionResult> requestPasswordReset(String email) async {
+    return _runAuthAction(() async {
+      final result = await _requireRegistrationGateway().requestPasswordReset(
+        email: email.trim(),
+      );
+      return AuthActionResult.passwordResetCodeSent(result.message);
+    });
+  }
+
+  Future<AuthActionResult> verifyPasswordRecoveryCode({
+    required String email,
+    required String code,
+  }) async {
+    return _runAuthAction(() async {
+      _pendingRecoverySession = await _requireRegistrationGateway()
+          .verifyPasswordRecoveryCode(email: email.trim(), code: code.trim());
+      return const AuthActionResult.passwordRecoveryVerified();
+    });
+  }
+
+  Future<AuthActionResult> resendPasswordRecoveryCode(String email) =>
+      _runAuthAction(() async {
+        await _requireRegistrationGateway().requestPasswordReset(
+          email: email.trim(),
+        );
+        return const AuthActionResult.codeResent(
+          'A new verification code was sent.',
+        );
+      });
+
+  Future<AuthActionResult> resetPassword({
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    return _runAuthAction(() async {
+      var tokens = _pendingRecoverySession;
+      if (tokens == null) {
+        throw const RegistrationException(
+          message: 'Verify your recovery code before resetting the password.',
+          statusCode: 401,
+          code: 'RECOVERY_SESSION_MISSING',
+        );
+      }
+      final shouldRefresh =
+          _recoverySessionRefresher != null ||
+          _verificationSessionHandler == null;
+      if (shouldRefresh) {
+        _passwordRecoveryInProgress = true;
+        notifyListeners();
+        tokens = await _refreshRecoverySession(tokens);
+        _pendingRecoverySession = tokens;
+      }
+
+      try {
+        await _requireRegistrationGateway().resetPassword(
+          accessToken: tokens.accessToken,
+          newPassword: newPassword,
+          confirmPassword: confirmPassword,
+        );
+      } on RegistrationException catch (error) {
+        if (!_isMissingJwtSession(error)) rethrow;
+        await _updateRecoveryPasswordDirectly(newPassword);
+      }
+
+      if (!shouldRefresh) await _establishSession(tokens);
+      _pendingRecoverySession = null;
+      _passwordRecoveryInProgress = false;
+      notifyListeners();
+      return const AuthActionResult.authenticated();
+>>>>>>> Stashed changes
     });
   }
 
@@ -245,6 +426,7 @@ class AppState extends ChangeNotifier {
     });
   }
 
+<<<<<<< Updated upstream
   Future<AuthActionResult> sendPasswordReset(String email) async {
     return _runAuthAction(() async {
       final gateway = _registrationGateway;
@@ -373,6 +555,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+=======
+>>>>>>> Stashed changes
   Future<void> signOut() async {
     _setBusy(true);
     try {
@@ -380,6 +564,7 @@ class AppState extends ChangeNotifier {
       _isPasswordRecovery = false;
       _passwordRecoveryTokens = null;
       _activeUser = null;
+      _pendingRecoverySession = null;
       _errorMessage = null;
     } on AuthException catch (error) {
       _errorMessage = error.message;
@@ -404,6 +589,7 @@ class AppState extends ChangeNotifier {
       return AuthActionResult.failure(error.message);
     } on RegistrationException catch (error) {
       _errorMessage = error.message;
+<<<<<<< Updated upstream
       return AuthActionResult.failure(error.message, code: error.code);
     } on TimeoutException {
       const message =
@@ -414,6 +600,13 @@ class AppState extends ChangeNotifier {
       final message = error.message.toString();
       _errorMessage = message;
       return AuthActionResult.failure(message);
+=======
+      return AuthActionResult.failure(
+        error.message,
+        errorCode: error.code,
+        statusCode: error.statusCode,
+      );
+>>>>>>> Stashed changes
     } catch (error) {
       _errorMessage = error.toString();
       return AuthActionResult.failure(
@@ -437,7 +630,91 @@ class AppState extends ChangeNotifier {
     return client;
   }
 
+<<<<<<< Updated upstream
   void _applyUser(User? user) {
+=======
+  RegistrationGateway _requireRegistrationGateway() {
+    final gateway = _registrationGateway;
+    if (gateway == null) {
+      throw StateError(
+        'The NaviPet backend is not configured. Add BACKEND_BASE_URL to .env.',
+      );
+    }
+    return gateway;
+  }
+
+  Future<void> _establishSession(RegistrationVerificationSuccess tokens) async {
+    final sessionHandler = _verificationSessionHandler;
+    if (sessionHandler != null) {
+      await sessionHandler(tokens);
+      _pendingRecoverySession = null;
+      _passwordRecoveryInProgress = false;
+      notifyListeners();
+      return;
+    }
+    final response = await _requireClient().auth.setSession(
+      tokens.refreshToken,
+      accessToken: tokens.accessToken,
+    );
+    await _applyUser(response.user);
+    _pendingRecoverySession = null;
+    _passwordRecoveryInProgress = false;
+    notifyListeners();
+  }
+
+  bool _isExistingAccountError(RegistrationException error) {
+    final code = error.code?.toLowerCase().replaceAll('-', '_') ?? '';
+    final message = error.message.toLowerCase();
+    return error.statusCode == 409 ||
+        code.contains('already_exists') ||
+        code.contains('email_exists') ||
+        code.contains('user_exists') ||
+        message.contains('already registered') ||
+        message.contains('already exists');
+  }
+
+  Future<RegistrationVerificationSuccess> _refreshRecoverySession(
+    RegistrationVerificationSuccess tokens,
+  ) async {
+    final refresher = _recoverySessionRefresher;
+    if (refresher != null) return refresher(tokens);
+
+    final response = await _requireClient().auth.refreshSession(
+      tokens.refreshToken,
+    );
+    final session = response.session;
+    final refreshToken = session?.refreshToken;
+    if (session == null || refreshToken == null || refreshToken.isEmpty) {
+      throw const RegistrationException(
+        message: 'The recovery session expired. Request a new code.',
+        statusCode: 401,
+        code: 'RECOVERY_SESSION_EXPIRED',
+      );
+    }
+    return RegistrationVerificationSuccess(
+      accessToken: session.accessToken,
+      refreshToken: refreshToken,
+    );
+  }
+
+  bool _isMissingJwtSession(RegistrationException error) {
+    final message = error.message.toLowerCase();
+    return message.contains('session_id') && message.contains('does not exist');
+  }
+
+  Future<void> _updateRecoveryPasswordDirectly(String newPassword) async {
+    final fallback = _recoveryPasswordFallback;
+    if (fallback != null) {
+      await fallback(newPassword);
+      return;
+    }
+    await _requireClient().auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
+
+  Future<void> _applyUser(User? user) async {
+>>>>>>> Stashed changes
     if (user == null) {
       _activeUser = null;
       _classes = const [];
@@ -487,6 +764,7 @@ class AppState extends ChangeNotifier {
 
 enum AuthActionStatus {
   authenticated,
+<<<<<<< Updated upstream
   emailConfirmationRequired,
   passwordResetSent,
 
@@ -494,21 +772,37 @@ enum AuthActionStatus {
   /// The user is *not* signed in — only `/auth/reset-password` may be called.
   passwordRecoveryReady,
   passwordUpdated,
+=======
+  emailVerificationRequired,
+  passwordResetCodeSent,
+  passwordRecoveryVerified,
+  codeResent,
+>>>>>>> Stashed changes
   failure,
 }
 
 class AuthActionResult {
+<<<<<<< Updated upstream
   const AuthActionResult._(this.status, [this.message, this.code]);
+=======
+  const AuthActionResult._(
+    this.status, {
+    this.message,
+    this.errorCode,
+    this.statusCode,
+  });
+>>>>>>> Stashed changes
 
   const AuthActionResult.authenticated()
     : this._(AuthActionStatus.authenticated);
 
-  const AuthActionResult.emailConfirmationRequired([String? message])
-    : this._(AuthActionStatus.emailConfirmationRequired, message);
+  const AuthActionResult.emailVerificationRequired([String? message])
+    : this._(AuthActionStatus.emailVerificationRequired, message: message);
 
-  const AuthActionResult.passwordResetSent()
-    : this._(AuthActionStatus.passwordResetSent);
+  const AuthActionResult.passwordResetCodeSent([String? message])
+    : this._(AuthActionStatus.passwordResetCodeSent, message: message);
 
+<<<<<<< Updated upstream
   const AuthActionResult.passwordRecoveryReady()
     : this._(AuthActionStatus.passwordRecoveryReady);
 
@@ -524,4 +818,27 @@ class AuthActionResult {
   /// The backend's `error.code`, when the failure came from the NaviPet API.
   /// Branch on this rather than on [message].
   final String? code;
+=======
+  const AuthActionResult.passwordRecoveryVerified()
+    : this._(AuthActionStatus.passwordRecoveryVerified);
+
+  const AuthActionResult.codeResent([String? message])
+    : this._(AuthActionStatus.codeResent, message: message);
+
+  const AuthActionResult.failure(
+    String message, {
+    String? errorCode,
+    int? statusCode,
+  }) : this._(
+         AuthActionStatus.failure,
+         message: message,
+         errorCode: errorCode,
+         statusCode: statusCode,
+       );
+
+  final AuthActionStatus status;
+  final String? message;
+  final String? errorCode;
+  final int? statusCode;
+>>>>>>> Stashed changes
 }

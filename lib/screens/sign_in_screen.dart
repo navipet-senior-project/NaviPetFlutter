@@ -40,10 +40,17 @@ class _SignInScreenState extends State<SignInScreen> {
     switch (result.status) {
       case AuthActionStatus.authenticated:
         context.go('/map');
+<<<<<<< Updated upstream
       case AuthActionStatus.emailConfirmationRequired:
       case AuthActionStatus.passwordResetSent:
       case AuthActionStatus.passwordRecoveryReady:
       case AuthActionStatus.passwordUpdated:
+=======
+      case AuthActionStatus.emailVerificationRequired:
+      case AuthActionStatus.passwordResetCodeSent:
+      case AuthActionStatus.passwordRecoveryVerified:
+      case AuthActionStatus.codeResent:
+>>>>>>> Stashed changes
         break;
       case AuthActionStatus.failure:
         _showMessage(result.message ?? 'Authentication failed.');
@@ -103,7 +110,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     style: TextStyle(fontSize: 14, color: AppColors.labelInk),
                   ),
                   const SizedBox(height: 28),
-                  if (!appState.isSupabaseConfigured) ...[
+                  if (!appState.isAuthenticationConfigured) ...[
                     _configurationNotice(),
                     const SizedBox(height: 16),
                   ],
@@ -140,7 +147,11 @@ class _SignInScreenState extends State<SignInScreen> {
                     child: TextButton(
                       onPressed: appState.isBusy
                           ? null
+<<<<<<< Updated upstream
                           : () => context.push('/forgot-password'),
+=======
+                          : () => context.go('/forgot-password'),
+>>>>>>> Stashed changes
                       child: const Text('Forgot password?'),
                     ),
                   ),
@@ -183,8 +194,7 @@ class _SignInScreenState extends State<SignInScreen> {
         border: Border.all(color: AppColors.amber),
       ),
       child: const Text(
-        'Supabase setup required: add SUPABASE_URL and '
-        'SUPABASE_PUBLISHABLE_KEY to .env.',
+        'Authentication setup required: add Supabase and backend values to .env.',
         style: TextStyle(fontSize: 12, color: AppColors.amberInk),
       ),
     );
@@ -194,7 +204,7 @@ class _SignInScreenState extends State<SignInScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: appState.isBusy || !appState.isSupabaseConfigured
+        onPressed: appState.isBusy || !appState.isAuthenticationConfigured
             ? null
             : _submit,
         style: ElevatedButton.styleFrom(

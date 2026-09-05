@@ -22,7 +22,7 @@ void main() {
       });
 
       final gateway = HttpRegistrationGateway(
-        baseUrl: 'https://navipetbackend.onrender.com',
+        baseUrl: 'https://navipetbackend.onrender.com/',
         client: client,
       );
 
@@ -45,7 +45,144 @@ void main() {
         'password': 'Password1!',
       });
       expect(result.message, 'Verification code sent. Check your inbox.');
+<<<<<<< Updated upstream
       expect(result.confirmationRequired, isTrue);
+=======
+      expect(result.otpRequired, isTrue);
+    });
+
+    test('posts a registration code and parses session tokens', () async {
+      late http.Request capturedRequest;
+      final client = MockClient((request) async {
+        capturedRequest = request;
+        return http.Response(
+          jsonEncode({
+            'access_token': 'access-token',
+            'refresh_token': 'refresh-token',
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final gateway = HttpRegistrationGateway(
+        baseUrl: 'https://navipetbackend.onrender.com/',
+        client: client,
+      );
+
+      final result = await gateway.verifyRegistrationCode(
+        email: 'person@example.com',
+        code: '123456',
+      );
+
+      expect(
+        capturedRequest.url,
+        Uri.parse('https://navipetbackend.onrender.com/auth/verify-otp'),
+      );
+      expect(jsonDecode(capturedRequest.body), {
+        'email': 'person@example.com',
+        'code': '123456',
+        'type': 'register',
+      });
+      expect(result.accessToken, 'access-token');
+      expect(result.refreshToken, 'refresh-token');
+    });
+
+    test('signs in through /auth/login and parses session tokens', () async {
+      late http.Request capturedRequest;
+      final client = MockClient((request) async {
+        capturedRequest = request;
+        return http.Response(
+          jsonEncode({
+            'access_token': 'access-token',
+            'refresh_token': 'refresh-token',
+          }),
+          200,
+        );
+      });
+      final gateway = HttpRegistrationGateway(
+        baseUrl: 'https://navipetbackend.onrender.com',
+        client: client,
+      );
+
+      await gateway.signIn(email: 'person@example.com', password: 'Password1!');
+
+      expect(capturedRequest.url.path, '/auth/login');
+      expect(jsonDecode(capturedRequest.body), {
+        'email': 'person@example.com',
+        'password': 'Password1!',
+      });
+    });
+
+    test('requests and verifies a password recovery code', () async {
+      final requests = <http.Request>[];
+      final client = MockClient((request) async {
+        requests.add(request);
+        if (request.url.path == '/auth/forgot-password') {
+          return http.Response(
+            jsonEncode({
+              'message': 'Verification code sent. Check your inbox.',
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'access_token': 'recovery-access',
+            'refresh_token': 'recovery-refresh',
+          }),
+          200,
+        );
+      });
+      final gateway = HttpRegistrationGateway(
+        baseUrl: 'https://navipetbackend.onrender.com',
+        client: client,
+      );
+
+      await gateway.requestPasswordReset(email: 'person@example.com');
+      final tokens = await gateway.verifyPasswordRecoveryCode(
+        email: 'person@example.com',
+        code: '654321',
+      );
+
+      expect(requests[0].url.path, '/auth/forgot-password');
+      expect(jsonDecode(requests[0].body), {'email': 'person@example.com'});
+      expect(requests[1].url.path, '/auth/verify-otp');
+      expect(jsonDecode(requests[1].body), {
+        'email': 'person@example.com',
+        'code': '654321',
+        'type': 'recovery',
+      });
+      expect(tokens.accessToken, 'recovery-access');
+    });
+
+    test('resets a password with the recovery bearer token', () async {
+      late http.Request capturedRequest;
+      final client = MockClient((request) async {
+        capturedRequest = request;
+        return http.Response('', 204);
+      });
+      final gateway = HttpRegistrationGateway(
+        baseUrl: 'https://navipetbackend.onrender.com',
+        client: client,
+      );
+
+      await gateway.resetPassword(
+        accessToken: 'recovery-access',
+        newPassword: 'NewPassword1',
+        confirmPassword: 'NewPassword1',
+      );
+
+      expect(capturedRequest.url.path, '/auth/reset-password');
+      expect(
+        capturedRequest.headers['authorization'],
+        'Bearer recovery-access',
+      );
+      expect(jsonDecode(capturedRequest.body), {
+        'newPassword': 'NewPassword1',
+        'confirmPassword': 'NewPassword1',
+      });
+>>>>>>> Stashed changes
     });
 
     test(
