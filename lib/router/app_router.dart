@@ -1,13 +1,14 @@
 import 'package:go_router/go_router.dart';
 
 import '../data/app_state.dart';
+import '../data/navigation_models.dart';
 import '../screens/account_settings_screen.dart';
-import '../screens/ar_navigation_screen.dart';
 import '../screens/auth_recovery_screens.dart';
 import '../screens/checklist_screen.dart';
 import '../screens/email_sent_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/map_screen.dart';
+import '../screens/navigation_flow_screens.dart';
 import '../screens/pet_customization_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/reset_password_screen.dart';
@@ -140,8 +141,60 @@ GoRouter createAppRouter(AppState appState) => GoRouter(
       builder: (context, state) => const AccountSettingsScreen(),
     ),
     GoRoute(
+      path: '/account/edit',
+      builder: (context, state) => const EditProfileScreen(),
+    ),
+    GoRoute(
+      path: '/account/manage',
+      builder: (context, state) => const ManageAccountScreen(),
+    ),
+    GoRoute(
+      path: '/account/accessibility',
+      builder: (context, state) => const AccessibilityScreen(),
+    ),
+    GoRoute(
+      path: '/account/privacy',
+      builder: (context, state) => const PrivacyPermissionsScreen(),
+    ),
+    GoRoute(
+      path: '/place-details',
+      builder: (context, state) => DestinationDetailsScreen(
+        destination: state.extra is NaviDestination
+            ? state.extra! as NaviDestination
+            : null,
+      ),
+    ),
+    GoRoute(
+      path: '/navigation/outdoor',
+      builder: (context, state) => const OutdoorNavigationScreen(),
+    ),
+    GoRoute(
+      path: '/navigation/off-route',
+      builder: (context, state) => const OffRouteScreen(),
+    ),
+    GoRoute(
+      path: '/navigation/campus-arrival',
+      builder: (context, state) => const CampusArrivalScreen(),
+    ),
+    GoRoute(
+      path: '/navigation/localize',
+      builder: (context, state) => const LocalizationScreen(),
+    ),
+    GoRoute(
+      path: '/navigation/indoor',
+      builder: (context, state) => const IndoorNavigationScreen(),
+    ),
+    GoRoute(
+      path: '/navigation/elevator',
+      builder: (context, state) => const ElevatorTransitionScreen(),
+    ),
+    GoRoute(
+      path: '/navigation/final',
+      builder: (context, state) => const FinalArrivalScreen(),
+    ),
+    GoRoute(
       path: '/ar',
-      builder: (context, state) => const ArNavigationScreen(),
+      builder: (context, state) => const LocalizationScreen(),
     ),
   ],
 );

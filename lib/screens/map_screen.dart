@@ -188,6 +188,25 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _openSearch() async {
     final destination = await context.push<NaviDestination>('/search');
     if (!mounted || destination == null) return;
+    final startRoute = await context.push<bool>(
+      '/place-details',
+      extra: destination,
+    );
+    if (!mounted || startRoute != true) return;
+    await _previewRoute(destination);
+  }
+
+  Future<void> _openDemoDestination() async {
+    const destination = NaviDestination(
+      name: 'College of Business',
+      address: '1250 Bellflower Blvd, Long Beach, CA',
+      coordinate: NavigationCoordinate(latitude: 33.7832, longitude: -118.1147),
+    );
+    final startRoute = await context.push<bool>(
+      '/place-details',
+      extra: destination,
+    );
+    if (!mounted || startRoute != true) return;
     await _previewRoute(destination);
   }
 
@@ -479,11 +498,7 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        icon: const Icon(
-          Icons.check_circle,
-          color: AppColors.green,
-          size: 56,
-        ),
+        icon: const Icon(Icons.check_circle, color: AppColors.green, size: 56),
         title: const Text('You have arrived!'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -494,7 +509,11 @@ class _MapScreenState extends State<MapScreen> {
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 20),
-            _summaryRow(Icons.timer_outlined, 'Travel time', summary.elapsedLabel),
+            _summaryRow(
+              Icons.timer_outlined,
+              'Travel time',
+              summary.elapsedLabel,
+            ),
             const SizedBox(height: 12),
             _summaryRow(
               Icons.directions_walk,
@@ -567,7 +586,8 @@ class _MapScreenState extends State<MapScreen> {
     final activeUser = context.watch<AppState>().activeUser;
     final padding = MediaQuery.paddingOf(context);
 
-    final initialCoordinate = _lastKnownCoordinate ??
+    final initialCoordinate =
+        _lastKnownCoordinate ??
         const NavigationCoordinate(latitude: csulbLat, longitude: csulbLng);
 
     return Scaffold(
@@ -588,6 +608,7 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
               zoom: csulbZoom,
+              pitch: 52,
             ),
             onMapCreated: _onMapCreated,
           ),
@@ -604,6 +625,70 @@ class _MapScreenState extends State<MapScreen> {
                   child: _avatar(
                     activeUser?.name ?? '?',
                     activeUser?.avatarColor ?? AppColors.amber,
+                  ),
+                ),
+              ),
+            ),
+          if (!_navigating && _route == null)
+            Positioned(
+              top: padding.top + 72,
+              left: 20,
+              right: 20,
+              child: Row(
+                children: [
+                  _mapChip(Icons.apartment, 'Buildings'),
+                  const SizedBox(width: 8),
+                  _mapChip(Icons.restaurant, 'Food', selected: true),
+                  const SizedBox(width: 8),
+                  _mapChip(Icons.local_parking, 'Parking'),
+                ],
+              ),
+            ),
+          if (!_navigating && _route == null)
+            Positioned(
+              left: 24,
+              bottom: 88,
+              child: InkWell(
+                onTap: _openDemoDestination,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: AppColors.navy, width: 2),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppShadows.card,
+                  ),
+                  child: const Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: AppColors.yellow,
+                        child: Icon(Icons.pets, color: AppColors.navy),
+                      ),
+                      SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'NAVIPET GUIDE',
+                            style: TextStyle(
+                              color: AppColors.faint,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            'Need directions?',
+                            style: TextStyle(
+                              color: AppColors.navy,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -665,47 +750,109 @@ class _MapScreenState extends State<MapScreen> {
     final step = route.steps.isEmpty
         ? null
         : route.steps[_stepIndex.clamp(0, route.steps.length - 1)];
-    return Material(
-      elevation: 5,
-      borderRadius: BorderRadius.circular(16),
-      color: AppColors.navy,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            const Icon(Icons.navigation, color: AppColors.amber, size: 34),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                step?.instruction ?? 'Follow the highlighted route',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          elevation: 5,
+          borderRadius: BorderRadius.circular(22),
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 56, 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.navy,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.turn_right,
+                    color: Colors.white,
+                    size: 30,
+                  ),
                 ),
-              ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        step?.instruction ?? 'Follow the highlighted route',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        step == null
+                            ? route.distanceLabel
+                            : _distanceText(step.distanceMeters),
+                        style: const TextStyle(
+                          color: AppColors.labelInk,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        Positioned(
+          right: 10,
+          bottom: -18,
+          child: Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: AppColors.yellow,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: AppShadows.soft,
+            ),
+            child: const Icon(Icons.pets, color: AppColors.navy, size: 27),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _routeCard(NavigationRoute route, NaviDestination destination) {
+    final arrivalTime = TimeOfDay.fromDateTime(
+      DateTime.now().add(Duration(seconds: route.durationSeconds.round())),
+    ).format(context);
     return Material(
       elevation: 8,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(28),
       color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                const CircleAvatar(
-                  backgroundColor: Color(0xFFFFF1C2),
-                  child: Icon(Icons.directions_walk, color: AppColors.amberInk),
+                Text(
+                  route.durationLabel.replaceFirst(' min', ''),
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text(' min', style: TextStyle(fontSize: 14)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -722,7 +869,7 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                       ),
                       Text(
-                        '${route.durationLabel} • ${route.distanceLabel}',
+                        '${route.distanceLabel}  •  ETA $arrivalTime',
                         style: const TextStyle(
                           color: AppColors.muted,
                           fontWeight: FontWeight.w600,
@@ -731,10 +878,11 @@ class _MapScreenState extends State<MapScreen> {
                     ],
                   ),
                 ),
-                IconButton(
-                  onPressed: _clearRoute,
-                  icon: const Icon(Icons.close),
-                ),
+                if (!_navigating)
+                  IconButton(
+                    onPressed: _clearRoute,
+                    icon: const Icon(Icons.close),
+                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -744,20 +892,27 @@ class _MapScreenState extends State<MapScreen> {
                 onPressed: _navigating ? _stopNavigation : _startNavigation,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _navigating
-                      ? AppColors.danger
+                      ? const Color(0xFFFFD9D9)
                       : AppColors.navy,
-                  foregroundColor: Colors.white,
+                  foregroundColor: _navigating
+                      ? AppColors.danger
+                      : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   shape: const StadiumBorder(),
                 ),
                 icon: Icon(_navigating ? Icons.stop : Icons.navigation),
-                label: Text(_navigating ? 'End Navigation' : 'Start Walking'),
+                label: Text(_navigating ? 'Exit' : 'Start Walking'),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _distanceText(double meters) {
+    if (meters < 160) return '${(meters * 3.28084).round()} ft';
+    return '${(meters / 1609.344).toStringAsFixed(1)} mi';
   }
 
   Widget _avatar(String name, Color color) {
@@ -772,6 +927,35 @@ class _MapScreenState extends State<MapScreen> {
           color: Colors.white,
           fontSize: 14,
           fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+
+  Widget _mapChip(IconData icon, String label, {bool selected = false}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.yellow : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: selected ? AppColors.yellow : AppColors.inputBorder,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: AppColors.navy),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.navy),
+              ),
+            ),
+          ],
         ),
       ),
     );
