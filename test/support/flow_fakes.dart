@@ -190,12 +190,30 @@ class FakeRouteGateway implements OutdoorRouteGateway {
 class RecordingMap implements NaviMapController {
   final List<String> calls = [];
 
+  Completer<void>? _blockedShowPlace;
+
+  /// Test control: makes the next `showPlace` call wait until [unblock]
+  /// releases it, so a test can force two competing map operations to
+  /// resolve in request order rather than in whatever order the fakes'
+  /// instant, no-delay futures happen to settle — proving the `_mapWork`
+  /// serialization queue, not just the ordering luck of the event loop.
+  void blockShowPlace() => _blockedShowPlace = Completer<void>();
+
+  void unblock() {
+    _blockedShowPlace?.complete();
+    _blockedShowPlace = null;
+  }
+
   @override
   Future<void> showPlace(
     NavigationCoordinate coordinate, {
     required String label,
     required double bottomInset,
-  }) async => calls.add('showPlace:$label');
+  }) async {
+    final gate = _blockedShowPlace;
+    if (gate != null) await gate.future;
+    calls.add('showPlace:$label');
+  }
 
   @override
   Future<void> showRoute(

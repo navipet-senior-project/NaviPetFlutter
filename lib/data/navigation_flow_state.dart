@@ -73,24 +73,28 @@ class FlowIdle extends NavigationFlowState {
 }
 
 class FlowSearching extends NavigationFlowState {
-  const FlowSearching({
-    this.query = '',
-    this.pickingOrigin = false,
-    this.configuringRoute,
-  });
+  const FlowSearching({this.query = '', this.configuringRoute, this.pickError});
 
   final String query;
 
-  /// True when the overlay is choosing a starting point rather than a
-  /// destination.
-  final bool pickingOrigin;
-
-  /// The route configuration this search interrupted, when [pickingOrigin]
-  /// is true. Picking a place restores it with the new origin instead of
-  /// falling through to an ordinary [FlowPlacePreview] — otherwise the
-  /// destination and mode being configured would be lost. Null for an
-  /// ordinary destination search.
+  /// The route configuration this search interrupted. Set only while the
+  /// overlay is choosing a starting point rather than a destination, so
+  /// picking a place can restore it with the new origin instead of falling
+  /// through to an ordinary [FlowPlacePreview] and discarding the
+  /// destination and mode already chosen. Null for an ordinary destination
+  /// search.
   final FlowConfiguringRoute? configuringRoute;
+
+  /// True when the overlay is choosing a starting point rather than a
+  /// destination. Derived from [configuringRoute] instead of stored
+  /// separately, so it is impossible to represent "picking an origin" with
+  /// no route to return to.
+  bool get pickingOrigin => configuringRoute != null;
+
+  /// Set when the user tried to pick an origin from a place with no map
+  /// location. There is no coordinate to route from, so the picker stays
+  /// open with this message rather than the tap silently doing nothing.
+  final String? pickError;
 }
 
 class FlowPlacePreview extends NavigationFlowState {

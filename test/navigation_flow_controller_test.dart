@@ -59,11 +59,15 @@ void main() {
     expect(state.query, 'horn');
   });
 
-  test('back from search returns to idle and clears the map', () {
+  test('back from search returns to idle and clears the map', () async {
     final map = harness.RecordingMap();
     final controller = harness.build(map: map)..openSearch();
 
     controller.back();
+    // back() queues the map clear rather than firing it directly (see
+    // NavigationFlowController._queueMap), so it lands a microtask later
+    // rather than synchronously within back() itself.
+    await Future<void>.delayed(Duration.zero);
 
     expect(controller.state, isA<FlowIdle>());
     expect(map.calls, contains('clear'));
@@ -363,6 +367,10 @@ void main() {
     map.calls.clear();
 
     controller.back();
+    // Queued behind _mapWork rather than fired directly (see the map-work
+    // serialization fix), so it lands a microtask later rather than
+    // synchronously within back() itself.
+    await Future<void>.delayed(Duration.zero);
 
     expect(controller.state, isA<FlowPlacePreview>());
     expect(map.calls, contains('showPlace:Horn Center'));
@@ -405,5 +413,125 @@ void main() {
 
     expect(routes.calls, 1);
     expect((controller.state as FlowRoutePreview).mode, TravelMode.walking);
+  });
+
+  // Fix-round 2 additions: round 1 closed the forward path into the origin
+  // picker but left three ways back out of it (or back into it) broken.
+
+  test('re-entering the origin picker does not lose the route being '
+      'configured', () async {
+    final search = harness.FakeSearchGateway()
+      ..results = const [harness.horn, harness.library];
+    final controller = harness.build(search: search)..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    final before = controller.state as FlowConfiguringRoute;
+
+    controller.openSearch(pickingOrigin: true);
+    // Reopening the picker while already picking (e.g. the search screen
+    // being reopened) must carry the snapshot forward rather than
+    // recapturing from `_state`, which by now is `FlowSearching`, not
+    // the `FlowConfiguringRoute` being interrupted.
+    controller.openSearch(pickingOrigin: true);
+
+    final searching = controller.state as FlowSearching;
+    expect(searching.pickingOrigin, isTrue);
+    expect(searching.configuringRoute, isNotNull);
+
+    await controller.selectPlace(harness.library);
+
+    final after = controller.state as FlowConfiguringRoute;
+    expect(after.destination.name, before.destination.name);
+    expect(after.mode, before.mode);
+    expect(after.origin, isA<PlaceOrigin>());
+  });
+
+  test('requesting the origin picker with nothing to configure opens an '
+      'ordinary search', () {
+    final controller = harness.build();
+
+    controller.openSearch(pickingOrigin: true);
+
+    // There is no FlowConfiguringRoute to interrupt, so the incoherent
+    // combination of "picking" with nothing to return to must not be
+    // representable: pickingOrigin is derived from configuringRoute, so
+    // it comes back false here rather than a dangling true.
+    final state = controller.state as FlowSearching;
+    expect(state.pickingOrigin, isFalse);
+    expect(state.configuringRoute, isNull);
+  });
+
+  test(
+    'back out of the origin picker restores the route being configured',
+    () async {
+      final map = harness.RecordingMap();
+      final controller = harness.build(map: map)..openSearch();
+      await controller.selectPlace(harness.horn);
+      await controller.requestDirections();
+      final before = controller.state as FlowConfiguringRoute;
+
+      controller.openSearch(pickingOrigin: true);
+      map.calls.clear();
+
+      controller.back();
+
+      final after = controller.state as FlowConfiguringRoute;
+      expect(after.destination.name, before.destination.name);
+      expect(after.mode, before.mode);
+      expect(after.origin, isA<CurrentLocationOrigin>());
+      // Backing out of the picker is not abandoning the flow: it must not
+      // be treated like back() from an ordinary search.
+      await Future<void>.delayed(Duration.zero);
+      expect(map.calls, isNot(contains('clear')));
+    },
+  );
+
+  test('picking an origin with an unmapped place surfaces why nothing '
+      'happened', () async {
+    final controller = harness.build()..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+
+    controller.openSearch(pickingOrigin: true);
+    await controller.selectPlace(harness.unmapped);
+
+    final state = controller.state as FlowSearching;
+    expect(state.pickingOrigin, isTrue);
+    expect(state.configuringRoute, isNotNull);
+    expect(state.pickError, isNotNull);
+  });
+
+  test('map work from back() and a fresh route calculation stays in request '
+      'order', () async {
+    final map = harness.RecordingMap();
+    final controller = harness.build(map: map)..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+
+    map.calls.clear();
+    map.blockShowPlace();
+    // back() queues showPlace(Horn Center) for the place sheet, blocked.
+    controller.back();
+
+    // Re-requesting directions and recalculating immediately — before
+    // the blocked showPlace resolves — is the exact interleaving the
+    // review found: without a serialized map queue, showRoute's fake
+    // (never blocked) could finish and record itself before the stale
+    // showPlace call catches up, which is indistinguishable here from
+    // the real bug where a slow-but-earlier map call overwrites a
+    // fast-but-later one.
+    await controller.requestDirections();
+    final calculating = controller.calculateRoute();
+
+    // showRoute must not have run yet: it is queued behind the blocked
+    // showPlace, not racing it.
+    await Future<void>.delayed(Duration.zero);
+    expect(map.calls, isEmpty);
+
+    map.unblock();
+    await calculating;
+
+    expect(map.calls, ['showPlace:Horn Center', 'showRoute:Horn Center']);
   });
 }

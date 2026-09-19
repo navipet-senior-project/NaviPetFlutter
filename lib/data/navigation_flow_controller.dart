@@ -45,6 +45,13 @@ class NavigationFlowController extends ChangeNotifier {
   List<CampusPlace> _recents = const [];
   int _generation = 0;
 
+  // Chained so map mutations always apply in the order they were issued
+  // rather than the order their underlying async work happens to finish.
+  // Without this, a call queued after a slower one — e.g. requesting a new
+  // route right after backing out of a drawn one — could have its result
+  // silently overwritten when the slower, now-stale call finally lands.
+  Future<void> _mapWork = Future<void>.value();
+
   NavigationFlowState get state => _state;
 
   List<CampusPlace> get recents => List.unmodifiable(_recents);
@@ -52,18 +59,24 @@ class NavigationFlowController extends ChangeNotifier {
   void openSearch({bool pickingOrigin = false}) {
     final current = _state;
     // Picking an origin interrupts route configuration; remember it so
-    // selecting a place can restore it instead of discarding the
-    // destination and mode already chosen.
-    final configuringRoute = pickingOrigin && current is FlowConfiguringRoute
-        ? current
-        : null;
+    // selecting a place — or backing out — can restore it. Re-entering the
+    // picker (e.g. reopening the search screen while already picking) must
+    // carry the existing snapshot forward: by then `_state` is already
+    // `FlowSearching`, not the `FlowConfiguringRoute` being interrupted, so
+    // recapturing only from a `FlowConfiguringRoute` would null it out and
+    // reproduce the very bug this field exists to fix. When there is no
+    // route to return to — from `FlowIdle`, mid-search, etc. — picking mode
+    // is not entered at all; `pickingOrigin` is derived from this snapshot,
+    // so there is no way to end up "picking" with nothing to restore.
+    final configuringRoute = !pickingOrigin
+        ? null
+        : switch (current) {
+            FlowConfiguringRoute() => current,
+            FlowSearching(:final configuringRoute) => configuringRoute,
+            _ => null,
+          };
     _generation++;
-    _set(
-      FlowSearching(
-        pickingOrigin: pickingOrigin,
-        configuringRoute: configuringRoute,
-      ),
-    );
+    _set(FlowSearching(configuringRoute: configuringRoute));
     unawaited(loadRecents());
   }
 
@@ -72,7 +85,6 @@ class NavigationFlowController extends ChangeNotifier {
     if (current is FlowSearching) {
       _state = FlowSearching(
         query: value,
-        pickingOrigin: current.pickingOrigin,
         configuringRoute: current.configuringRoute,
       );
     }
@@ -123,17 +135,27 @@ class NavigationFlowController extends ChangeNotifier {
     // restores the interrupted route configuration with the new origin
     // instead of falling through to a plain place preview, which would
     // discard the destination and mode already chosen.
-    if (requestState is FlowSearching && requestState.pickingOrigin) {
-      final configuring = requestState.configuringRoute;
-      if (configuring != null) {
-        // A place with no map pin has no coordinate to route from; stay in
-        // picking mode rather than silently dropping the configuration.
-        if (destination == null) return;
-        _set(configuring);
-        setOrigin(PlaceOrigin(place: destination));
-        unawaited(recentSearches.save(resolved));
+    final configuring = requestState is FlowSearching
+        ? requestState.configuringRoute
+        : null;
+    if (configuring != null) {
+      if (destination == null) {
+        // A place with no map pin has no coordinate to route from. Stay in
+        // picking mode — surface why, so the tap does not look like it did
+        // nothing.
+        _set(
+          FlowSearching(
+            query: query,
+            configuringRoute: configuring,
+            pickError: '${resolved.title} has no location on the map yet.',
+          ),
+        );
         return;
       }
+      _set(configuring);
+      setOrigin(PlaceOrigin(place: destination));
+      unawaited(recentSearches.save(resolved));
+      return;
     }
 
     _set(
@@ -146,10 +168,12 @@ class NavigationFlowController extends ChangeNotifier {
 
     unawaited(recentSearches.save(resolved));
     if (destination != null) {
-      await _map.showPlace(
-        destination.coordinate,
-        label: destination.name,
-        bottomInset: placeSheetInset,
+      await _queueMap(
+        () => _map.showPlace(
+          destination.coordinate,
+          label: destination.name,
+          bottomInset: placeSheetInset,
+        ),
       );
     }
   }
@@ -259,11 +283,13 @@ class NavigationFlowController extends ChangeNotifier {
           place: current.place,
         ),
       );
-      await _map.showRoute(
-        plan,
-        origin: origin,
-        destination: current.destination,
-        bottomInset: routeSheetInset,
+      await _queueMap(
+        () => _map.showRoute(
+          plan,
+          origin: origin,
+          destination: current.destination,
+          bottomInset: routeSheetInset,
+        ),
       );
     } on RouteFailure catch (error) {
       if (generation != _generation) return;
@@ -285,11 +311,13 @@ class NavigationFlowController extends ChangeNotifier {
     );
     final origin = current.origin.coordinate;
     if (origin == null) return;
-    await _map.showRoute(
-      plan,
-      origin: origin,
-      destination: current.destination,
-      bottomInset: routeSheetInset,
+    await _queueMap(
+      () => _map.showRoute(
+        plan,
+        origin: origin,
+        destination: current.destination,
+        bottomInset: routeSheetInset,
+      ),
     );
   }
 
@@ -352,7 +380,9 @@ class NavigationFlowController extends ChangeNotifier {
       ),
     );
     final coordinate = origin.coordinate;
-    if (coordinate != null) await _map.followUser(coordinate);
+    if (coordinate != null) {
+      await _queueMap(() => _map.followUser(coordinate));
+    }
   }
 
   Future<void> endRoute() async {
@@ -380,10 +410,17 @@ class NavigationFlowController extends ChangeNotifier {
     switch (_state) {
       case FlowIdle():
         return;
-      case FlowSearching():
+      case FlowSearching(:final configuringRoute):
         _generation++;
-        _set(const FlowIdle());
-        unawaited(_map.clear());
+        if (configuringRoute != null) {
+          // Backing out of the origin picker returns to the route being
+          // configured, not to idle — leaving picking mode must not
+          // reproduce the bug this field exists to fix.
+          _set(configuringRoute);
+        } else {
+          _set(const FlowIdle());
+          unawaited(_queueMap(() => _map.clear()));
+        }
       case FlowPlacePreview(:final previousQuery):
         _generation++;
         _set(FlowSearching(query: previousQuery));
@@ -418,12 +455,18 @@ class NavigationFlowController extends ChangeNotifier {
             destination: destination,
           ),
         );
-        // The drawn route must not survive behind the place sheet.
+        // The drawn route must not survive behind the place sheet. Queued
+        // rather than fired directly, so it cannot race a map call issued
+        // moments later (e.g. a fresh calculateRoute()) and lose — without
+        // the queue, whichever call's underlying async work happens to
+        // finish last wins, not whichever was issued last.
         unawaited(
-          _map.showPlace(
-            destination.coordinate,
-            label: destination.name,
-            bottomInset: placeSheetInset,
+          _queueMap(
+            () => _map.showPlace(
+              destination.coordinate,
+              label: destination.name,
+              bottomInset: placeSheetInset,
+            ),
           ),
         );
       case FlowRouteSteps():
@@ -431,7 +474,12 @@ class NavigationFlowController extends ChangeNotifier {
         // — one behaviour per transition, not a second copy of it.
         hideSteps();
       case FlowActiveNavigation():
-        // Identical to the user tapping "end navigation".
+        // Identical to the user tapping "end navigation". Firing without
+        // awaiting is only safe because endRoute() has no `await` before
+        // its `_set` call, so the state update still lands this turn. If
+        // endRoute() ever gains an await before that `_set`, back() would
+        // silently stop updating state synchronously and no test here
+        // would catch it.
         unawaited(endRoute());
       case FlowIndoorHandoff():
         _generation++;
@@ -445,6 +493,17 @@ class NavigationFlowController extends ChangeNotifier {
   void _set(NavigationFlowState next) {
     _state = next;
     notifyListeners();
+  }
+
+  /// Queues [action] behind whatever map work is already in flight, so map
+  /// mutations complete in request order instead of finish order.
+  Future<void> _queueMap(Future<void> Function() action) {
+    final result = _mapWork.then((_) => action());
+    // The queue itself must stay resolved even when a call fails, or every
+    // later map call would wait forever behind a permanently-rejected
+    // future. The caller's own awaited [result] still carries the error.
+    _mapWork = result.catchError((_) {});
+    return result;
   }
 
   /// Rebuilds a minimal place record when the flow only kept the destination.
