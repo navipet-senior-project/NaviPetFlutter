@@ -83,8 +83,25 @@ class FakeLocationService implements LocationService {
     coordinate: NavigationCoordinate(latitude: 33.7840, longitude: -118.1150),
   );
 
+  Completer<void>? _blocked;
+
+  /// Test control: makes `current()` wait until [unblock] releases it, so a
+  /// test can hold one `requestDirections` in flight while a second, newer
+  /// flow action runs to completion first — proving the stale-generation
+  /// guard.
+  void block() => _blocked = Completer<void>();
+
+  void unblock() {
+    _blocked?.complete();
+    _blocked = null;
+  }
+
   @override
-  Future<LocationReading> current() async => reading;
+  Future<LocationReading> current() async {
+    final gate = _blocked;
+    if (gate != null) await gate.future;
+    return reading;
+  }
 
   @override
   Stream<NavigationCoordinate> watch() => const Stream.empty();
@@ -113,6 +130,18 @@ class FakeRouteGateway implements OutdoorRouteGateway {
   Object? error;
   int calls = 0;
 
+  Completer<void>? _blocked;
+
+  /// Test control: makes `getRoute` wait until [unblock] releases it, so a
+  /// test can hold one `calculateRoute` in flight while a second, newer flow
+  /// action runs to completion first — proving the stale-generation guard.
+  void block() => _blocked = Completer<void>();
+
+  void unblock() {
+    _blocked?.complete();
+    _blocked = null;
+  }
+
   @override
   Future<NavigationRoute> getRoute({
     required NavigationCoordinate origin,
@@ -120,6 +149,8 @@ class FakeRouteGateway implements OutdoorRouteGateway {
     String profile = 'walking',
   }) async {
     calls++;
+    final gate = _blocked;
+    if (gate != null) await gate.future;
     final failure = error;
     if (failure != null) throw failure;
     return const NavigationRoute(

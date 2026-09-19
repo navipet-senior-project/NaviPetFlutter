@@ -11,6 +11,7 @@ import 'navigation_flow_state.dart';
 import 'navigation_models.dart';
 import 'recent_searches_gateway.dart';
 import 'route_repository.dart';
+import 'travel_mode.dart';
 
 /// Owns which part of the search-to-route flow the user is in.
 ///
@@ -122,6 +123,227 @@ class NavigationFlowController extends ChangeNotifier {
     }
   }
 
+  Future<void> requestDirections() async {
+    final current = _state;
+    if (current is! FlowPlacePreview) return;
+    final destination = current.destination;
+    if (destination == null) return;
+
+    final generation = ++_generation;
+    final reading = await location.current();
+    if (generation != _generation) return;
+
+    final origin = reading.usable
+        ? CurrentLocationOrigin(
+            coordinate: reading.coordinate!,
+            approximate: reading.isApproximate,
+          )
+        : const UnknownOrigin();
+
+    _set(
+      FlowConfiguringRoute(
+        destination: destination,
+        origin: origin,
+        mode: enabledTravelModes.first,
+        place: current.place,
+      ),
+    );
+  }
+
+  void setOrigin(RouteOrigin origin) {
+    final current = _state;
+    if (current is! FlowConfiguringRoute) return;
+    _set(
+      FlowConfiguringRoute(
+        destination: current.destination,
+        origin: origin,
+        mode: current.mode,
+        place: current.place,
+      ),
+    );
+  }
+
+  Future<void> setMode(TravelMode mode) async {
+    final current = _state;
+    final (destination, origin, place) = switch (current) {
+      FlowConfiguringRoute(:final destination, :final origin, :final place) => (
+        destination,
+        origin,
+        place,
+      ),
+      FlowRoutePreview(:final destination, :final origin, :final place) => (
+        destination,
+        origin,
+        place,
+      ),
+      FlowRouteSteps(:final destination, :final origin, :final place) => (
+        destination,
+        origin,
+        place,
+      ),
+      _ => (null, null, null),
+    };
+    if (destination == null || origin == null) return;
+
+    _set(
+      FlowConfiguringRoute(
+        destination: destination,
+        origin: origin,
+        mode: mode,
+        place: place,
+      ),
+    );
+    await calculateRoute();
+  }
+
+  Future<void> calculateRoute() async {
+    final current = _state;
+    if (current is! FlowConfiguringRoute) return;
+    final origin = current.origin.coordinate;
+    if (origin == null) return;
+
+    final generation = ++_generation;
+    _set(
+      FlowCalculatingRoute(
+        destination: current.destination,
+        origin: current.origin,
+        mode: current.mode,
+        place: current.place,
+      ),
+    );
+
+    try {
+      final plan = await routes.plan(
+        origin: origin,
+        destination: current.destination,
+        mode: current.mode,
+      );
+      if (generation != _generation) return;
+      _set(
+        FlowRoutePreview(
+          destination: current.destination,
+          origin: current.origin,
+          plan: plan,
+          place: current.place,
+        ),
+      );
+      await _map.showRoute(
+        plan,
+        origin: origin,
+        destination: current.destination,
+        bottomInset: routeSheetInset,
+      );
+    } on RouteFailure catch (error) {
+      if (generation != _generation) return;
+      _set(FlowError(message: error.message, previous: current));
+    }
+  }
+
+  Future<void> selectRoute(int index) async {
+    final current = _state;
+    if (current is! FlowRoutePreview) return;
+    final plan = current.plan.select(index);
+    _set(
+      FlowRoutePreview(
+        destination: current.destination,
+        origin: current.origin,
+        plan: plan,
+        place: current.place,
+      ),
+    );
+    final origin = current.origin.coordinate;
+    if (origin == null) return;
+    await _map.showRoute(
+      plan,
+      origin: origin,
+      destination: current.destination,
+      bottomInset: routeSheetInset,
+    );
+  }
+
+  void showSteps() {
+    final current = _state;
+    if (current is! FlowRoutePreview) return;
+    _set(
+      FlowRouteSteps(
+        destination: current.destination,
+        origin: current.origin,
+        plan: current.plan,
+        place: current.place,
+      ),
+    );
+  }
+
+  void hideSteps() {
+    final current = _state;
+    if (current is! FlowRouteSteps) return;
+    _set(
+      FlowRoutePreview(
+        destination: current.destination,
+        origin: current.origin,
+        plan: current.plan,
+        place: current.place,
+      ),
+    );
+  }
+
+  Future<void> startRoute() async {
+    final current = _state;
+    final (destination, origin, plan, place) = switch (current) {
+      FlowRoutePreview(
+        :final destination,
+        :final origin,
+        :final plan,
+        :final place,
+      ) =>
+        (destination, origin, plan, place),
+      FlowRouteSteps(
+        :final destination,
+        :final origin,
+        :final plan,
+        :final place,
+      ) =>
+        (destination, origin, plan, place),
+      _ => (null, null, null, null),
+    };
+    if (destination == null || origin == null || plan == null) return;
+
+    // Guidance is only offered when the route starts where the user is.
+    if (!origin.canStartGuidance) return;
+
+    _set(
+      FlowActiveNavigation(
+        destination: destination,
+        origin: origin,
+        plan: plan,
+        place: place,
+      ),
+    );
+    final coordinate = origin.coordinate;
+    if (coordinate != null) await _map.followUser(coordinate);
+  }
+
+  Future<void> endRoute() async {
+    final current = _state;
+    if (current is! FlowActiveNavigation) return;
+    _set(
+      FlowRoutePreview(
+        destination: current.destination,
+        origin: current.origin,
+        plan: current.plan,
+        place: current.place,
+      ),
+    );
+  }
+
+  Future<void> retry() async {
+    final current = _state;
+    if (current is! FlowError) return;
+    final previous = current.previous;
+    _set(previous);
+    if (previous is FlowConfiguringRoute) await calculateRoute();
+  }
+
   void back() {
     switch (_state) {
       case FlowIdle():
@@ -170,6 +392,7 @@ class NavigationFlowController extends ChangeNotifier {
         :final origin,
         :final plan,
       ):
+        _generation++;
         _set(
           FlowRoutePreview(
             destination: destination,
@@ -184,6 +407,7 @@ class NavigationFlowController extends ChangeNotifier {
         :final origin,
         :final plan,
       ):
+        _generation++;
         _set(
           FlowRoutePreview(
             destination: destination,
@@ -193,8 +417,10 @@ class NavigationFlowController extends ChangeNotifier {
           ),
         );
       case FlowIndoorHandoff():
+        _generation++;
         _set(const FlowIdle());
       case FlowError(:final previous):
+        _generation++;
         _set(previous);
     }
   }
