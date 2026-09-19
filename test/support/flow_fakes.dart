@@ -122,6 +122,15 @@ class FakeLocationService implements LocationService {
 
   @override
   Stream<NavigationCoordinate> watch() => const Stream.empty();
+
+  /// Test control: records what was primed, so a test can assert on it
+  /// directly instead of only inferring priming happened.
+  NavigationCoordinate? primedLastKnown;
+
+  @override
+  void primeLastKnown(NavigationCoordinate coordinate) {
+    primedLastKnown = coordinate;
+  }
 }
 
 class FakeRecents implements RecentSearchesGateway {
@@ -141,6 +150,9 @@ class FakeRecents implements RecentSearchesGateway {
 
   @override
   Future<void> clear() async => stored = const [];
+
+  @override
+  Future<void> clearLocal() async => stored = const [];
 }
 
 class FakeRouteGateway implements OutdoorRouteGateway {

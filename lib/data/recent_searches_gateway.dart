@@ -16,6 +16,13 @@ abstract interface class RecentSearchesGateway {
   Future<void> save(CampusPlace place);
 
   Future<void> clear();
+
+  /// Clears only device-local fallback data.
+  ///
+  /// Identity changes use this instead of [clear], because the auth provider
+  /// already reflects the newly active account by then; clearing the remote
+  /// through [clear] would erase that new account's server history.
+  Future<void> clearLocal();
 }
 
 class HttpRecentSearchesGateway implements RecentSearchesGateway {
@@ -61,6 +68,9 @@ class HttpRecentSearchesGateway implements RecentSearchesGateway {
 
   @override
   Future<void> clear() => _send('DELETE', '/recent-searches');
+
+  @override
+  Future<void> clearLocal() async {}
 
   Future<http.Response> _send(
     String method,
@@ -128,23 +138,33 @@ class CachedRecentSearches implements RecentSearchesGateway {
 
   final RecentSearchesGateway remote;
   final SearchHistoryStore cache;
+  int _localGeneration = 0;
+  Future<void> _localWork = Future.value();
 
   @override
   Future<List<CampusPlace>> list() async {
+    final generation = _localGeneration;
     try {
       final places = filterToCampus(await remote.list());
-      await _replaceCache(places);
+      await _queueLocal(() async {
+        if (generation != _localGeneration) return;
+        await _replaceCache(places);
+      });
       return places;
     } on Object {
-      final cached = (await cache.load())
-          .map(_fromDestination)
-          .toList(growable: false);
-      return filterToCampus(cached);
+      return _queueLocal(() async {
+        if (generation != _localGeneration) return const <CampusPlace>[];
+        final cached = (await cache.load())
+            .map(_fromDestination)
+            .toList(growable: false);
+        return filterToCampus(cached);
+      });
     }
   }
 
   @override
   Future<void> save(CampusPlace place) async {
+    final generation = _localGeneration;
     try {
       await remote.save(place);
     } on Object {
@@ -154,18 +174,40 @@ class CachedRecentSearches implements RecentSearchesGateway {
     // resurface indistinguishably from a real campus result on the next
     // remote failure, defeating campus-only filtering.
     if (place.outdoorDestination != null && !place.external) {
-      await cache.add(place.toDestination());
+      await _queueLocal(() async {
+        if (generation != _localGeneration) return;
+        await cache.add(place.toDestination());
+      });
     }
   }
 
   @override
   Future<void> clear() async {
+    final generation = ++_localGeneration;
     try {
       await remote.clear();
     } on Object {
       // Local clear still applies below.
     }
-    await cache.clear();
+    await _queueLocal(() async {
+      if (generation != _localGeneration) return;
+      await cache.clear();
+    });
+  }
+
+  @override
+  Future<void> clearLocal() {
+    final generation = ++_localGeneration;
+    return _queueLocal(() async {
+      if (generation != _localGeneration) return;
+      await cache.clear();
+    });
+  }
+
+  Future<T> _queueLocal<T>(Future<T> Function() action) {
+    final result = _localWork.then((_) => action());
+    _localWork = result.then<void>((_) {}, onError: (_) {});
+    return result;
   }
 
   Future<void> _replaceCache(List<CampusPlace> places) async {

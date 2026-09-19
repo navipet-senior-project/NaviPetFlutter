@@ -8,6 +8,7 @@ import 'package:navipet/widgets/route_preview_sheet.dart';
 import 'package:navipet/widgets/search_bar_field.dart';
 import 'package:navipet/widgets/search_overlay.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // The task-15 brief pointed this at 'navigation_flow_controller_test.dart',
 // but that file itself imports these fakes from here as `harness` — a test
@@ -136,4 +137,58 @@ void main() {
       expect(find.byType(RoutePreviewSheet), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'unmounting MapScreen detaches the map, so a route calculation that '
+    'lands after navigating away does not call into the disposed map '
+    'surface',
+    (tester) async {
+      // Regression test for the review finding: NaviBottomNav's context.go
+      // to /checklist or /pet disposes MapScreen while this app-scoped flow
+      // keeps calculating in the background. Before detachMap() existed,
+      // the reply would call into a MapboxNaviMapController wrapping an
+      // already-torn-down MapboxMap.
+      final map = harness.RecordingMap();
+      final routes = harness.FakeRouteGateway()..block();
+      final controller = harness.build(map: map, routes: routes);
+      await tester.pumpWidget(host(controller));
+
+      controller.openSearch();
+      await controller.selectPlace(harness.horn);
+      await controller.requestDirections();
+      // selectPlace() already drew the place marker — clear that so the
+      // assertion below only checks for the calculation's own reply.
+      map.calls.clear();
+      final pending = controller.calculateRoute();
+
+      // Simulate navigating away before the calculation resolves — the
+      // same MapScreen.dispose() path NaviBottomNav's context.go triggers.
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      routes.unblock();
+      await pending;
+
+      // The reply landed on a flow with no attached map: it must not reach
+      // the RecordingMap this now-disposed MapScreen was using.
+      expect(map.calls, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets("hands the persisted last-known location to the flow's location "
+      'service, so a momentary GPS dropout still has an approximate origin '
+      'to fall back to', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'last_location_latitude': 33.7838,
+      'last_location_longitude': -118.1141,
+    });
+    final location = harness.FakeLocationService();
+    final controller = harness.build(location: location);
+    await tester.pumpWidget(host(controller));
+    await tester.pumpAndSettle();
+
+    expect(location.primedLastKnown, isNotNull);
+    expect(location.primedLastKnown!.latitude, 33.7838);
+    expect(location.primedLastKnown!.longitude, -118.1141);
+  });
 }

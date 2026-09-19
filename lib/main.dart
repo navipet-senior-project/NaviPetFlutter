@@ -13,7 +13,6 @@ import 'data/campus_search_gateway.dart';
 import 'data/location_service.dart';
 import 'data/mapbox_config.dart';
 import 'data/mapbox_navigation_service.dart';
-import 'data/navi_map_controller.dart';
 import 'data/navigation_flow_controller.dart';
 import 'data/recent_searches_gateway.dart';
 import 'data/registration_gateway.dart';
@@ -81,6 +80,28 @@ class _NaviPetAppState extends State<NaviPetApp> {
   late final _router = createAppRouter(widget.appState);
   late final NavigationFlowController _flow = _buildFlow();
 
+  /// The signed-in identity the flow currently reflects, so a later change
+  /// (sign-out, sign-in, or a different user signing in on the same device)
+  /// can be told apart from any other `AppState` change. `_flow` is
+  /// app-scoped and outlives any one session — without this, a new user
+  /// would briefly see the previous one's destination, origin, and recent
+  /// searches until something happened to overwrite it.
+  String? _flowIdentity;
+
+  @override
+  void initState() {
+    super.initState();
+    _flowIdentity = widget.appState.activeUser?.id;
+    widget.appState.addListener(_onAppStateChanged);
+  }
+
+  void _onAppStateChanged() {
+    final identity = widget.appState.activeUser?.id;
+    if (identity == _flowIdentity) return;
+    _flowIdentity = identity;
+    _flow.resetForNewIdentity();
+  }
+
   NavigationFlowController _buildFlow() {
     final auth = widget.authTokenProvider;
     final searchGateway = HttpCampusSearchGateway(
@@ -106,12 +127,15 @@ class _NaviPetAppState extends State<NaviPetApp> {
       recentSearches: recents,
       routes: RouteRepository(gateway: routeGateway),
       location: GeolocatorLocationService(),
-      map: DeferredMapController(),
+      // No `map:` — defaults to a no-op until MapScreen.onMapCreated calls
+      // attachMap() with the real Mapbox map. The flow is built here, in
+      // initState, always before that map exists.
     );
   }
 
   @override
   void dispose() {
+    widget.appState.removeListener(_onAppStateChanged);
     _router.dispose();
     widget.appState.dispose();
     _flow.dispose();

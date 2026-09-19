@@ -534,4 +534,185 @@ void main() {
 
     expect(map.calls, ['showPlace:Horn Center', 'showRoute:Horn Center']);
   });
+
+  // Fix-round 3 additions: the review found MapScreen's map delegate was a
+  // one-way assignment with no replay on remount (NaviBottomNav disposes
+  // MapScreen navigating to /checklist or /pet while this app-scoped flow
+  // keeps its state) and no teardown on dispose (a reply landing after
+  // navigating away would call into a MapboxNaviMapController wrapping an
+  // already-dead map). attachMap()/detachMap() replace that one-way
+  // assignment; these tests exercise them directly, independent of
+  // MapScreen/Mapbox (which the widget tests in map_screen_flow_test.dart
+  // can't reach — onMapCreated never fires without a real platform view).
+
+  test('attaching a map redraws the current place preview', () async {
+    final controller = harness.build()..openSearch();
+    await controller.selectPlace(harness.horn);
+
+    final newMap = harness.RecordingMap();
+    await controller.attachMap(newMap);
+
+    expect(newMap.calls, ['showPlace:Horn Center']);
+  });
+
+  test('attaching a map redraws the current route preview', () async {
+    final controller = harness.build()..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+
+    final newMap = harness.RecordingMap();
+    await controller.attachMap(newMap);
+
+    expect(newMap.calls, ['showRoute:Horn Center']);
+  });
+
+  test('attaching a map redraws the expanded steps sheet as a route', () async {
+    final controller = harness.build()..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    controller.showSteps();
+
+    final newMap = harness.RecordingMap();
+    await controller.attachMap(newMap);
+
+    expect(newMap.calls, ['showRoute:Horn Center']);
+  });
+
+  test('attaching a map while active navigation follows the user', () async {
+    final controller = harness.build()..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    await controller.startRoute();
+
+    final newMap = harness.RecordingMap();
+    await controller.attachMap(newMap);
+
+    expect(newMap.calls, ['followUser']);
+  });
+
+  test('attaching a map while idle, searching, configuring, or calculating '
+      'draws nothing', () async {
+    final controller = harness.build();
+    final idleMap = harness.RecordingMap();
+    await controller.attachMap(idleMap);
+    expect(idleMap.calls, isEmpty);
+
+    controller.openSearch();
+    final searchingMap = harness.RecordingMap();
+    await controller.attachMap(searchingMap);
+    expect(searchingMap.calls, isEmpty);
+
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    final configuringMap = harness.RecordingMap();
+    await controller.attachMap(configuringMap);
+    expect(configuringMap.calls, isEmpty);
+  });
+
+  test(
+    'detaching the map stops further calls from reaching the old delegate',
+    () async {
+      final map = harness.RecordingMap();
+      final controller = harness.build(map: map)..openSearch();
+      await controller.selectPlace(harness.horn);
+      await controller.requestDirections();
+      await controller.calculateRoute();
+      map.calls.clear();
+
+      controller.detachMap();
+      // selectRoute() always calls _map.showRoute() when the origin has a
+      // coordinate (see selectRoute's implementation) — exactly the kind of
+      // call that, before detachMap(), would have reached a torn-down real
+      // map after the user navigated away.
+      await controller.selectRoute(0);
+
+      expect(map.calls, isEmpty);
+    },
+  );
+
+  test(
+    'reattaching after detach draws on the new map, not the detached one',
+    () async {
+      final oldMap = harness.RecordingMap();
+      final controller = harness.build(map: oldMap)..openSearch();
+      await controller.selectPlace(harness.horn);
+      await controller.requestDirections();
+      await controller.calculateRoute();
+      oldMap.calls.clear();
+      controller.detachMap();
+
+      final newMap = harness.RecordingMap();
+      await controller.attachMap(newMap);
+
+      expect(newMap.calls, ['showRoute:Horn Center']);
+      expect(oldMap.calls, isEmpty);
+    },
+  );
+
+  // Fix-round 3 additions, part 2: the flow controller is app-scoped and
+  // outlives any one signed-in session (main.dart builds it once). Without
+  // resetForNewIdentity(), signing out mid-route and back in as someone
+  // else would show the new user the previous user's destination, origin,
+  // and recent searches.
+
+  test('resetForNewIdentity returns to idle and clears the map', () async {
+    final map = harness.RecordingMap();
+    final controller = harness.build(map: map)..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    map.calls.clear();
+
+    controller.resetForNewIdentity();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state, isA<FlowIdle>());
+    expect(map.calls, contains('clear'));
+  });
+
+  test('resetForNewIdentity drops the previous user\'s recents', () async {
+    final recents = harness.FakeRecents()..stored = const [harness.horn];
+    final controller = harness.build(recents: recents);
+    await controller.loadRecents();
+    expect(controller.recents, isNotEmpty);
+
+    controller.resetForNewIdentity();
+
+    expect(controller.recents, isEmpty);
+  });
+
+  test(
+    'resetForNewIdentity prevents cached recents from reappearing on reload',
+    () async {
+      final recents = harness.FakeRecents()..stored = const [harness.horn];
+      final controller = harness.build(recents: recents);
+
+      controller.resetForNewIdentity();
+      await controller.loadRecents();
+
+      expect(controller.recents, isEmpty);
+    },
+  );
+
+  test(
+    'resetForNewIdentity discards a route calculation already in flight',
+    () async {
+      final routes = harness.FakeRouteGateway()..block();
+      final controller = harness.build(routes: routes)..openSearch();
+      await controller.selectPlace(harness.horn);
+      await controller.requestDirections();
+      final pending = controller.calculateRoute();
+
+      controller.resetForNewIdentity();
+      routes.unblock();
+      await pending;
+
+      // The stale reply from the previous user's in-flight calculation
+      // must not resurrect a route preview on top of the reset.
+      expect(controller.state, isA<FlowIdle>());
+    },
+  );
 }

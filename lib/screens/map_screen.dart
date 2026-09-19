@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_state.dart';
 import '../data/mapbox_config.dart';
-import '../data/navi_map_controller.dart';
+import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
@@ -43,8 +43,8 @@ class _MapScreenState extends State<MapScreen> {
   NavigationCoordinate? _lastKnownCoordinate;
   String? _locationMessage;
 
-  NavigationFlowController get _flow =>
-      widget.controller ?? context.read<NavigationFlowController>();
+  late final NavigationFlowController _flow;
+  bool _flowResolved = false;
 
   @override
   void initState() {
@@ -53,8 +53,22 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_flowResolved) return;
+    _flow = widget.controller ?? context.read<NavigationFlowController>();
+    _flowResolved = true;
+  }
+
+  @override
   void dispose() {
     _positionSubscription?.cancel();
+    // MapScreen remounts every time NaviBottomNav routes away and back
+    // (e.g. to /checklist or /pet) while the flow itself — app-scoped —
+    // keeps whatever state it was in. Detaching here means a route
+    // calculation that lands after this point calls into nothing rather
+    // than a MapboxNaviMapController wrapping this now-dead map.
+    _flow.detachMap();
     super.dispose();
   }
 
@@ -64,17 +78,15 @@ class _MapScreenState extends State<MapScreen> {
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
 
-    // The flow was built before this map existed, so it was handed a
-    // DeferredMapController that queued everything. Now that the real map is
-    // ready, give it something to delegate to.
-    final seam = _flow.map;
-    if (seam is DeferredMapController) {
-      seam.delegate = MapboxNaviMapController(
-        map: mapboxMap,
-        routes: routes,
-        markers: markers,
-      );
-    }
+    // Hands the flow a live map and re-issues whatever the current state
+    // should already be showing — necessary both on first launch (the flow
+    // was built, in main.dart's initState, before this map existed) and on
+    // every remount (the flow is app-scoped and outlives this MapScreen
+    // instance; without the replay, a route sheet from before the remount
+    // would claim a distance and duration over a blank map).
+    await _flow.attachMap(
+      MapboxNaviMapController(map: mapboxMap, routes: routes, markers: markers),
+    );
 
     await _lastLocationReady;
     await _centerOnBestKnownLocation();
@@ -86,11 +98,19 @@ class _MapScreenState extends State<MapScreen> {
     final latitude = preferences.getDouble(_lastLatitudeKey);
     final longitude = preferences.getDouble(_lastLongitudeKey);
     if (latitude == null || longitude == null) return;
-    _lastKnownCoordinate = NavigationCoordinate(
+    final coordinate = NavigationCoordinate(
       latitude: latitude,
       longitude: longitude,
     );
-    if (mounted) setState(() {});
+    _lastKnownCoordinate = coordinate;
+    if (!mounted) return;
+    // The flow's LocationService defaults to no remembered fix at all,
+    // which leaves its approximate-origin fallback dead: a momentary GPS
+    // dropout would show UnknownOrigin and the manual picker even while
+    // this exact persisted coordinate is on screen. Only seeds the gap —
+    // primeLastKnown never overwrites a fresher live fix.
+    _flow.location.primeLastKnown(coordinate);
+    setState(() {});
   }
 
   Future<void> _rememberPosition(geo.Position position) async {
@@ -346,11 +366,22 @@ class _MapScreenState extends State<MapScreen> {
       child: SearchBarField(
         placeholder: 'Where to?',
         onPressed: _flow.openSearch,
-        right: GestureDetector(
-          onTap: () => context.push('/account'),
-          child: _avatar(
-            activeUser?.name ?? '?',
-            activeUser?.avatarColor ?? AppColors.amber,
+        right: Semantics(
+          label: 'Account settings',
+          button: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => context.push('/account'),
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(
+                child: _avatar(
+                  activeUser?.name ?? '?',
+                  activeUser?.avatarColor ?? AppColors.amber,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -379,12 +410,16 @@ class _MapScreenState extends State<MapScreen> {
     return Positioned(
       right: 16,
       bottom: bottom,
-      child: FloatingActionButton.small(
-        heroTag: 'recenter',
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.navy,
-        onPressed: _centerOnBestKnownLocation,
-        child: const Icon(Icons.my_location),
+      child: Semantics(
+        label: 'Center map on your location',
+        button: true,
+        child: FloatingActionButton.small(
+          heroTag: 'recenter',
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.navy,
+          onPressed: _centerOnBestKnownLocation,
+          child: const Icon(Icons.my_location),
+        ),
       ),
     );
   }
@@ -396,7 +431,7 @@ class _MapScreenState extends State<MapScreen> {
       right: 16,
       top: top,
       child: Material(
-        color: const Color(0xFFFFF4D6),
+        color: AppColors.accentSoft,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -406,10 +441,12 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _calculating() => const Positioned.fill(
+  Widget _calculating() => Positioned.fill(
     child: ColoredBox(
-      color: Color(0x3D002B5B),
-      child: Center(
+      // Same navy scrim as before (0x3D002B5B), expressed as a token instead
+      // of a new hex literal: 0x3D / 0xFF is ~24% opacity.
+      color: AppColors.navy.withValues(alpha: 0x3D / 0xFF),
+      child: const Center(
         child: Card(
           child: Padding(
             padding: EdgeInsets.all(AppSpacing.xl),

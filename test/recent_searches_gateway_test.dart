@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -26,9 +28,12 @@ class FakeRemote implements RecentSearchesGateway {
   Object? error;
   final List<String> saved = [];
   int clears = 0;
+  Completer<void>? listGate;
+  Completer<void>? saveGate;
 
   @override
   Future<List<CampusPlace>> list() async {
+    await listGate?.future;
     final failure = error;
     if (failure != null) throw failure;
     return remote;
@@ -36,6 +41,7 @@ class FakeRemote implements RecentSearchesGateway {
 
   @override
   Future<void> save(CampusPlace place) async {
+    await saveGate?.future;
     final failure = error;
     if (failure != null) throw failure;
     saved.add(place.id);
@@ -47,6 +53,9 @@ class FakeRemote implements RecentSearchesGateway {
     if (failure != null) throw failure;
     clears++;
   }
+
+  @override
+  Future<void> clearLocal() async {}
 }
 
 class FakeAuth implements AuthTokenProvider {
@@ -185,6 +194,57 @@ void main() {
     expect(remote.clears, 0);
     expect(await store.load(), isEmpty);
   });
+
+  test(
+    'clearLocal removes the cache without clearing remote history',
+    () async {
+      final remote = FakeRemote();
+      final store = SearchHistoryStore();
+      await store.add(horn.toDestination());
+      final gateway = CachedRecentSearches(remote: remote, cache: store);
+
+      await gateway.clearLocal();
+
+      expect(remote.clears, 0);
+      expect(await store.load(), isEmpty);
+    },
+  );
+
+  test(
+    'clearLocal prevents an older in-flight save from restoring the cache',
+    () async {
+      final remote = FakeRemote()..saveGate = Completer<void>();
+      final store = SearchHistoryStore();
+      final gateway = CachedRecentSearches(remote: remote, cache: store);
+
+      final pendingSave = gateway.save(horn);
+      await Future<void>.delayed(Duration.zero);
+      await gateway.clearLocal();
+      remote.saveGate!.complete();
+      await pendingSave;
+
+      expect(await store.load(), isEmpty);
+    },
+  );
+
+  test(
+    'clearLocal prevents an older in-flight list from restoring the cache',
+    () async {
+      final remote = FakeRemote()
+        ..remote = const [horn]
+        ..listGate = Completer<void>();
+      final store = SearchHistoryStore();
+      final gateway = CachedRecentSearches(remote: remote, cache: store);
+
+      final pendingList = gateway.list();
+      await Future<void>.delayed(Duration.zero);
+      await gateway.clearLocal();
+      remote.listGate!.complete();
+      await pendingList;
+
+      expect(await store.load(), isEmpty);
+    },
+  );
 
   test(
     'HttpRecentSearchesGateway refreshes once and retries after a 401',

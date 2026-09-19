@@ -416,5 +416,57 @@ void main() {
         expect(secondReading.usable, isTrue);
       },
     );
+
+    test('primeLastKnown seeds a remembered coordinate for the approximate '
+        'fallback', () async {
+      const primed = NavigationCoordinate(
+        latitude: 33.7838,
+        longitude: -118.1141,
+      );
+      final fake = FakeGeolocatorPlatform(shouldThrowOnGetPosition: true);
+      GeolocatorPlatform.instance = fake;
+
+      final service = GeolocatorLocationService();
+      service.primeLastKnown(primed);
+      final reading = await service.current();
+
+      expect(reading.availability, equals(LocationAvailability.approximate));
+      expect(reading.coordinate?.latitude, equals(primed.latitude));
+      expect(reading.coordinate?.longitude, equals(primed.longitude));
+    });
+
+    test('primeLastKnown never overwrites a coordinate a live fix already '
+        'produced', () async {
+      const liveCoord = NavigationCoordinate(
+        latitude: 33.784,
+        longitude: -118.115,
+      );
+      const primedCoord = NavigationCoordinate(latitude: 10, longitude: 10);
+      final testPosition = Position(
+        longitude: liveCoord.longitude,
+        latitude: liveCoord.latitude,
+        timestamp: DateTime(2024, 1, 1),
+        accuracy: 5,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
+      final fake = FakeGeolocatorPlatform(position: testPosition);
+      GeolocatorPlatform.instance = fake;
+
+      final service = GeolocatorLocationService();
+      await service.current(); // establishes the live fix as _lastKnown
+
+      service.primeLastKnown(primedCoord);
+      fake.shouldThrowOnGetPosition = true;
+      final reading = await service.current();
+
+      expect(reading.availability, equals(LocationAvailability.approximate));
+      expect(reading.coordinate?.latitude, equals(liveCoord.latitude));
+      expect(reading.coordinate?.longitude, equals(liveCoord.longitude));
+    });
   });
 }

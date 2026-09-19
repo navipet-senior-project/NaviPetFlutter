@@ -290,4 +290,59 @@ void main() {
     expect(controller.results, isEmpty);
     expect(controller.status, CampusSearchStatus.noResults);
   });
+
+  test('reset drops the query and results without disposing', () async {
+    final gateway = FakeGateway();
+    final controller = CampusSearchController(
+      gateway: gateway,
+      location: FakeLocationProvider(),
+      debounce: const Duration(milliseconds: 20),
+    );
+    addTearDown(controller.dispose);
+
+    controller.queryChanged('college of business');
+    await debounceElapsed();
+    expect(controller.results, isNotEmpty);
+
+    controller.reset();
+
+    expect(controller.query, '');
+    expect(controller.results, isEmpty);
+    expect(controller.status, CampusSearchStatus.initial);
+
+    // Still usable afterward — reset() is not a substitute for dispose().
+    controller.queryChanged('college of business');
+    await debounceElapsed();
+    expect(controller.results, isNotEmpty);
+  });
+
+  test(
+    'reset stops a stale in-flight search from landing on top of it',
+    () async {
+      final pending = Completer<List<CampusPlace>>();
+      final gateway = FakeGateway()..onAutocomplete = (_) => pending.future;
+      final controller = CampusSearchController(
+        gateway: gateway,
+        location: FakeLocationProvider(),
+        debounce: const Duration(milliseconds: 20),
+      );
+      addTearDown(controller.dispose);
+
+      controller.queryChanged('college of business');
+      await debounceElapsed();
+      expect(controller.status, CampusSearchStatus.loading);
+
+      controller.reset();
+      expect(controller.status, CampusSearchStatus.initial);
+
+      // The search that reset() interrupted finally answers — it must not
+      // resurrect the query/results reset() just cleared.
+      pending.complete([cob]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.status, CampusSearchStatus.initial);
+      expect(controller.results, isEmpty);
+      expect(controller.query, '');
+    },
+  );
 }

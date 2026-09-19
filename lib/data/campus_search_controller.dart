@@ -69,6 +69,18 @@ class CampusSearchController extends ChangeNotifier {
     );
   }
 
+  /// Drops the current query and results without disposing. Used when the
+  /// signed-in identity changes — this search must not keep showing the
+  /// previous user's query or results the next time it's opened.
+  void reset() {
+    _timer?.cancel();
+    _generation++;
+    _query = '';
+    _message = null;
+    _results = const [];
+    _setStatus(CampusSearchStatus.initial);
+  }
+
   Future<void> retry() async {
     _timer?.cancel();
     final normalized = _normalize(_query);

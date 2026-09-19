@@ -24,7 +24,7 @@ class NavigationFlowController extends ChangeNotifier {
     required this.recentSearches,
     required this.routes,
     required this.location,
-    required NaviMapController map,
+    NaviMapController map = const _NoOpMapController(),
     // ignore: prefer_initializing_formals
   }) : _map = map {
     search.addListener(notifyListeners);
@@ -39,10 +39,15 @@ class NavigationFlowController extends ChangeNotifier {
   final RecentSearchesGateway recentSearches;
   final RouteRepository routes;
   final LocationService location;
-  final NaviMapController _map;
+
+  // Not final: attachMap()/detachMap() swap it as the real Mapbox map is
+  // created and torn down alongside MapScreen's own lifecycle, independent
+  // of this controller's (app-scoped, longer-lived) lifecycle.
+  NaviMapController _map;
 
   NavigationFlowState _state = const FlowIdle();
   List<CampusPlace> _recents = const [];
+  Future<void> _localRecentsReady = Future.value();
   int _generation = 0;
 
   // Chained so map mutations always apply in the order they were issued
@@ -56,11 +61,111 @@ class NavigationFlowController extends ChangeNotifier {
 
   List<CampusPlace> get recents => List.unmodifiable(_recents);
 
-  /// The map seam this flow drives. Exposed so `MapScreen` can hand a
-  /// `DeferredMapController` (built before the real Mapbox map exists) its
-  /// real delegate once `onMapCreated` fires — the flow is constructed
-  /// ahead of the map, so something has to bridge the two.
-  NaviMapController get map => _map;
+  /// Hands the flow a live map to draw on, and re-issues whatever the
+  /// current state should already be showing.
+  ///
+  /// `MapScreen` calls this from `onMapCreated`, once the real Mapbox map
+  /// and its annotation managers exist — which is always *after* this
+  /// controller itself was constructed (it's built in `main.dart`'s
+  /// `initState`, before `MapWidget` fires `onMapCreated`) and, on every
+  /// remount (e.g. `NaviBottomNav` navigating to `/checklist` or `/pet` and
+  /// back — this controller is app-scoped and outlives any one `MapScreen`
+  /// instance), after the app already has a destination or route showing.
+  /// Without the replay, the map comes back blank under a route sheet that
+  /// still claims a distance and duration.
+  Future<void> attachMap(NaviMapController controller) {
+    _map = controller;
+    return _redraw();
+  }
+
+  /// Detaches whatever map is currently attached. `MapScreen` calls this
+  /// from `dispose()`, so a `MapboxNaviMapController` wrapping an
+  /// already-torn-down `MapboxMap` is never left as the delegate — an
+  /// async reply (e.g. a `calculateRoute()` in flight when the user
+  /// navigates away) that lands afterward is silently dropped instead of
+  /// calling into a dead map surface.
+  void detachMap() {
+    _map = const _NoOpMapController();
+  }
+
+  /// Re-issues the draw for whatever [_state] already is, onto whatever
+  /// [_map] currently is. Used by [attachMap] to catch a newly (re)attached
+  /// map up to date; states with nothing to draw (idle, searching,
+  /// configuring, calculating, error) are left alone.
+  Future<void> _redraw() async {
+    switch (_state) {
+      case FlowPlacePreview(:final destination):
+        if (destination == null) return;
+        await _queueMap(
+          () => _map.showPlace(
+            destination.coordinate,
+            label: destination.name,
+            bottomInset: placeSheetInset,
+          ),
+        );
+      case FlowRoutePreview(:final destination, :final origin, :final plan):
+        await _redrawRoute(
+          destination: destination,
+          origin: origin,
+          plan: plan,
+        );
+      case FlowRouteSteps(:final destination, :final origin, :final plan):
+        await _redrawRoute(
+          destination: destination,
+          origin: origin,
+          plan: plan,
+        );
+      case FlowActiveNavigation(:final origin):
+        final coordinate = origin.coordinate;
+        if (coordinate == null) return;
+        await _queueMap(() => _map.followUser(coordinate));
+      case FlowIdle():
+      case FlowSearching():
+      case FlowConfiguringRoute():
+      case FlowCalculatingRoute():
+      case FlowIndoorHandoff():
+      case FlowError():
+      // Nothing was ever drawn for these states, so there is nothing to
+      // replay.
+    }
+  }
+
+  Future<void> _redrawRoute({
+    required NaviDestination destination,
+    required RouteOrigin origin,
+    required RoutePlan plan,
+  }) async {
+    final coordinate = origin.coordinate;
+    if (coordinate == null) return;
+    await _queueMap(
+      () => _map.showRoute(
+        plan,
+        origin: coordinate,
+        destination: destination,
+        bottomInset: routeSheetInset,
+      ),
+    );
+  }
+
+  /// Returns the flow to [FlowIdle], drops the in-memory recents list, and
+  /// resets the search — called when the signed-in identity changes (sign
+  /// out, sign in, or a different user signing in on the same device).
+  ///
+  /// This controller is app-scoped and outlives any one session; without
+  /// this, a new user briefly sees whatever the previous one had on
+  /// screen — their destination, their origin, their recent searches —
+  /// until they happen to interact with something that overwrites it.
+  void resetForNewIdentity() {
+    _generation++;
+    _recents = const [];
+    _localRecentsReady = recentSearches.clearLocal().catchError((_) {
+      // Recents are a convenience. A local-storage failure must not block
+      // the rest of the identity reset or future search.
+    });
+    search.reset();
+    _set(const FlowIdle());
+    unawaited(_queueMap(() => _map.clear()));
+  }
 
   void openSearch({bool pickingOrigin = false}) {
     final current = _state;
@@ -99,8 +204,11 @@ class NavigationFlowController extends ChangeNotifier {
   }
 
   Future<void> loadRecents() async {
+    final generation = _generation;
     try {
+      await _localRecentsReady;
       final loaded = await recentSearches.list();
+      if (generation != _generation) return;
       _recents = loaded;
       notifyListeners();
     } on Object {
@@ -531,4 +639,39 @@ class NavigationFlowController extends ChangeNotifier {
     search.removeListener(notifyListeners);
     super.dispose();
   }
+}
+
+/// Silently drops every call. The flow's map until [NavigationFlowController.
+/// attachMap] hands it a real one — deliberately a no-op, not a queue:
+/// nothing issued before attachment is replayed. [NavigationFlowController.
+/// attachMap] instead re-issues the draw for whatever state the flow is
+/// already in when it's called, which is what "catching up" a newly (or
+/// freshly re-) attached map actually requires; queueing every call made
+/// while unattached would replay stale intermediate states on top of it.
+class _NoOpMapController implements NaviMapController {
+  const _NoOpMapController();
+
+  @override
+  Future<void> showPlace(
+    NavigationCoordinate coordinate, {
+    required String label,
+    required double bottomInset,
+  }) async {}
+
+  @override
+  Future<void> showRoute(
+    RoutePlan plan, {
+    required NavigationCoordinate origin,
+    required NaviDestination destination,
+    required double bottomInset,
+  }) async {}
+
+  @override
+  Future<void> followUser(
+    NavigationCoordinate coordinate, {
+    double? bearing,
+  }) async {}
+
+  @override
+  Future<void> clear() async {}
 }

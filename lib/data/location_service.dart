@@ -35,6 +35,12 @@ abstract interface class LocationService {
   Future<LocationReading> current();
 
   Stream<NavigationCoordinate> watch();
+
+  /// Seeds a remembered coordinate to fall back to if the next [current]
+  /// call can't get a live fix. Implementations must not let this overwrite
+  /// a fresher coordinate a real GPS fix already produced — it only fills
+  /// the gap when nothing better is known yet.
+  void primeLastKnown(NavigationCoordinate coordinate);
 }
 
 class GeolocatorLocationService implements LocationService {
@@ -92,6 +98,11 @@ class GeolocatorLocationService implements LocationService {
       _lastKnown = coordinate;
       return coordinate;
     });
+  }
+
+  @override
+  void primeLastKnown(NavigationCoordinate coordinate) {
+    _lastKnown ??= coordinate;
   }
 
   NavigationCoordinate _coordinateFrom(Position position) {
