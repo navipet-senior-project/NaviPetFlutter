@@ -2,7 +2,7 @@ import 'navigation_models.dart';
 
 export 'navigation_models.dart' show CampusDestinationType;
 
-enum CampusSearchFailure { offline, api }
+enum CampusSearchFailure { offline, api, unauthorized }
 
 class CampusSearchException implements Exception {
   const CampusSearchException({

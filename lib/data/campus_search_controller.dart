@@ -14,6 +14,7 @@ enum CampusSearchStatus {
   results,
   noResults,
   offline,
+  unauthorized,
   permissionRequired,
   locationUnavailable,
   apiError,
@@ -86,11 +87,7 @@ class CampusSearchController extends ChangeNotifier {
     } on CampusSearchException catch (error) {
       if (_isCurrent(generation)) {
         _message = error.message;
-        _setStatus(
-          error.failure == CampusSearchFailure.offline
-              ? CampusSearchStatus.offline
-              : CampusSearchStatus.apiError,
-        );
+        _setStatus(_statusFor(error.failure));
       }
       return null;
     }
@@ -141,11 +138,7 @@ class CampusSearchController extends ChangeNotifier {
       if (!_isCurrent(generation)) return;
       _message = error.message;
       _results = const [];
-      _setStatus(
-        error.failure == CampusSearchFailure.offline
-            ? CampusSearchStatus.offline
-            : CampusSearchStatus.apiError,
-      );
+      _setStatus(_statusFor(error.failure));
     } on Object catch (error) {
       if (!_isCurrent(generation)) return;
       _message = error.toString();
@@ -153,6 +146,13 @@ class CampusSearchController extends ChangeNotifier {
       _setStatus(CampusSearchStatus.apiError);
     }
   }
+
+  static CampusSearchStatus _statusFor(CampusSearchFailure failure) =>
+      switch (failure) {
+        CampusSearchFailure.offline => CampusSearchStatus.offline,
+        CampusSearchFailure.unauthorized => CampusSearchStatus.unauthorized,
+        CampusSearchFailure.api => CampusSearchStatus.apiError,
+      };
 
   bool _isCurrent(int generation) => !_disposed && generation == _generation;
 
