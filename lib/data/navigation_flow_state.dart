@@ -73,13 +73,24 @@ class FlowIdle extends NavigationFlowState {
 }
 
 class FlowSearching extends NavigationFlowState {
-  const FlowSearching({this.query = '', this.pickingOrigin = false});
+  const FlowSearching({
+    this.query = '',
+    this.pickingOrigin = false,
+    this.configuringRoute,
+  });
 
   final String query;
 
   /// True when the overlay is choosing a starting point rather than a
   /// destination.
   final bool pickingOrigin;
+
+  /// The route configuration this search interrupted, when [pickingOrigin]
+  /// is true. Picking a place restores it with the new origin instead of
+  /// falling through to an ordinary [FlowPlacePreview] — otherwise the
+  /// destination and mode being configured would be lost. Null for an
+  /// ordinary destination search.
+  final FlowConfiguringRoute? configuringRoute;
 }
 
 class FlowPlacePreview extends NavigationFlowState {

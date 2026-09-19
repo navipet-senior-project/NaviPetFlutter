@@ -50,8 +50,20 @@ class NavigationFlowController extends ChangeNotifier {
   List<CampusPlace> get recents => List.unmodifiable(_recents);
 
   void openSearch({bool pickingOrigin = false}) {
+    final current = _state;
+    // Picking an origin interrupts route configuration; remember it so
+    // selecting a place can restore it instead of discarding the
+    // destination and mode already chosen.
+    final configuringRoute = pickingOrigin && current is FlowConfiguringRoute
+        ? current
+        : null;
     _generation++;
-    _set(FlowSearching(pickingOrigin: pickingOrigin));
+    _set(
+      FlowSearching(
+        pickingOrigin: pickingOrigin,
+        configuringRoute: configuringRoute,
+      ),
+    );
     unawaited(loadRecents());
   }
 
@@ -61,6 +73,7 @@ class NavigationFlowController extends ChangeNotifier {
       _state = FlowSearching(
         query: value,
         pickingOrigin: current.pickingOrigin,
+        configuringRoute: current.configuringRoute,
       );
     }
     search.queryChanged(value);
@@ -84,8 +97,9 @@ class NavigationFlowController extends ChangeNotifier {
   }
 
   Future<void> selectPlace(CampusPlace place) async {
+    final requestState = _state;
     final generation = ++_generation;
-    final query = switch (_state) {
+    final query = switch (requestState) {
       FlowSearching(:final query) => query,
       _ => '',
     };
@@ -104,6 +118,23 @@ class NavigationFlowController extends ChangeNotifier {
     final destination = resolved.outdoorDestination == null
         ? null
         : resolved.toDestination();
+
+    // Picking an origin (rather than an ordinary destination search)
+    // restores the interrupted route configuration with the new origin
+    // instead of falling through to a plain place preview, which would
+    // discard the destination and mode already chosen.
+    if (requestState is FlowSearching && requestState.pickingOrigin) {
+      final configuring = requestState.configuringRoute;
+      if (configuring != null) {
+        // A place with no map pin has no coordinate to route from; stay in
+        // picking mode rather than silently dropping the configuration.
+        if (destination == null) return;
+        _set(configuring);
+        setOrigin(PlaceOrigin(place: destination));
+        unawaited(recentSearches.save(resolved));
+        return;
+      }
+    }
 
     _set(
       FlowPlacePreview(
@@ -164,6 +195,7 @@ class NavigationFlowController extends ChangeNotifier {
   }
 
   Future<void> setMode(TravelMode mode) async {
+    if (!enabledTravelModes.contains(mode)) return;
     final current = _state;
     final (destination, origin, place) = switch (current) {
       FlowConfiguringRoute(:final destination, :final origin, :final place) => (
@@ -386,36 +418,21 @@ class NavigationFlowController extends ChangeNotifier {
             destination: destination,
           ),
         );
-      case FlowRouteSteps(
-        :final place,
-        :final destination,
-        :final origin,
-        :final plan,
-      ):
-        _generation++;
-        _set(
-          FlowRoutePreview(
-            destination: destination,
-            origin: origin,
-            plan: plan,
-            place: place,
+        // The drawn route must not survive behind the place sheet.
+        unawaited(
+          _map.showPlace(
+            destination.coordinate,
+            label: destination.name,
+            bottomInset: placeSheetInset,
           ),
         );
-      case FlowActiveNavigation(
-        :final place,
-        :final destination,
-        :final origin,
-        :final plan,
-      ):
-        _generation++;
-        _set(
-          FlowRoutePreview(
-            destination: destination,
-            origin: origin,
-            plan: plan,
-            place: place,
-          ),
-        );
+      case FlowRouteSteps():
+        // Identical to the user tapping the steps sheet's close affordance
+        // — one behaviour per transition, not a second copy of it.
+        hideSteps();
+      case FlowActiveNavigation():
+        // Identical to the user tapping "end navigation".
+        unawaited(endRoute());
       case FlowIndoorHandoff():
         _generation++;
         _set(const FlowIdle());

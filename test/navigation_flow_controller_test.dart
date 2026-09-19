@@ -298,4 +298,112 @@ void main() {
 
     expect(controller.state, isA<FlowPlacePreview>());
   });
+
+  // Fix-round additions (review findings on the first pass):
+  // closing the origin-picking loop, redrawing the map on back() out of a
+  // route, delegating back()'s FlowRouteSteps/FlowActiveNavigation arms to
+  // hideSteps()/endRoute(), and rejecting a disabled travel mode.
+
+  test('picking an origin restores the destination and mode', () async {
+    final search = harness.FakeSearchGateway()
+      ..results = const [harness.horn, harness.library];
+    final controller = harness.build(search: search)..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    final before = controller.state as FlowConfiguringRoute;
+
+    controller.openSearch(pickingOrigin: true);
+    final searching = controller.state as FlowSearching;
+    expect(searching.pickingOrigin, isTrue);
+    expect(searching.configuringRoute, isNotNull);
+
+    await controller.selectPlace(harness.library);
+
+    final after = controller.state as FlowConfiguringRoute;
+    expect(after.destination.name, before.destination.name);
+    expect(after.mode, before.mode);
+    expect(after.origin, isA<PlaceOrigin>());
+    expect((after.origin as PlaceOrigin).place.name, 'University Library');
+  });
+
+  test('an ordinary search does not carry a route to restore', () async {
+    final controller = harness.build()..openSearch();
+
+    final state = controller.state as FlowSearching;
+    expect(state.pickingOrigin, isFalse);
+    expect(state.configuringRoute, isNull);
+
+    await controller.selectPlace(harness.horn);
+    expect(controller.state, isA<FlowPlacePreview>());
+  });
+
+  test(
+    'picking an origin with an unmapped place stays in picking mode',
+    () async {
+      final controller = harness.build()..openSearch();
+      await controller.selectPlace(harness.horn);
+      await controller.requestDirections();
+
+      controller.openSearch(pickingOrigin: true);
+      await controller.selectPlace(harness.unmapped);
+
+      final state = controller.state as FlowSearching;
+      expect(state.pickingOrigin, isTrue);
+      expect(state.configuringRoute, isNotNull);
+    },
+  );
+
+  test('back from a route preview redraws the place instead of leaving the '
+      'route on the map', () async {
+    final map = harness.RecordingMap();
+    final controller = harness.build(map: map)..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    map.calls.clear();
+
+    controller.back();
+
+    expect(controller.state, isA<FlowPlacePreview>());
+    expect(map.calls, contains('showPlace:Horn Center'));
+  });
+
+  test('back from route steps behaves like closing the steps sheet', () async {
+    final controller = harness.build()..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    final plan = (controller.state as FlowRoutePreview).plan;
+    controller.showSteps();
+
+    controller.back();
+
+    expect(controller.state, isA<FlowRoutePreview>());
+    expect((controller.state as FlowRoutePreview).plan, plan);
+  });
+
+  test('back from active navigation behaves like ending the route', () async {
+    final controller = harness.build()..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    await controller.startRoute();
+
+    controller.back();
+
+    expect(controller.state, isA<FlowRoutePreview>());
+  });
+
+  test('setMode ignores a travel mode that is not enabled', () async {
+    final routes = harness.FakeRouteGateway();
+    final controller = harness.build(routes: routes)..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+
+    await controller.setMode(TravelMode.accessible);
+
+    expect(routes.calls, 1);
+    expect((controller.state as FlowRoutePreview).mode, TravelMode.walking);
+  });
 }

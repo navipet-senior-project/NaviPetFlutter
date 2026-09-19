@@ -41,6 +41,23 @@ const unmapped = CampusPlace(
   buildingCode: 'VEC',
 );
 
+const libraryCoordinate = NavigationCoordinate(
+  latitude: 33.78854,
+  longitude: -118.11407,
+);
+
+/// A second mapped place, distinct from [horn], for tests that pick an
+/// origin rather than a destination.
+const library = CampusPlace(
+  id: '00000000-0000-4000-8000-000000000003',
+  type: CampusDestinationType.building,
+  title: 'University Library',
+  subtitle: 'LIB',
+  source: 'csulb',
+  buildingCode: 'LIB',
+  outdoorDestination: libraryCoordinate,
+);
+
 class FakeSearchGateway implements CampusSearchGateway {
   List<CampusPlace> results = const [horn];
 
