@@ -63,5 +63,28 @@ void main() {
     controller.back();
 
     expect(controller.state, isA<FlowIdle>());
+    expect(map.calls, contains('clear'));
   });
+
+  test(
+    'a stale selectPlace reply is discarded once a newer one lands',
+    () async {
+      final search = harness.FakeSearchGateway();
+      // Block the first selectPlace's gateway reply so it stays in flight
+      // while a second, newer selectPlace runs to completion first.
+      search.blockPlace(harness.horn.id);
+      final controller = harness.build(search: search)..openSearch();
+
+      final firstSelect = controller.selectPlace(harness.horn);
+      await controller.selectPlace(harness.unmapped);
+
+      // Now let the stale first reply land.
+      search.unblockPlace(harness.horn.id);
+      await firstSelect;
+
+      final state = controller.state as FlowPlacePreview;
+      expect(state.place.id, harness.unmapped.id);
+      expect(state.routable, isFalse);
+    },
+  );
 }

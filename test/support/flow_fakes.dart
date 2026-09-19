@@ -3,6 +3,8 @@
 // Task 11 (search + place preview) and Task 12 (route configuration and
 // calculation) both need these. They live here instead of inside either
 // test file so neither test file imports another test file.
+import 'dart:async';
+
 import 'package:navipet/data/campus_place.dart';
 import 'package:navipet/data/campus_search_controller.dart';
 import 'package:navipet/data/campus_search_gateway.dart';
@@ -42,6 +44,15 @@ const unmapped = CampusPlace(
 class FakeSearchGateway implements CampusSearchGateway {
   List<CampusPlace> results = const [horn];
 
+  final Map<String, Completer<void>> _blocked = {};
+
+  /// Test control: makes `place(id)` wait until [unblockPlace] releases the
+  /// same id, so a test can hold one `selectPlace` in flight while a second,
+  /// newer one runs to completion — proving the stale-generation guard.
+  void blockPlace(String id) => _blocked[id] = Completer<void>();
+
+  void unblockPlace(String id) => _blocked.remove(id)?.complete();
+
   @override
   Future<List<CampusPlace>> autocomplete(
     String query, {
@@ -51,6 +62,8 @@ class FakeSearchGateway implements CampusSearchGateway {
 
   @override
   Future<CampusPlace> place(String stableId) async {
+    final gate = _blocked[stableId];
+    if (gate != null) await gate.future;
     for (final item in results) {
       if (item.id == stableId) return item;
     }
@@ -85,7 +98,12 @@ class FakeRecents implements RecentSearchesGateway {
   Future<List<CampusPlace>> list() async => stored;
 
   @override
-  Future<void> save(CampusPlace place) async => saved.add(place.id);
+  Future<void> save(CampusPlace place) async {
+    // Matches HttpRecentSearchesGateway.save(): external (Mapbox) results
+    // are not CSULB records and are never stored server-side.
+    if (place.external) return;
+    saved.add(place.id);
+  }
 
   @override
   Future<void> clear() async => stored = const [];
