@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/navi_map_controller.dart';
 import 'package:navipet/data/navigation_models.dart';
-import 'package:navipet/data/travel_mode.dart';
 
 /// Records calls so flow tests can assert what the map was asked to do.
 class RecordingMapController implements NaviMapController {

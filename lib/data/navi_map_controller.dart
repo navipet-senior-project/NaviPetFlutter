@@ -1,8 +1,3 @@
-// Constructor parameters keep public names (map/routes/markers) distinct
-// from the private fields they populate, so initializing formals — which
-// would force the parameter name to match the private field name — aren't
-// used here.
-// ignore_for_file: prefer_initializing_formals
 import 'package:flutter/material.dart' show Colors;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
@@ -34,8 +29,14 @@ class MapboxNaviMapController implements NaviMapController {
     required MapboxMap map,
     required PolylineAnnotationManager routes,
     required PointAnnotationManager markers,
-  }) : _map = map,
+  }) : // Initializing formals would force the private field names into the
+       // public constructor signature, making it unusable from other
+       // libraries. Same resolution as HttpCampusSearchGateway.
+       // ignore: prefer_initializing_formals
+       _map = map,
+       // ignore: prefer_initializing_formals
        _routes = routes,
+       // ignore: prefer_initializing_formals
        _markers = markers;
 
   final MapboxMap _map;
