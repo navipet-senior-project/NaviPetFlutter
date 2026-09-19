@@ -19,8 +19,8 @@ class CurrentLocationOrigin extends RouteOrigin {
     required NavigationCoordinate coordinate,
     this.approximate = false,
   })
-      // ignore: prefer_initializing_formals
-      : _coordinate = coordinate;
+    // ignore: prefer_initializing_formals
+    : _coordinate = coordinate;
 
   final NavigationCoordinate _coordinate;
   final bool approximate;
