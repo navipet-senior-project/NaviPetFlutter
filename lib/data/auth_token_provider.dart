@@ -9,6 +9,15 @@ abstract interface class AuthTokenProvider {
   Future<String?> token({bool forceRefresh = false});
 }
 
+/// A no-session stand-in for callers that require a non-null
+/// [AuthTokenProvider] (e.g. `HttpRecentSearchesGateway`, whose gateway
+/// requires one) when Supabase itself is not configured. Requests go out
+/// unauthenticated rather than the app failing to build its dependencies.
+class AnonymousAuthTokenProvider implements AuthTokenProvider {
+  @override
+  Future<String?> token({bool forceRefresh = false}) async => null;
+}
+
 class SupabaseAuthTokenProvider implements AuthTokenProvider {
   SupabaseAuthTokenProvider(this._auth);
 

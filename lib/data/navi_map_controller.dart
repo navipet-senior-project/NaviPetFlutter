@@ -24,6 +24,50 @@ abstract interface class NaviMapController {
   Future<void> clear();
 }
 
+/// Queues calls until [delegate] is set.
+///
+/// `NavigationFlowController` is built before the Mapbox map exists (its
+/// constructor runs in `main.dart`'s `initState`, before `MapWidget` has
+/// fired `onMapCreated`). This stands in for the real
+/// [MapboxNaviMapController] until `MapScreen` hands one over; anything the
+/// flow asks for before then is dropped, not stood in with a fabricated map
+/// surface.
+class DeferredMapController implements NaviMapController {
+  NaviMapController? _delegate;
+
+  set delegate(NaviMapController value) => _delegate = value;
+
+  @override
+  Future<void> showPlace(
+    NavigationCoordinate coordinate, {
+    required String label,
+    required double bottomInset,
+  }) async =>
+      _delegate?.showPlace(coordinate, label: label, bottomInset: bottomInset);
+
+  @override
+  Future<void> showRoute(
+    RoutePlan plan, {
+    required NavigationCoordinate origin,
+    required NaviDestination destination,
+    required double bottomInset,
+  }) async => _delegate?.showRoute(
+    plan,
+    origin: origin,
+    destination: destination,
+    bottomInset: bottomInset,
+  );
+
+  @override
+  Future<void> followUser(
+    NavigationCoordinate coordinate, {
+    double? bearing,
+  }) async => _delegate?.followUser(coordinate, bearing: bearing);
+
+  @override
+  Future<void> clear() async => _delegate?.clear();
+}
+
 class MapboxNaviMapController implements NaviMapController {
   MapboxNaviMapController({
     required MapboxMap map,

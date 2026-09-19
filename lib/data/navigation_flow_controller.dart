@@ -56,6 +56,12 @@ class NavigationFlowController extends ChangeNotifier {
 
   List<CampusPlace> get recents => List.unmodifiable(_recents);
 
+  /// The map seam this flow drives. Exposed so `MapScreen` can hand a
+  /// `DeferredMapController` (built before the real Mapbox map exists) its
+  /// real delegate once `onMapCreated` fires — the flow is constructed
+  /// ahead of the map, so something has to bridge the two.
+  NaviMapController get map => _map;
+
   void openSearch({bool pickingOrigin = false}) {
     final current = _state;
     // Picking an origin interrupts route configuration; remember it so
