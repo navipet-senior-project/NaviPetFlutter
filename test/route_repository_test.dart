@@ -92,4 +92,68 @@ void main() {
       throwsA(isA<RouteFailure>()),
     );
   });
+
+  test('captures the original error as cause in RouteFailure', () async {
+    final originalError = Exception('network timeout');
+    final gateway = FakeRouteGateway()..error = originalError;
+    final repository = RouteRepository(gateway: gateway);
+
+    try {
+      await repository.plan(origin: origin, destination: destination);
+      fail('Expected RouteFailure to be thrown');
+    } on RouteFailure catch (failure) {
+      expect(failure.cause, originalError);
+      expect(failure.stackTrace, isNotNull);
+    }
+  });
+
+  test('handles empty destination name with fallback in warning', () async {
+    final repository = RouteRepository(gateway: FakeRouteGateway());
+
+    final plan = await repository.plan(
+      origin: origin,
+      destination: const NaviDestination(
+        name: '',
+        address: 'Some Building',
+        coordinate: NavigationCoordinate(
+          latitude: 33.7831,
+          longitude: -118.1146,
+        ),
+        type: CampusDestinationType.room,
+        roomNumber: '404',
+      ),
+    );
+
+    expect(plan.endsAtBuilding, isTrue);
+    expect(
+      plan.warnings.single,
+      'Walking guidance ends at the destination. Indoor directions are '
+      'not available yet.',
+    );
+  });
+
+  test('prefers building code over name in warning', () async {
+    final repository = RouteRepository(gateway: FakeRouteGateway());
+
+    final plan = await repository.plan(
+      origin: origin,
+      destination: const NaviDestination(
+        name: 'Some Long Room Name',
+        address: 'Some Building',
+        coordinate: NavigationCoordinate(
+          latitude: 33.7831,
+          longitude: -118.1146,
+        ),
+        type: CampusDestinationType.room,
+        buildingCode: 'SLR',
+        roomNumber: '404',
+      ),
+    );
+
+    expect(plan.endsAtBuilding, isTrue);
+    expect(
+      plan.warnings.single,
+      'Walking guidance ends at SLR. Indoor directions are not available yet.',
+    );
+  });
 }
