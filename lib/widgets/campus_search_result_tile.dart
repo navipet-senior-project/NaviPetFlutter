@@ -106,7 +106,7 @@ class CampusSearchResultTile extends StatelessWidget {
 
   static String _distanceLabel(int meters) {
     final miles = meters / 1609.344;
-    if (miles < 0.1) return '${(meters * 3.28084).ceil()} ft';
+    if (miles < 0.1) return '${(meters * 3.28084).round()} ft';
     return '${miles.toStringAsFixed(miles < 10 ? 1 : 0)} mi';
   }
 }

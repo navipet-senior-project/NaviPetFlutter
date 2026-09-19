@@ -33,7 +33,7 @@ void main() {
 
     expect(find.text('VEC 404'), findsOneWidget);
     expect(find.text('Vivian Engineering Center'), findsOneWidget);
-    expect(find.text('Room · VEC · Floor 4 · 450 ft'), findsOneWidget);
+    expect(find.text('Room · VEC · Floor 4 · 449 ft'), findsOneWidget);
   });
 
   testWidgets('never shows a navigation-capability line', (tester) async {
