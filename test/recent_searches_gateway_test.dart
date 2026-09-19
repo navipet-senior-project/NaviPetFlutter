@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:navipet/data/auth_token_provider.dart';
 import 'package:navipet/data/campus_place.dart';
 import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/data/recent_searches_gateway.dart';
@@ -40,7 +43,24 @@ class FakeRemote implements RecentSearchesGateway {
 
   @override
   Future<void> clear() async {
+    final failure = error;
+    if (failure != null) throw failure;
     clears++;
+  }
+}
+
+class FakeAuth implements AuthTokenProvider {
+  FakeAuth(this.tokens);
+  final List<String?> tokens;
+  final List<bool> refreshCalls = [];
+  int _index = 0;
+
+  @override
+  Future<String?> token({bool forceRefresh = false}) async {
+    refreshCalls.add(forceRefresh);
+    final value = tokens[_index.clamp(0, tokens.length - 1)];
+    _index++;
+    return value;
   }
 }
 
@@ -91,4 +111,134 @@ void main() {
 
     expect((await store.load()).single.id, horn.id);
   });
+
+  test(
+    'an external place already in the cache never reaches the UI on fallback',
+    () async {
+      final store = SearchHistoryStore();
+      await store.add(
+        const NaviDestination(
+          id: 'ext-1',
+          name: 'Off-map Coffee',
+          address: 'Somewhere nearby',
+          coordinate: NavigationCoordinate(
+            latitude: 33.7838,
+            longitude: -118.1141,
+          ),
+          external: true,
+        ),
+      );
+      final remote = FakeRemote()..error = Exception('offline');
+      final gateway = CachedRecentSearches(remote: remote, cache: store);
+
+      final result = await gateway.list();
+
+      expect(result, isEmpty);
+    },
+  );
+
+  test(
+    'saving an external place never caches it locally, even if the remote save fails',
+    () async {
+      const externalPlace = CampusPlace(
+        id: 'ext-2',
+        type: CampusDestinationType.external,
+        title: 'Off-map POI',
+        subtitle: 'Nearby',
+        source: 'mapbox',
+        external: true,
+        outdoorDestination: NavigationCoordinate(
+          latitude: 33.7838,
+          longitude: -118.1141,
+        ),
+      );
+      final remote = FakeRemote()..error = Exception('offline');
+      final store = SearchHistoryStore();
+      final gateway = CachedRecentSearches(remote: remote, cache: store);
+
+      await gateway.save(externalPlace);
+
+      expect(await store.load(), isEmpty);
+    },
+  );
+
+  test('clear removes both the remote and local history', () async {
+    final remote = FakeRemote();
+    final store = SearchHistoryStore();
+    await store.add(horn.toDestination());
+    final gateway = CachedRecentSearches(remote: remote, cache: store);
+
+    await gateway.clear();
+
+    expect(remote.clears, 1);
+    expect(await store.load(), isEmpty);
+  });
+
+  test('a remote clear failure still clears the local history', () async {
+    final remote = FakeRemote()..error = Exception('offline');
+    final store = SearchHistoryStore();
+    await store.add(horn.toDestination());
+    final gateway = CachedRecentSearches(remote: remote, cache: store);
+
+    await gateway.clear();
+
+    expect(remote.clears, 0);
+    expect(await store.load(), isEmpty);
+  });
+
+  test(
+    'HttpRecentSearchesGateway refreshes once and retries after a 401',
+    () async {
+      var calls = 0;
+      final auth = FakeAuth(['stale', 'fresh']);
+      final client = MockClient((request) async {
+        calls++;
+        if (calls == 1) {
+          return http.Response(
+            '{"error":{"code":"INVALID_ACCESS_TOKEN","message":"Authentication required"}}',
+            401,
+          );
+        }
+        return http.Response('{"results":[]}', 200);
+      });
+      final gateway = HttpRecentSearchesGateway(
+        baseUrl: 'https://api.test',
+        auth: auth,
+        client: client,
+      );
+
+      await gateway.list();
+
+      expect(calls, 2);
+      expect(auth.refreshCalls, [false, true]);
+    },
+  );
+
+  test(
+    'HttpRecentSearchesGateway reports unauthorized when the retry also fails',
+    () async {
+      final client = MockClient(
+        (request) async => http.Response(
+          '{"error":{"code":"INVALID_ACCESS_TOKEN","message":"Authentication required"}}',
+          401,
+        ),
+      );
+      final gateway = HttpRecentSearchesGateway(
+        baseUrl: 'https://api.test',
+        auth: FakeAuth(['stale', 'also-stale']),
+        client: client,
+      );
+
+      await expectLater(
+        gateway.list(),
+        throwsA(
+          isA<CampusSearchException>().having(
+            (error) => error.failure,
+            'failure',
+            CampusSearchFailure.unauthorized,
+          ),
+        ),
+      );
+    },
+  );
 }

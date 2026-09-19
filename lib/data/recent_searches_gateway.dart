@@ -67,7 +67,34 @@ class HttpRecentSearchesGateway implements RecentSearchesGateway {
     String path, {
     String? body,
   }) async {
-    final token = await _auth.token();
+    var response = await _attempt(
+      method,
+      path,
+      body: body,
+      forceRefresh: false,
+    );
+    if (response.statusCode == 401) {
+      response = await _attempt(method, path, body: body, forceRefresh: true);
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CampusSearchException(
+        failure: response.statusCode == 401
+            ? CampusSearchFailure.unauthorized
+            : CampusSearchFailure.api,
+        message: 'Recent searches are unavailable.',
+        statusCode: response.statusCode,
+      );
+    }
+    return response;
+  }
+
+  Future<http.Response> _attempt(
+    String method,
+    String path, {
+    String? body,
+    required bool forceRefresh,
+  }) async {
+    final token = await _auth.token(forceRefresh: forceRefresh);
     final request = http.Request(method, Uri.parse('$baseUrl$path'))
       ..headers.addAll({
         if (token != null) 'Authorization': 'Bearer $token',
@@ -77,17 +104,7 @@ class HttpRecentSearchesGateway implements RecentSearchesGateway {
 
     try {
       final streamed = await _client.send(request).timeout(_timeout);
-      final response = await http.Response.fromStream(streamed);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw CampusSearchException(
-          failure: response.statusCode == 401
-              ? CampusSearchFailure.unauthorized
-              : CampusSearchFailure.api,
-          message: 'Recent searches are unavailable.',
-          statusCode: response.statusCode,
-        );
-      }
-      return response;
+      return await http.Response.fromStream(streamed);
     } on TimeoutException {
       throw const CampusSearchException(
         failure: CampusSearchFailure.offline,
@@ -119,7 +136,10 @@ class CachedRecentSearches implements RecentSearchesGateway {
       await _replaceCache(places);
       return places;
     } on Object {
-      return (await cache.load()).map(_fromDestination).toList(growable: false);
+      final cached = (await cache.load())
+          .map(_fromDestination)
+          .toList(growable: false);
+      return filterToCampus(cached);
     }
   }
 
@@ -130,7 +150,10 @@ class CachedRecentSearches implements RecentSearchesGateway {
     } on Object {
       // Keeping the local copy is more useful than surfacing this failure.
     }
-    if (place.outdoorDestination != null) {
+    // External/Mapbox results are not CSULB records; caching one would let it
+    // resurface indistinguishably from a real campus result on the next
+    // remote failure, defeating campus-only filtering.
+    if (place.outdoorDestination != null && !place.external) {
       await cache.add(place.toDestination());
     }
   }
@@ -164,6 +187,7 @@ class CachedRecentSearches implements RecentSearchesGateway {
     floorNumber: destination.floorNumber,
     outdoorDestination: destination.coordinate,
     indoorDestinationId: destination.indoorDestinationId,
+    external: destination.external,
     attribution: destination.attribution,
   );
 }
