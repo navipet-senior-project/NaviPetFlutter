@@ -13,6 +13,15 @@ class RouteStepRow extends StatelessWidget {
 
   final NavigationStep step;
   final int index;
+
+  /// The brief's Interfaces section lists this as `required bool
+  /// isDestination`, but its own Step-4 code template (the code actually
+  /// shipped here) declares it optional with a `false` default — the brief
+  /// contradicts itself. Kept optional deliberately: every call site today
+  /// (`RoutePreviewSheet`'s `ListView.builder`) always passes it explicitly
+  /// anyway, so the default only matters for call sites this task does not
+  /// control yet (e.g. a future turn-by-turn screen rendering a single
+  /// step), where "not the destination" is the safer implicit default.
   final bool isDestination;
 
   @override
