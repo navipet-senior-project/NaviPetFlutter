@@ -38,7 +38,8 @@ abstract interface class LocationService {
 }
 
 class GeolocatorLocationService implements LocationService {
-  GeolocatorLocationService({this._lastKnown});
+  GeolocatorLocationService({NavigationCoordinate? lastKnown})
+    : _lastKnown = lastKnown;
 
   static const _settings = LocationSettings(
     accuracy: LocationAccuracy.bestForNavigation,
@@ -67,10 +68,7 @@ class GeolocatorLocationService implements LocationService {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: _settings,
       );
-      final coordinate = NavigationCoordinate(
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
+      final coordinate = _coordinateFrom(position);
       _lastKnown = coordinate;
       return LocationReading(
         availability: LocationAvailability.available,
@@ -87,13 +85,17 @@ class GeolocatorLocationService implements LocationService {
     return Geolocator.getPositionStream(locationSettings: _settings).map((
       position,
     ) {
-      final coordinate = NavigationCoordinate(
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
+      final coordinate = _coordinateFrom(position);
       _lastKnown = coordinate;
       return coordinate;
     });
+  }
+
+  NavigationCoordinate _coordinateFrom(Position position) {
+    return NavigationCoordinate(
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
   }
 
   /// A remembered position is offered as approximate rather than presented as
