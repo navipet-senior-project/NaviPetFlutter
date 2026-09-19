@@ -32,6 +32,15 @@ class RecordingMapController implements NaviMapController {
 }
 
 void main() {
+  test('route camera replaces stale place-sheet padding', () {
+    final camera = routeCameraOptions(bottomInset: 320);
+
+    expect(camera.padding?.top, 140);
+    expect(camera.padding?.left, 48);
+    expect(camera.padding?.bottom, 320);
+    expect(camera.padding?.right, 48);
+  });
+
   test('the recording controller satisfies the interface', () async {
     final controller = RecordingMapController();
 

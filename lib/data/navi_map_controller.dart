@@ -4,6 +4,20 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../theme/app_theme.dart';
 import 'navigation_models.dart';
 
+/// Builds a complete camera configuration for a route, replacing any padding
+/// left behind by the place sheet before Mapbox calculates the fit.
+CameraOptions routeCameraOptions({required double bottomInset}) =>
+    CameraOptions(
+      bearing: 0,
+      pitch: 0,
+      padding: MbxEdgeInsets(
+        top: 140,
+        left: 48,
+        bottom: bottomInset,
+        right: 48,
+      ),
+    );
+
 /// Everything the flow needs from the map, and nothing else.
 abstract interface class NaviMapController {
   Future<void> showPlace(
@@ -89,8 +103,8 @@ class MapboxNaviMapController implements NaviMapController {
     if (coordinates.isEmpty) return;
     final camera = await _map.cameraForCoordinatesPadding(
       coordinates.map(_point).toList(),
-      CameraOptions(bearing: 0, pitch: 0),
-      MbxEdgeInsets(top: 140, left: 48, bottom: bottomInset, right: 48),
+      routeCameraOptions(bottomInset: bottomInset),
+      null,
       17,
       null,
     );

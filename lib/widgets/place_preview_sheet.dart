@@ -70,6 +70,7 @@ class PlacePreviewSheet extends StatelessWidget {
                   label: 'Close place details',
                   button: true,
                   child: IconButton(
+                    tooltip: 'Close place details',
                     onPressed: onClose,
                     icon: const Icon(Icons.close, color: AppColors.muted),
                     constraints: const BoxConstraints(

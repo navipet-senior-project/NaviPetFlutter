@@ -78,6 +78,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
                   label: 'Close search',
                   button: true,
                   child: IconButton(
+                    tooltip: 'Close search',
                     onPressed: widget.controller.back,
                     icon: const Icon(Icons.arrow_back, color: AppColors.navy),
                     constraints: const BoxConstraints(
@@ -111,6 +112,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
                               label: 'Clear search',
                               button: true,
                               child: IconButton(
+                                tooltip: 'Clear search',
                                 onPressed: () {
                                   _field.clear();
                                   widget.controller.queryChanged('');
