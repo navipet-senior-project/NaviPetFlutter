@@ -27,9 +27,7 @@ Widget host(NavigationFlowController controller) => MultiProvider(
 );
 
 void main() {
-  testWidgets('walks search to place preview to route preview', (
-    tester,
-  ) async {
+  testWidgets('walks search to place preview to route preview', (tester) async {
     final controller = harness.build();
     await tester.pumpWidget(host(controller));
 
