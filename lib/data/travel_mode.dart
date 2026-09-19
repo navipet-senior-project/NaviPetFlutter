@@ -17,6 +17,12 @@ enum TravelMode {
   };
 
   /// Mapbox Directions profile used to request this mode.
+  ///
+  /// [TravelMode.accessible] currently maps to the plain Mapbox `walking`
+  /// profile, identical to [TravelMode.walking]. That profile makes no
+  /// accessibility guarantees — no curb ramps, stairs, or elevators are
+  /// accounted for. Do not add [TravelMode.accessible] to
+  /// [enabledTravelModes] until real accessible-routing data backs it.
   String get directionsProfile => switch (this) {
     TravelMode.walking || TravelMode.accessible => 'walking',
     TravelMode.shuttle => 'driving',

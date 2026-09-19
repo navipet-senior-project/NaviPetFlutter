@@ -26,7 +26,7 @@ void main() {
   });
 
   test('a plan exposes its selected route', () {
-    const plan = RoutePlan(routes: [route], mode: TravelMode.walking);
+    final plan = RoutePlan(routes: [route], mode: TravelMode.walking);
 
     expect(plan.selected, route);
     expect(plan.selectedIndex, 0);
@@ -39,7 +39,7 @@ void main() {
       distanceMeters: 500,
       durationSeconds: 400,
     );
-    const plan = RoutePlan(
+    final plan = RoutePlan(
       routes: [route, other],
       mode: TravelMode.walking,
       endsAtBuilding: true,
@@ -56,6 +56,39 @@ void main() {
   test('carries maneuver metadata on steps', () {
     expect(plan(route).selected.steps.single.maneuverType, 'turn');
     expect(plan(route).selected.steps.single.maneuverModifier, 'left');
+  });
+
+  test('select clamps an out-of-range index to the valid bounds', () {
+    const other = NavigationRoute(
+      coordinates: [NavigationCoordinate(latitude: 33.79, longitude: -118.12)],
+      steps: [],
+      distanceMeters: 500,
+      durationSeconds: 400,
+    );
+    final plan = RoutePlan(routes: [route, other], mode: TravelMode.walking);
+
+    final clampedLow = plan.select(-1);
+    expect(clampedLow.selectedIndex, 0);
+    expect(clampedLow.selected, route);
+
+    final clampedHigh = plan.select(5);
+    expect(clampedHigh.selectedIndex, 1);
+    expect(clampedHigh.selected, other);
+  });
+
+  test('hasAlternatives reflects whether there is more than one route', () {
+    final single = RoutePlan(routes: [route], mode: TravelMode.walking);
+    final multiple = RoutePlan(
+      routes: [route, route],
+      mode: TravelMode.walking,
+    );
+
+    expect(single.hasAlternatives, isFalse);
+    expect(multiple.hasAlternatives, isTrue);
+  });
+
+  test('warnings default to an empty list', () {
+    expect(plan(route).warnings, const <String>[]);
   });
 }
 

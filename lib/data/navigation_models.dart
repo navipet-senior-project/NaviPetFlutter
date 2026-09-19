@@ -153,7 +153,10 @@ class RoutePlan {
     this.selectedIndex = 0,
     this.warnings = const [],
     this.endsAtBuilding = false,
-  });
+  }) : assert(
+         routes.length > 0,
+         'RoutePlan.routes must not be empty — there must always be a selectable route',
+       );
 
   final List<NavigationRoute> routes;
   final TravelMode mode;
