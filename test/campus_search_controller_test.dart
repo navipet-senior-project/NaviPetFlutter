@@ -233,4 +233,61 @@ void main() {
     expect(gateway.proximities.last?.latitude, 33.7838);
     expect(gateway.proximities.last?.longitude, -118.1141);
   });
+
+  test('filters external results out of autocomplete', () async {
+    final gateway = FakeGateway()
+      ..onAutocomplete = (_) async => [
+        cob,
+        const CampusPlace(
+          id: 'mapbox:dXJuOm1ieHBsYzpBQQ',
+          type: CampusDestinationType.external,
+          title: 'College of Business',
+          subtitle: 'Somewhere else entirely',
+          source: 'mapbox',
+          external: true,
+          outdoorDestination: NavigationCoordinate(
+            latitude: 34.0522,
+            longitude: -118.2437,
+          ),
+        ),
+      ];
+    final controller = CampusSearchController(
+      gateway: gateway,
+      location: FakeLocationProvider(),
+      debounce: const Duration(milliseconds: 20),
+    );
+    addTearDown(controller.dispose);
+
+    controller.queryChanged('college of business');
+    await debounceElapsed();
+
+    expect(controller.results.map((item) => item.id), [cob.id]);
+    expect(controller.status, CampusSearchStatus.results);
+  });
+
+  test('reports no results when every match was off campus', () async {
+    final gateway = FakeGateway()
+      ..onAutocomplete = (_) async => [
+        const CampusPlace(
+          id: 'mapbox:dXJuOm1ieHBsYzpCQg',
+          type: CampusDestinationType.external,
+          title: 'Vons',
+          subtitle: 'Bellflower Blvd',
+          source: 'mapbox',
+          external: true,
+        ),
+      ];
+    final controller = CampusSearchController(
+      gateway: gateway,
+      location: FakeLocationProvider(),
+      debounce: const Duration(milliseconds: 20),
+    );
+    addTearDown(controller.dispose);
+
+    controller.queryChanged('vons');
+    await debounceElapsed();
+
+    expect(controller.results, isEmpty);
+    expect(controller.status, CampusSearchStatus.noResults);
+  });
 }

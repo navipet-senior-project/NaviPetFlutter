@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'campus_bounds.dart';
 import 'campus_place.dart';
 import 'campus_search_gateway.dart';
 import 'navigation_models.dart';
@@ -128,7 +129,7 @@ class CampusSearchController extends ChangeNotifier {
         limit: 10,
       );
       if (!_isCurrent(generation)) return;
-      _results = found.take(10).toList(growable: false);
+      _results = filterToCampus(found).take(10).toList(growable: false);
       _setStatus(
         _results.isEmpty
             ? CampusSearchStatus.noResults
