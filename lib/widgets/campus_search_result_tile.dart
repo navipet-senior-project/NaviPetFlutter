@@ -17,67 +17,62 @@ class CampusSearchResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final details = <String>[
+    final meta = <String>[
       _typeLabel(place.type),
       if (place.buildingCode != null) place.buildingCode!,
+      if (place.roomNumber != null) 'Room ${place.roomNumber}',
       if (place.floorNumber != null) 'Floor ${place.floorNumber}',
+      if (place.distanceMeters != null) _distanceLabel(place.distanceMeters!),
     ];
-    final navigationLabel = place.isBuildingAlternative
-        ? 'Navigation ends at the building'
-        : place.hasIndoorNavigation
-        ? 'Indoor navigation available'
-        : 'Outdoor navigation only';
 
     return ListTile(
       enabled: enabled,
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      minVerticalPadding: 12,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
       leading: CircleAvatar(
-        backgroundColor: const Color(0xFFFFF1C2),
+        backgroundColor: AppColors.accentSoft,
         child: Icon(
           _icon(place.type),
           key: ValueKey('campus-result-icon-${place.type.name}'),
           color: AppColors.amberInk,
         ),
       ),
-      title: Text(place.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Text(
+        place.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.navy,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(place.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 4),
-          Wrap(
-            spacing: 8,
-            runSpacing: 2,
-            children: [
-              for (final detail in details)
-                Text(
-                  detail,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-            ],
-          ),
           Text(
-            place.external ? 'External Mapbox result' : navigationLabel,
-            style: TextStyle(
-              color: place.hasIndoorNavigation
-                  ? AppColors.green
-                  : AppColors.muted,
+            place.subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.muted),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            meta.join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.faint,
               fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          if (place.external)
-            Text(
-              navigationLabel,
-              style: const TextStyle(color: AppColors.muted, fontSize: 11),
-            ),
         ],
       ),
-      trailing: const Icon(Icons.north_west, size: 18),
+      trailing: const Icon(Icons.north_west, size: 18, color: AppColors.faint),
     );
   }
 
@@ -108,4 +103,10 @@ class CampusSearchResultTile extends StatelessWidget {
     CampusDestinationType.landmark => Icons.place_outlined,
     CampusDestinationType.external => Icons.public,
   };
+
+  static String _distanceLabel(int meters) {
+    final miles = meters / 1609.344;
+    if (miles < 0.1) return '${(meters * 3.28084).ceil()} ft';
+    return '${miles.toStringAsFixed(miles < 10 ? 1 : 0)} mi';
+  }
 }
