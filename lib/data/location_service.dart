@@ -39,7 +39,10 @@ abstract interface class LocationService {
 
 class GeolocatorLocationService implements LocationService {
   GeolocatorLocationService({NavigationCoordinate? lastKnown})
-    : _lastKnown = lastKnown;
+    : // An initializing formal would force the private field name into the
+      // public constructor signature, making it unusable from other libraries.
+      // ignore: prefer_initializing_formals
+      _lastKnown = lastKnown;
 
   static const _settings = LocationSettings(
     accuracy: LocationAccuracy.bestForNavigation,
