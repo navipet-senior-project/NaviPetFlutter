@@ -1,3 +1,5 @@
+import 'travel_mode.dart';
+
 class NavigationCoordinate {
   const NavigationCoordinate({required this.latitude, required this.longitude});
 
@@ -70,12 +72,26 @@ class NavigationStep {
     required this.distanceMeters,
     required this.durationSeconds,
     required this.maneuver,
+    this.maneuverType,
+    this.maneuverModifier,
   });
 
   final String instruction;
   final double distanceMeters;
   final double durationSeconds;
   final NavigationCoordinate maneuver;
+
+  /// Mapbox maneuver type, for example `turn`, `depart`, or `arrive`.
+  final String? maneuverType;
+
+  /// Mapbox maneuver modifier, for example `left` or `slight right`.
+  final String? maneuverModifier;
+
+  String get distanceLabel {
+    final feet = distanceMeters * 3.28084;
+    if (feet < 1000) return '${feet.round()} ft';
+    return '${(distanceMeters / 1609.344).toStringAsFixed(1)} mi';
+  }
 }
 
 class NavigationRoute {
@@ -126,4 +142,37 @@ class NavigationTripSummary {
     if (minutes > 0) return '${minutes}m ${seconds}s';
     return '${seconds}s';
   }
+}
+
+/// One routing answer, plus room for the alternates the backend cannot
+/// produce yet. [routes] holds a single entry today.
+class RoutePlan {
+  const RoutePlan({
+    required this.routes,
+    required this.mode,
+    this.selectedIndex = 0,
+    this.warnings = const [],
+    this.endsAtBuilding = false,
+  });
+
+  final List<NavigationRoute> routes;
+  final TravelMode mode;
+  final int selectedIndex;
+  final List<String> warnings;
+
+  /// True when guidance stops at a building rather than the exact place the
+  /// user asked for — for example a room whose pin resolves to its building.
+  final bool endsAtBuilding;
+
+  NavigationRoute get selected => routes[selectedIndex];
+
+  bool get hasAlternatives => routes.length > 1;
+
+  RoutePlan select(int index) => RoutePlan(
+    routes: routes,
+    mode: mode,
+    selectedIndex: index.clamp(0, routes.length - 1),
+    warnings: warnings,
+    endsAtBuilding: endsAtBuilding,
+  );
 }
