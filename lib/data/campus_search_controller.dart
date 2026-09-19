@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'campus_bounds.dart';
 import 'campus_place.dart';
 import 'campus_search_gateway.dart';
 import 'navigation_models.dart';
@@ -14,6 +15,7 @@ enum CampusSearchStatus {
   results,
   noResults,
   offline,
+  unauthorized,
   permissionRequired,
   locationUnavailable,
   apiError,
@@ -67,6 +69,18 @@ class CampusSearchController extends ChangeNotifier {
     );
   }
 
+  /// Drops the current query and results without disposing. Used when the
+  /// signed-in identity changes — this search must not keep showing the
+  /// previous user's query or results the next time it's opened.
+  void reset() {
+    _timer?.cancel();
+    _generation++;
+    _query = '';
+    _message = null;
+    _results = const [];
+    _setStatus(CampusSearchStatus.initial);
+  }
+
   Future<void> retry() async {
     _timer?.cancel();
     final normalized = _normalize(_query);
@@ -86,11 +100,7 @@ class CampusSearchController extends ChangeNotifier {
     } on CampusSearchException catch (error) {
       if (_isCurrent(generation)) {
         _message = error.message;
-        _setStatus(
-          error.failure == CampusSearchFailure.offline
-              ? CampusSearchStatus.offline
-              : CampusSearchStatus.apiError,
-        );
+        _setStatus(_statusFor(error.failure));
       }
       return null;
     }
@@ -131,7 +141,7 @@ class CampusSearchController extends ChangeNotifier {
         limit: 10,
       );
       if (!_isCurrent(generation)) return;
-      _results = found.take(10).toList(growable: false);
+      _results = filterToCampus(found).take(10).toList(growable: false);
       _setStatus(
         _results.isEmpty
             ? CampusSearchStatus.noResults
@@ -141,11 +151,7 @@ class CampusSearchController extends ChangeNotifier {
       if (!_isCurrent(generation)) return;
       _message = error.message;
       _results = const [];
-      _setStatus(
-        error.failure == CampusSearchFailure.offline
-            ? CampusSearchStatus.offline
-            : CampusSearchStatus.apiError,
-      );
+      _setStatus(_statusFor(error.failure));
     } on Object catch (error) {
       if (!_isCurrent(generation)) return;
       _message = error.toString();
@@ -153,6 +159,13 @@ class CampusSearchController extends ChangeNotifier {
       _setStatus(CampusSearchStatus.apiError);
     }
   }
+
+  static CampusSearchStatus _statusFor(CampusSearchFailure failure) =>
+      switch (failure) {
+        CampusSearchFailure.offline => CampusSearchStatus.offline,
+        CampusSearchFailure.unauthorized => CampusSearchStatus.unauthorized,
+        CampusSearchFailure.api => CampusSearchStatus.apiError,
+      };
 
   bool _isCurrent(int generation) => !_disposed && generation == _generation;
 

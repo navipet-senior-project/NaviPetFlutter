@@ -168,6 +168,8 @@ class MapboxNavigationService implements OutdoorRouteGateway {
               longitude: (location[0] as num).toDouble(),
               latitude: (location[1] as num).toDouble(),
             ),
+            maneuverType: maneuver['type']?.toString(),
+            maneuverModifier: maneuver['modifier']?.toString(),
           ),
         );
       }
