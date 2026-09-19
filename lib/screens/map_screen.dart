@@ -31,7 +31,7 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   static const _lastLatitudeKey = 'last_location_latitude';
   static const _lastLongitudeKey = 'last_location_longitude';
 
@@ -49,6 +49,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _lastLocationReady = _loadLastKnownLocation();
   }
 
@@ -61,7 +62,15 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_flow.handleAppResumed());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
     // MapScreen remounts every time NaviBottomNav routes away and back
     // (e.g. to /checklist or /pet) while the flow itself — app-scoped —
@@ -239,6 +248,7 @@ class _MapScreenState extends State<MapScreen> {
       builder: (context, _) {
         final state = flow.state;
         final padding = MediaQuery.paddingOf(context);
+        final locationMessage = flow.locationNotice ?? _locationMessage;
         return PopScope(
           canPop: state is FlowIdle,
           onPopInvokedWithResult: (didPop, _) {
@@ -253,8 +263,8 @@ class _MapScreenState extends State<MapScreen> {
               children: [
                 _mapWidget(),
                 if (state is FlowIdle) _searchBar(context, padding),
-                if (_locationMessage != null && state is! FlowSearching)
-                  _locationBanner(padding, state),
+                if (locationMessage != null && state is! FlowSearching)
+                  _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
                   _recenterButton(padding, state),
                 if (state is FlowSearching)
@@ -424,7 +434,11 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _locationBanner(EdgeInsets padding, NavigationFlowState state) {
+  Widget _locationBanner(
+    EdgeInsets padding,
+    NavigationFlowState state,
+    String message,
+  ) {
     final top = padding.top + (state is FlowActiveNavigation ? 112 : 80);
     return Positioned(
       left: 16,
@@ -433,10 +447,7 @@ class _MapScreenState extends State<MapScreen> {
       child: Material(
         color: AppColors.accentSoft,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Text(_locationMessage!),
-        ),
+        child: Padding(padding: const EdgeInsets.all(12), child: Text(message)),
       ),
     );
   }

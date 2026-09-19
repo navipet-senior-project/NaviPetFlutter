@@ -47,8 +47,10 @@ class NavigationFlowController extends ChangeNotifier {
 
   NavigationFlowState _state = const FlowIdle();
   List<CampusPlace> _recents = const [];
+  String? _locationNotice;
   Future<void> _localRecentsReady = Future.value();
   int _generation = 0;
+  int _resumeGeneration = 0;
 
   // Chained so map mutations always apply in the order they were issued
   // rather than the order their underlying async work happens to finish.
@@ -60,6 +62,30 @@ class NavigationFlowController extends ChangeNotifier {
   NavigationFlowState get state => _state;
 
   List<CampusPlace> get recents => List.unmodifiable(_recents);
+
+  String? get locationNotice => _locationNotice;
+
+  /// Re-checks location after the app comes back to the foreground. The flow
+  /// state is preserved: coming back from Settings should not throw away a
+  /// route the user was reading.
+  Future<void> handleAppResumed() async {
+    final generation = ++_resumeGeneration;
+    final reading = await location.current();
+    if (generation != _resumeGeneration) return;
+
+    final navigating = _state is FlowActiveNavigation;
+    if (reading.usable &&
+        (!navigating ||
+            reading.availability == LocationAvailability.available)) {
+      _locationNotice = null;
+      notifyListeners();
+      return;
+    }
+    _locationNotice = navigating
+        ? 'Reacquiring GPS…'
+        : 'Turn on location to route from here.';
+    notifyListeners();
+  }
 
   /// Hands the flow a live map to draw on, and re-issues whatever the
   /// current state should already be showing.
@@ -157,7 +183,9 @@ class NavigationFlowController extends ChangeNotifier {
   /// until they happen to interact with something that overwrites it.
   void resetForNewIdentity() {
     _generation++;
+    _resumeGeneration++;
     _recents = const [];
+    _locationNotice = null;
     _localRecentsReady = recentSearches.clearLocal().catchError((_) {
       // Recents are a convenience. A local-storage failure must not block
       // the rest of the identity reset or future search.

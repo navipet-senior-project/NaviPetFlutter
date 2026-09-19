@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/app_state.dart';
+import 'package:navipet/data/location_service.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/screens/map_screen.dart';
 import 'package:navipet/widgets/place_preview_sheet.dart';
@@ -190,5 +191,21 @@ void main() {
     expect(location.primedLastKnown, isNotNull);
     expect(location.primedLastKnown!.latitude, 33.7838);
     expect(location.primedLastKnown!.longitude, -118.1141);
+  });
+
+  testWidgets('app resume rechecks location and renders the flow notice', (
+    tester,
+  ) async {
+    final location = harness.FakeLocationService()
+      ..reading = const LocationReading(
+        availability: LocationAvailability.permissionDenied,
+      );
+    final controller = harness.build(location: location);
+    await tester.pumpWidget(host(controller));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(find.text('Turn on location to route from here.'), findsOneWidget);
   });
 }

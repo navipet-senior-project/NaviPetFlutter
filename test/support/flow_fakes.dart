@@ -101,6 +101,15 @@ class FakeLocationService implements LocationService {
   );
 
   Completer<void>? _blocked;
+  final List<Completer<LocationReading>> _queuedReadings = [];
+
+  /// Test control: queues a specific future reply for the next `current()`
+  /// call, allowing overlapping requests to complete out of order.
+  Completer<LocationReading> queueReading() {
+    final completer = Completer<LocationReading>();
+    _queuedReadings.add(completer);
+    return completer;
+  }
 
   /// Test control: makes `current()` wait until [unblock] releases it, so a
   /// test can hold one `requestDirections` in flight while a second, newer
@@ -115,6 +124,9 @@ class FakeLocationService implements LocationService {
 
   @override
   Future<LocationReading> current() async {
+    if (_queuedReadings.isNotEmpty) {
+      return _queuedReadings.removeAt(0).future;
+    }
     final gate = _blocked;
     if (gate != null) await gate.future;
     return reading;

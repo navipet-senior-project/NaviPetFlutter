@@ -715,4 +715,103 @@ void main() {
       expect(controller.state, isA<FlowIdle>());
     },
   );
+
+  test('resuming keeps the current flow state', () async {
+    final controller = harness.build()..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+
+    await controller.handleAppResumed();
+
+    expect(controller.state, isA<FlowRoutePreview>());
+  });
+
+  test('resuming with a lost permission posts a notice', () async {
+    final location = harness.FakeLocationService();
+    final controller = harness.build(location: location)..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+
+    location.reading = const LocationReading(
+      availability: LocationAvailability.permissionDenied,
+    );
+    await controller.handleAppResumed();
+
+    expect(controller.locationNotice, 'Turn on location to route from here.');
+  });
+
+  test('resuming during navigation without a fix warns about GPS', () async {
+    final location = harness.FakeLocationService();
+    final controller = harness.build(location: location)..openSearch();
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    await controller.startRoute();
+
+    location.reading = const LocationReading(
+      availability: LocationAvailability.unavailable,
+    );
+    await controller.handleAppResumed();
+
+    expect(controller.locationNotice, 'Reacquiring GPS…');
+    expect(controller.state, isA<FlowActiveNavigation>());
+  });
+
+  test('an older resume check cannot overwrite a newer result', () async {
+    final location = harness.FakeLocationService();
+    final olderReading = location.queueReading();
+    final controller = harness.build(location: location);
+
+    final olderResume = controller.handleAppResumed();
+    await controller.handleAppResumed();
+    expect(controller.locationNotice, isNull);
+
+    olderReading.complete(
+      const LocationReading(
+        availability: LocationAvailability.permissionDenied,
+      ),
+    );
+    await olderResume;
+
+    expect(controller.locationNotice, isNull);
+  });
+
+  test(
+    'an approximate fix during navigation warns that GPS is stale',
+    () async {
+      final location = harness.FakeLocationService();
+      final controller = harness.build(location: location)..openSearch();
+      await controller.selectPlace(harness.horn);
+      await controller.requestDirections();
+      await controller.calculateRoute();
+      await controller.startRoute();
+
+      location.reading = const LocationReading(
+        availability: LocationAvailability.approximate,
+        coordinate: NavigationCoordinate(latitude: 33.784, longitude: -118.115),
+      );
+      await controller.handleAppResumed();
+
+      expect(controller.locationNotice, 'Reacquiring GPS…');
+    },
+  );
+
+  test('identity reset discards a resume check already in flight', () async {
+    final location = harness.FakeLocationService();
+    final pendingReading = location.queueReading();
+    final controller = harness.build(location: location);
+
+    final pendingResume = controller.handleAppResumed();
+    controller.resetForNewIdentity();
+    pendingReading.complete(
+      const LocationReading(
+        availability: LocationAvailability.permissionDenied,
+      ),
+    );
+    await pendingResume;
+
+    expect(controller.locationNotice, isNull);
+    expect(controller.state, isA<FlowIdle>());
+  });
 }
