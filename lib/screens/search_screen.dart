@@ -175,6 +175,11 @@ class _SearchScreenState extends State<SearchScreen> {
             focusNode: _focusNode,
             autofocus: true,
             onChanged: _onQueryChanged,
+            onSubmitted: (_) {
+              if (!_loading && _suggestions.isNotEmpty) {
+                _selectSuggestion(_suggestions.first);
+              }
+            },
             textInputAction: TextInputAction.search,
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(

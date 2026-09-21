@@ -18,6 +18,21 @@ import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/search_bar_field.dart';
 
+const _mapStyleOptions = <_MapStyleOption>[
+  _MapStyleOption('Standard', MapboxStyles.STANDARD, Icons.map_outlined),
+  _MapStyleOption('Satellite', MapboxStyles.SATELLITE, Icons.satellite_alt),
+  _MapStyleOption('Satellite streets', MapboxStyles.SATELLITE_STREETS, Icons.layers),
+  _MapStyleOption('Outdoors', MapboxStyles.OUTDOORS, Icons.terrain),
+  _MapStyleOption('Dark', MapboxStyles.DARK, Icons.dark_mode_outlined),
+];
+
+class _MapStyleOption {
+  const _MapStyleOption(this.label, this.uri, this.icon);
+  final String label;
+  final String uri;
+  final IconData icon;
+}
+
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -52,6 +67,10 @@ class _MapScreenState extends State<MapScreen> {
   int? _latestStepCount;
   int? _tripStepBaseline;
   bool _arrivalInProgress = false;
+  int _routeRequestId = 0;
+  String _mapStyle = mapboxStyle;
+  bool _locationModeActive = false;
+  bool _locationMode3d = false;
 
   @override
   void initState() {
@@ -177,6 +196,17 @@ class _MapScreenState extends State<MapScreen> {
             _position = position;
             unawaited(_rememberPosition(position));
             if (mounted) setState(() => _locationMessage = null);
+            if (_locationMode3d && !_navigating) {
+              unawaited(
+                _setLocationCamera(
+                  NavigationCoordinate(
+                    latitude: position.latitude,
+                    longitude: position.longitude,
+                  ),
+                  threeDimensional: true,
+                ),
+              );
+            }
             if (_navigating) unawaited(_handleNavigationUpdate(position));
           },
           onError: (Object error) {
@@ -340,6 +370,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _previewRoute(NaviDestination destination) async {
+    final requestId = ++_routeRequestId;
     setState(() {
       _destination = destination;
       _loadingRoute = true;
@@ -357,7 +388,7 @@ class _MapScreenState extends State<MapScreen> {
     } on TimeoutException {
       // Continue with the last known or default coordinate below.
     }
-    if (!mounted) return;
+    if (!mounted || requestId != _routeRequestId) return;
 
     final origin = _position == null
         ? (_lastKnownCoordinate ??
@@ -375,20 +406,30 @@ class _MapScreenState extends State<MapScreen> {
         origin: origin,
         destination: destination.coordinate,
       );
-      await _drawRoute(route, destination);
-      if (!mounted) return;
+      if (!mounted || requestId != _routeRequestId) return;
+      await _drawRoute(route, destination, origin: origin);
+      if (!mounted || requestId != _routeRequestId) return;
       setState(() => _route = route);
     } catch (error) {
-      if (mounted) _showMessage(error.toString());
+      if (mounted && requestId == _routeRequestId) {
+        setState(() {
+          _destination = null;
+          _route = null;
+        });
+        _showMessage(error.toString());
+      }
     } finally {
-      if (mounted) setState(() => _loadingRoute = false);
+      if (mounted && requestId == _routeRequestId) {
+        setState(() => _loadingRoute = false);
+      }
     }
   }
 
   Future<void> _drawRoute(
     NavigationRoute route,
-    NaviDestination destination,
-  ) async {
+    NaviDestination destination, {
+    NavigationCoordinate? origin,
+  }) async {
     await _routeManager?.deleteAll();
     await _destinationManager?.deleteAll();
     if (route.coordinates.isNotEmpty) {
@@ -423,14 +464,26 @@ class _MapScreenState extends State<MapScreen> {
         textSize: 13,
       ),
     );
-    await _fitRoute(route);
+    await _fitRoute(route, destination, origin: origin);
   }
 
-  Future<void> _fitRoute(NavigationRoute route) async {
+  Future<void> _fitRoute(
+    NavigationRoute route,
+    NaviDestination destination, {
+    NavigationCoordinate? origin,
+  }) async {
     final map = _map;
-    if (map == null || route.coordinates.isEmpty) return;
+    if (map == null) return;
+    final coordinates = [
+      if (origin != null) origin,
+      ...route.coordinates,
+      // Always include the selected destination, even when route geometry is
+      // sparse, so preview frames the place the user actually selected.
+      destination.coordinate,
+    ];
+    if (coordinates.isEmpty) return;
     final camera = await map.cameraForCoordinatesPadding(
-      route.coordinates
+      coordinates
           .map(
             (point) =>
                 Point(coordinates: Position(point.longitude, point.latitude)),
@@ -534,7 +587,14 @@ class _MapScreenState extends State<MapScreen> {
         ),
         destination: destination.coordinate,
       );
-      await _drawRoute(newRoute, destination);
+      await _drawRoute(
+        newRoute,
+        destination,
+        origin: NavigationCoordinate(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        ),
+      );
       if (!mounted) return;
       setState(() {
         _route = newRoute;
@@ -583,6 +643,107 @@ class _MapScreenState extends State<MapScreen> {
       ),
       MapAnimationOptions(duration: 500),
     );
+  }
+
+  Future<void> _onLocationControlPressed() async {
+    final coordinate = _position == null
+        ? _lastKnownCoordinate
+        : NavigationCoordinate(
+            latitude: _position!.latitude,
+            longitude: _position!.longitude,
+          );
+    if (coordinate == null) {
+      _showMessage('Waiting for a GPS location.');
+      return;
+    }
+
+    final camera = await _map?.getCameraState();
+    final cameraCenter = camera?.center.coordinates;
+    final isAlreadyAtLocation = cameraCenter is Position &&
+        geo.Geolocator.distanceBetween(
+              coordinate.latitude,
+              coordinate.longitude,
+              cameraCenter.lat.toDouble(),
+              cameraCenter.lng.toDouble(),
+            ) <
+            80;
+
+    if (!_locationModeActive || !isAlreadyAtLocation) {
+      _locationModeActive = true;
+      _locationMode3d = false;
+      await _setLocationCamera(coordinate, threeDimensional: false);
+      if (mounted) setState(() {});
+      return;
+    }
+
+    _locationMode3d = !_locationMode3d;
+    await _setLocationCamera(coordinate, threeDimensional: _locationMode3d);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _setLocationCamera(
+    NavigationCoordinate coordinate, {
+    required bool threeDimensional,
+  }) async {
+    final heading = _position?.heading;
+    await _map?.easeTo(
+      CameraOptions(
+        center: Point(
+          coordinates: Position(coordinate.longitude, coordinate.latitude),
+        ),
+        zoom: threeDimensional ? 17.5 : 16,
+        pitch: threeDimensional ? 55 : 0,
+        bearing: threeDimensional && heading != null && heading >= 0
+            ? heading
+            : 0,
+      ),
+      MapAnimationOptions(duration: 700),
+    );
+  }
+
+  Future<void> _showMapStyles() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('Map details'),
+              subtitle: Text('Choose how the map is displayed'),
+            ),
+            for (final style in _mapStyleOptions)
+              RadioListTile<String>(
+                value: style.uri,
+                groupValue: _mapStyle,
+                title: Text(style.label),
+                secondary: Icon(style.icon),
+                onChanged: (value) => Navigator.of(sheetContext).pop(value),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || selected == null || selected == _mapStyle) return;
+    final camera = await _map?.getCameraState();
+    setState(() => _mapStyle = selected);
+    await _map?.loadStyleURI(selected);
+    if (!mounted) return;
+    if (_route != null && _destination != null) {
+      await _drawRoute(_route!, _destination!);
+    } else if (camera != null) {
+      await _map?.easeTo(
+        CameraOptions(
+          center: camera.center,
+          zoom: camera.zoom,
+          bearing: camera.bearing,
+          pitch: camera.pitch,
+        ),
+        MapAnimationOptions(duration: 0),
+      );
+    }
   }
 
   Future<void> _startStepTracking() async {
@@ -678,6 +839,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _clearRoute() async {
+    _routeRequestId++;
     await _tts.stop();
     await _stepCountSubscription?.cancel();
     _stepCountSubscription = null;
@@ -769,12 +931,29 @@ class _MapScreenState extends State<MapScreen> {
             bottom: _route == null
                 ? 24
                 : (_navigating ? 142 + padding.bottom : 294),
-            child: FloatingActionButton.small(
-              heroTag: 'recenter',
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.navy,
-              onPressed: _centerOnBestKnownLocation,
-              child: const Icon(Icons.my_location),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _mapControl(
+                  heroTag: 'map-style',
+                  tooltip: 'Map details and type',
+                  icon: Icons.layers_outlined,
+                  onPressed: _showMapStyles,
+                ),
+                const SizedBox(height: 12),
+                _mapControl(
+                  heroTag: 'recenter',
+                  tooltip: _locationMode3d
+                      ? 'Switch to 2D location view'
+                      : _locationModeActive
+                      ? 'Switch to 3D heading view'
+                      : 'Center on my location',
+                  icon: _locationMode3d
+                      ? Icons.threed_rotation
+                      : Icons.my_location,
+                  onPressed: _onLocationControlPressed,
+                ),
+              ],
             ),
           ),
           if (_locationMessage != null)
@@ -870,6 +1049,23 @@ class _MapScreenState extends State<MapScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _mapControl({
+    required String heroTag,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return FloatingActionButton.small(
+      heroTag: heroTag,
+      tooltip: tooltip,
+      backgroundColor: Colors.white,
+      foregroundColor: AppColors.navy,
+      elevation: 5,
+      onPressed: onPressed,
+      child: Icon(icon),
     );
   }
 
