@@ -233,4 +233,116 @@ void main() {
     expect(gateway.proximities.last?.latitude, 33.7838);
     expect(gateway.proximities.last?.longitude, -118.1141);
   });
+
+  test('filters external results out of autocomplete', () async {
+    final gateway = FakeGateway()
+      ..onAutocomplete = (_) async => [
+        cob,
+        const CampusPlace(
+          id: 'mapbox:dXJuOm1ieHBsYzpBQQ',
+          type: CampusDestinationType.external,
+          title: 'College of Business',
+          subtitle: 'Somewhere else entirely',
+          source: 'mapbox',
+          external: true,
+          outdoorDestination: NavigationCoordinate(
+            latitude: 34.0522,
+            longitude: -118.2437,
+          ),
+        ),
+      ];
+    final controller = CampusSearchController(
+      gateway: gateway,
+      location: FakeLocationProvider(),
+      debounce: const Duration(milliseconds: 20),
+    );
+    addTearDown(controller.dispose);
+
+    controller.queryChanged('college of business');
+    await debounceElapsed();
+
+    expect(controller.results.map((item) => item.id), [cob.id]);
+    expect(controller.status, CampusSearchStatus.results);
+  });
+
+  test('reports no results when every match was off campus', () async {
+    final gateway = FakeGateway()
+      ..onAutocomplete = (_) async => [
+        const CampusPlace(
+          id: 'mapbox:dXJuOm1ieHBsYzpCQg',
+          type: CampusDestinationType.external,
+          title: 'Vons',
+          subtitle: 'Bellflower Blvd',
+          source: 'mapbox',
+          external: true,
+        ),
+      ];
+    final controller = CampusSearchController(
+      gateway: gateway,
+      location: FakeLocationProvider(),
+      debounce: const Duration(milliseconds: 20),
+    );
+    addTearDown(controller.dispose);
+
+    controller.queryChanged('vons');
+    await debounceElapsed();
+
+    expect(controller.results, isEmpty);
+    expect(controller.status, CampusSearchStatus.noResults);
+  });
+
+  test('reset drops the query and results without disposing', () async {
+    final gateway = FakeGateway();
+    final controller = CampusSearchController(
+      gateway: gateway,
+      location: FakeLocationProvider(),
+      debounce: const Duration(milliseconds: 20),
+    );
+    addTearDown(controller.dispose);
+
+    controller.queryChanged('college of business');
+    await debounceElapsed();
+    expect(controller.results, isNotEmpty);
+
+    controller.reset();
+
+    expect(controller.query, '');
+    expect(controller.results, isEmpty);
+    expect(controller.status, CampusSearchStatus.initial);
+
+    // Still usable afterward — reset() is not a substitute for dispose().
+    controller.queryChanged('college of business');
+    await debounceElapsed();
+    expect(controller.results, isNotEmpty);
+  });
+
+  test(
+    'reset stops a stale in-flight search from landing on top of it',
+    () async {
+      final pending = Completer<List<CampusPlace>>();
+      final gateway = FakeGateway()..onAutocomplete = (_) => pending.future;
+      final controller = CampusSearchController(
+        gateway: gateway,
+        location: FakeLocationProvider(),
+        debounce: const Duration(milliseconds: 20),
+      );
+      addTearDown(controller.dispose);
+
+      controller.queryChanged('college of business');
+      await debounceElapsed();
+      expect(controller.status, CampusSearchStatus.loading);
+
+      controller.reset();
+      expect(controller.status, CampusSearchStatus.initial);
+
+      // The search that reset() interrupted finally answers — it must not
+      // resurrect the query/results reset() just cleared.
+      pending.complete([cob]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.status, CampusSearchStatus.initial);
+      expect(controller.results, isEmpty);
+      expect(controller.query, '');
+    },
+  );
 }

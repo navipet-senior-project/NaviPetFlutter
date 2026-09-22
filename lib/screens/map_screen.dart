@@ -1,113 +1,105 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:go_router/go_router.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:pedometer/pedometer.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_state.dart';
 import '../data/mapbox_config.dart';
-import '../data/mapbox_navigation_service.dart';
+import '../data/navi_map_controller.dart' show MapboxNaviMapController;
+import '../data/navigation_flow_controller.dart';
+import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/place_preview_sheet.dart';
+import '../widgets/route_preview_sheet.dart';
 import '../widgets/search_bar_field.dart';
-
-const _mapStyleOptions = <_MapStyleOption>[
-  _MapStyleOption('Standard', MapboxStyles.STANDARD, Icons.map_outlined),
-  _MapStyleOption('Satellite', MapboxStyles.SATELLITE, Icons.satellite_alt),
-  _MapStyleOption('Satellite streets', MapboxStyles.SATELLITE_STREETS, Icons.layers),
-  _MapStyleOption('Outdoors', MapboxStyles.OUTDOORS, Icons.terrain),
-  _MapStyleOption('Dark', MapboxStyles.DARK, Icons.dark_mode_outlined),
-];
-
-class _MapStyleOption {
-  const _MapStyleOption(this.label, this.uri, this.icon);
-  final String label;
-  final String uri;
-  final IconData icon;
-}
+import '../widgets/search_overlay.dart';
+import '../widgets/travel_mode_selector.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({super.key, this.controller});
+
+  /// Injected by widget tests; in the app it comes from the provider tree.
+  final NavigationFlowController? controller;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   static const _lastLatitudeKey = 'last_location_latitude';
   static const _lastLongitudeKey = 'last_location_longitude';
 
-  late final MapboxNavigationService _navigationService;
   late final Future<void> _lastLocationReady;
-  final FlutterTts _tts = FlutterTts();
-  final Completer<void> _initialLocationReady = Completer<void>();
 
   MapboxMap? _map;
-  PolylineAnnotationManager? _routeManager;
-  PointAnnotationManager? _destinationManager;
   StreamSubscription<geo.Position>? _positionSubscription;
-  StreamSubscription<StepCount>? _stepCountSubscription;
   geo.Position? _position;
   NavigationCoordinate? _lastKnownCoordinate;
-  NaviDestination? _destination;
-  NavigationRoute? _route;
-  int _stepIndex = 0;
-  bool _loadingRoute = false;
-  bool _navigating = false;
   String? _locationMessage;
-  DateTime? _lastReroute;
-  DateTime? _tripStartedAt;
-  int? _latestStepCount;
-  int? _tripStepBaseline;
-  bool _arrivalInProgress = false;
-  int _routeRequestId = 0;
-  String _mapStyle = mapboxStyle;
-  bool _locationModeActive = false;
-  bool _locationMode3d = false;
+
+  late final NavigationFlowController _flow;
+  bool _flowResolved = false;
 
   @override
   void initState() {
     super.initState();
-    _navigationService = MapboxNavigationService(
-      accessToken: mapboxPublicToken,
-    );
+    WidgetsBinding.instance.addObserver(this);
     _lastLocationReady = _loadLastKnownLocation();
-    _tts
-      ..setLanguage('en-US')
-      ..setSpeechRate(0.48);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_flowResolved) return;
+    _flow = widget.controller ?? context.read<NavigationFlowController>();
+    _flowResolved = true;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_flow.handleAppResumed());
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
-    _stepCountSubscription?.cancel();
-    _tts.stop();
-    _navigationService.dispose();
+    // MapScreen remounts every time NaviBottomNav routes away and back
+    // (e.g. to /checklist or /pet) while the flow itself — app-scoped —
+    // keeps whatever state it was in. Detaching here means a route
+    // calculation that lands after this point calls into nothing rather
+    // than a MapboxNaviMapController wrapping this now-dead map.
+    _flow.detachMap();
     super.dispose();
   }
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
     _map = mapboxMap;
-    _routeManager = await mapboxMap.annotations
+    final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
-    _destinationManager = await mapboxMap.annotations
-        .createPointAnnotationManager();
+    final markers = await mapboxMap.annotations.createPointAnnotationManager();
+
+    // Hands the flow a live map and re-issues whatever the current state
+    // should already be showing — necessary both on first launch (the flow
+    // was built, in main.dart's initState, before this map existed) and on
+    // every remount (the flow is app-scoped and outlives this MapScreen
+    // instance; without the replay, a route sheet from before the remount
+    // would claim a distance and duration over a blank map).
+    await _flow.attachMap(
+      MapboxNaviMapController(map: mapboxMap, routes: routes, markers: markers),
+    );
+
     await _lastLocationReady;
     await _centerOnBestKnownLocation();
-    try {
-      await _initializeLocation();
-    } finally {
-      if (!_initialLocationReady.isCompleted) {
-        _initialLocationReady.complete();
-      }
-    }
+    await _initializeLocation();
   }
 
   Future<void> _loadLastKnownLocation() async {
@@ -115,11 +107,19 @@ class _MapScreenState extends State<MapScreen> {
     final latitude = preferences.getDouble(_lastLatitudeKey);
     final longitude = preferences.getDouble(_lastLongitudeKey);
     if (latitude == null || longitude == null) return;
-    _lastKnownCoordinate = NavigationCoordinate(
+    final coordinate = NavigationCoordinate(
       latitude: latitude,
       longitude: longitude,
     );
-    if (mounted) setState(() {});
+    _lastKnownCoordinate = coordinate;
+    if (!mounted) return;
+    // The flow's LocationService defaults to no remembered fix at all,
+    // which leaves its approximate-origin fallback dead: a momentary GPS
+    // dropout would show UnknownOrigin and the manual picker even while
+    // this exact persisted coordinate is on screen. Only seeds the gap —
+    // primeLastKnown never overwrites a fresher live fix.
+    _flow.location.primeLastKnown(coordinate);
+    setState(() {});
   }
 
   Future<void> _rememberPosition(geo.Position position) async {
@@ -196,416 +196,11 @@ class _MapScreenState extends State<MapScreen> {
             _position = position;
             unawaited(_rememberPosition(position));
             if (mounted) setState(() => _locationMessage = null);
-            if (_locationMode3d && !_navigating) {
-              unawaited(
-                _setLocationCamera(
-                  NavigationCoordinate(
-                    latitude: position.latitude,
-                    longitude: position.longitude,
-                  ),
-                  threeDimensional: true,
-                ),
-              );
-            }
-            if (_navigating) unawaited(_handleNavigationUpdate(position));
           },
           onError: (Object error) {
             if (mounted) setState(() => _locationMessage = error.toString());
           },
         );
-  }
-
-  Future<void> _openSearch() async {
-    final destination = await context.push<NaviDestination>('/search');
-    if (!mounted || destination == null) return;
-    final wantsDirections = await _askForDirections(destination);
-    if (!mounted || !wantsDirections) return;
-    await _previewRoute(destination);
-  }
-
-  Future<bool> _askForDirections(NaviDestination destination) async {
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => Container(
-        key: const ValueKey('directions-prompt'),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.line,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    color: AppColors.accentSoft,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.directions_walk_rounded,
-                    color: AppColors.amberInk,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Get directions?',
-                        style: TextStyle(
-                          color: AppColors.navy,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        destination.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
-                        ),
-                      ),
-                      if (destination.address.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          destination.address,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.screenBg,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.my_location, size: 18, color: AppColors.navy),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Preview a walking route from your current location',
-                      style: TextStyle(
-                        color: AppColors.labelInk,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(false),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.navy,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: const BorderSide(color: AppColors.inputBorder),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: const Text('Not now'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    key: const ValueKey('preview-directions-button'),
-                    onPressed: () => Navigator.of(sheetContext).pop(true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.navy,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: const StadiumBorder(),
-                    ),
-                    icon: const Icon(Icons.route_rounded, size: 20),
-                    label: const Text('Preview route'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-    return result ?? false;
-  }
-
-  Future<void> _previewRoute(NaviDestination destination) async {
-    final requestId = ++_routeRequestId;
-    setState(() {
-      _destination = destination;
-      _loadingRoute = true;
-      _navigating = false;
-      _route = null;
-      _stepIndex = 0;
-    });
-
-    // Search can return before the map's initial GPS lookup has completed.
-    // Give that lookup a short chance to finish so the first route request
-    // starts from the user's position instead of the campus fallback. Location
-    // errors and slow fixes still fall back without blocking navigation.
-    try {
-      await _initialLocationReady.future.timeout(const Duration(seconds: 8));
-    } on TimeoutException {
-      // Continue with the last known or default coordinate below.
-    }
-    if (!mounted || requestId != _routeRequestId) return;
-
-    final origin = _position == null
-        ? (_lastKnownCoordinate ??
-              const NavigationCoordinate(
-                latitude: csulbLat,
-                longitude: csulbLng,
-              ))
-        : NavigationCoordinate(
-            latitude: _position!.latitude,
-            longitude: _position!.longitude,
-          );
-
-    try {
-      final route = await _navigationService.getRoute(
-        origin: origin,
-        destination: destination.coordinate,
-      );
-      if (!mounted || requestId != _routeRequestId) return;
-      await _drawRoute(route, destination, origin: origin);
-      if (!mounted || requestId != _routeRequestId) return;
-      setState(() => _route = route);
-    } catch (error) {
-      if (mounted && requestId == _routeRequestId) {
-        setState(() {
-          _destination = null;
-          _route = null;
-        });
-        _showMessage(error.toString());
-      }
-    } finally {
-      if (mounted && requestId == _routeRequestId) {
-        setState(() => _loadingRoute = false);
-      }
-    }
-  }
-
-  Future<void> _drawRoute(
-    NavigationRoute route,
-    NaviDestination destination, {
-    NavigationCoordinate? origin,
-  }) async {
-    await _routeManager?.deleteAll();
-    await _destinationManager?.deleteAll();
-    if (route.coordinates.isNotEmpty) {
-      await _routeManager?.create(
-        PolylineAnnotationOptions(
-          geometry: LineString(
-            coordinates: route.coordinates
-                .map((point) => Position(point.longitude, point.latitude))
-                .toList(),
-          ),
-          lineColor: AppColors.navy.toARGB32(),
-          lineBorderColor: Colors.white.toARGB32(),
-          lineBorderWidth: 2,
-          lineWidth: 7,
-          lineJoin: LineJoin.ROUND,
-        ),
-      );
-    }
-    await _destinationManager?.create(
-      PointAnnotationOptions(
-        geometry: Point(
-          coordinates: Position(
-            destination.coordinate.longitude,
-            destination.coordinate.latitude,
-          ),
-        ),
-        textField: destination.name,
-        textOffset: [0, -1.8],
-        textColor: AppColors.navy.toARGB32(),
-        textHaloColor: Colors.white.toARGB32(),
-        textHaloWidth: 2,
-        textSize: 13,
-      ),
-    );
-    await _fitRoute(route, destination, origin: origin);
-  }
-
-  Future<void> _fitRoute(
-    NavigationRoute route,
-    NaviDestination destination, {
-    NavigationCoordinate? origin,
-  }) async {
-    final map = _map;
-    if (map == null) return;
-    final coordinates = [
-      if (origin != null) origin,
-      ...route.coordinates,
-      // Always include the selected destination, even when route geometry is
-      // sparse, so preview frames the place the user actually selected.
-      destination.coordinate,
-    ];
-    if (coordinates.isEmpty) return;
-    final camera = await map.cameraForCoordinatesPadding(
-      coordinates
-          .map(
-            (point) =>
-                Point(coordinates: Position(point.longitude, point.latitude)),
-          )
-          .toList(),
-      CameraOptions(bearing: 0, pitch: 0),
-      MbxEdgeInsets(top: 150, left: 50, bottom: 300, right: 50),
-      17,
-      null,
-    );
-    await map.easeTo(camera, MapAnimationOptions(duration: 700));
-  }
-
-  Future<void> _startNavigation() async {
-    final route = _route;
-    if (route == null || route.steps.isEmpty) return;
-    if (_position == null) {
-      _showMessage('Waiting for your GPS location before navigation starts.');
-      return;
-    }
-    setState(() {
-      _navigating = true;
-      _stepIndex = 0;
-      _tripStartedAt = DateTime.now();
-      _tripStepBaseline = _latestStepCount;
-    });
-    await _startStepTracking();
-    await _speak(route.steps.first.instruction);
-    await _centerOnUser(following: true);
-  }
-
-  Future<void> _handleNavigationUpdate(geo.Position position) async {
-    final route = _route;
-    final destination = _destination;
-    if (!_navigating ||
-        _arrivalInProgress ||
-        route == null ||
-        destination == null) {
-      return;
-    }
-
-    if (_stepIndex < route.steps.length) {
-      final step = route.steps[_stepIndex];
-      final distance = geo.Geolocator.distanceBetween(
-        position.latitude,
-        position.longitude,
-        step.maneuver.latitude,
-        step.maneuver.longitude,
-      );
-      if (distance < 18 && _stepIndex < route.steps.length - 1) {
-        setState(() => _stepIndex += 1);
-        await _speak(route.steps[_stepIndex].instruction);
-      }
-    }
-
-    final arrivalDistance = geo.Geolocator.distanceBetween(
-      position.latitude,
-      position.longitude,
-      destination.coordinate.latitude,
-      destination.coordinate.longitude,
-    );
-    if (arrivalDistance < 15) {
-      await _completeArrival(destination);
-      return;
-    }
-
-    await _maybeReroute(position, route, destination);
-    await _centerOnUser(following: true);
-  }
-
-  Future<void> _maybeReroute(
-    geo.Position position,
-    NavigationRoute route,
-    NaviDestination destination,
-  ) async {
-    if (route.coordinates.isEmpty) return;
-    var nearestDistance = double.infinity;
-    for (var index = 0; index < route.coordinates.length; index += 4) {
-      final point = route.coordinates[index];
-      final distance = geo.Geolocator.distanceBetween(
-        position.latitude,
-        position.longitude,
-        point.latitude,
-        point.longitude,
-      );
-      if (distance < nearestDistance) nearestDistance = distance;
-    }
-    if (nearestDistance < 45) return;
-    if (_lastReroute != null &&
-        DateTime.now().difference(_lastReroute!) <
-            const Duration(seconds: 15)) {
-      return;
-    }
-
-    _lastReroute = DateTime.now();
-    try {
-      final newRoute = await _navigationService.getRoute(
-        origin: NavigationCoordinate(
-          latitude: position.latitude,
-          longitude: position.longitude,
-        ),
-        destination: destination.coordinate,
-      );
-      await _drawRoute(
-        newRoute,
-        destination,
-        origin: NavigationCoordinate(
-          latitude: position.latitude,
-          longitude: position.longitude,
-        ),
-      );
-      if (!mounted) return;
-      setState(() {
-        _route = newRoute;
-        _stepIndex = 0;
-      });
-      if (newRoute.steps.isNotEmpty) {
-        await _speak('Route updated. ${newRoute.steps.first.instruction}');
-      }
-    } catch (_) {
-      // Keep the last valid route if a background reroute cannot be fetched.
-    }
   }
 
   Future<void> _centerOnUser({bool following = false}) async {
@@ -645,387 +240,425 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Future<void> _onLocationControlPressed() async {
-    final coordinate = _position == null
-        ? _lastKnownCoordinate
-        : NavigationCoordinate(
-            latitude: _position!.latitude,
-            longitude: _position!.longitude,
-          );
-    if (coordinate == null) {
-      _showMessage('Waiting for a GPS location.');
-      return;
-    }
-
-    final camera = await _map?.getCameraState();
-    final cameraCenter = camera?.center.coordinates;
-    final isAlreadyAtLocation = cameraCenter is Position &&
-        geo.Geolocator.distanceBetween(
-              coordinate.latitude,
-              coordinate.longitude,
-              cameraCenter.lat.toDouble(),
-              cameraCenter.lng.toDouble(),
-            ) <
-            80;
-
-    if (!_locationModeActive || !isAlreadyAtLocation) {
-      _locationModeActive = true;
-      _locationMode3d = false;
-      await _setLocationCamera(coordinate, threeDimensional: false);
-      if (mounted) setState(() {});
-      return;
-    }
-
-    _locationMode3d = !_locationMode3d;
-    await _setLocationCamera(coordinate, threeDimensional: _locationMode3d);
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _setLocationCamera(
-    NavigationCoordinate coordinate, {
-    required bool threeDimensional,
-  }) async {
-    final heading = _position?.heading;
-    await _map?.easeTo(
-      CameraOptions(
-        center: Point(
-          coordinates: Position(coordinate.longitude, coordinate.latitude),
-        ),
-        zoom: threeDimensional ? 17.5 : 16,
-        pitch: threeDimensional ? 55 : 0,
-        bearing: threeDimensional && heading != null && heading >= 0
-            ? heading
-            : 0,
-      ),
-      MapAnimationOptions(duration: 700),
-    );
-  }
-
-  Future<void> _showMapStyles() async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              title: Text('Map details'),
-              subtitle: Text('Choose how the map is displayed'),
-            ),
-            for (final style in _mapStyleOptions)
-              RadioListTile<String>(
-                value: style.uri,
-                groupValue: _mapStyle,
-                title: Text(style.label),
-                secondary: Icon(style.icon),
-                onChanged: (value) => Navigator.of(sheetContext).pop(value),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-    if (!mounted || selected == null || selected == _mapStyle) return;
-    final camera = await _map?.getCameraState();
-    setState(() => _mapStyle = selected);
-    await _map?.loadStyleURI(selected);
-    if (!mounted) return;
-    if (_route != null && _destination != null) {
-      await _drawRoute(_route!, _destination!);
-    } else if (camera != null) {
-      await _map?.easeTo(
-        CameraOptions(
-          center: camera.center,
-          zoom: camera.zoom,
-          bearing: camera.bearing,
-          pitch: camera.pitch,
-        ),
-        MapAnimationOptions(duration: 0),
-      );
-    }
-  }
-
-  Future<void> _startStepTracking() async {
-    if (Theme.of(context).platform == TargetPlatform.android) {
-      final status = await Permission.activityRecognition.request();
-      if (!status.isGranted) return;
-    }
-    await _stepCountSubscription?.cancel();
-    _stepCountSubscription = Pedometer.stepCountStream.listen(
-      (event) {
-        _latestStepCount = event.steps;
-        _tripStepBaseline ??= event.steps;
-      },
-      onError: (_) {
-        _latestStepCount = null;
-        _tripStepBaseline = null;
-      },
-    );
-  }
-
-  Future<void> _completeArrival(NaviDestination destination) async {
-    _arrivalInProgress = true;
-    final startedAt = _tripStartedAt;
-    final baseline = _tripStepBaseline;
-    final currentSteps = _latestStepCount;
-    final countedSteps = baseline == null || currentSteps == null
-        ? null
-        : (currentSteps - baseline).clamp(0, 1 << 31).toInt();
-    final summary = NavigationTripSummary(
-      elapsed: startedAt == null
-          ? Duration.zero
-          : DateTime.now().difference(startedAt),
-      walkingSteps: countedSteps,
-    );
-
-    await _removeRoute();
-    await _stepCountSubscription?.cancel();
-    _stepCountSubscription = null;
-    await _speak('You have arrived at ${destination.name}.');
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.check_circle, color: AppColors.green, size: 56),
-        title: const Text('You have arrived!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              destination.name,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 20),
-            _summaryRow(
-              Icons.timer_outlined,
-              'Travel time',
-              summary.elapsedLabel,
-            ),
-            const SizedBox(height: 12),
-            _summaryRow(
-              Icons.directions_walk,
-              'Walking steps',
-              summary.walkingStepsLabel,
-            ),
-          ],
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-    _arrivalInProgress = false;
-  }
-
-  Widget _summaryRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.navy),
-        const SizedBox(width: 10),
-        Expanded(child: Text(label)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
-      ],
-    );
-  }
-
-  Future<void> _stopNavigation() async {
-    await _clearRoute();
-  }
-
-  Future<void> _clearRoute() async {
-    _routeRequestId++;
-    await _tts.stop();
-    await _stepCountSubscription?.cancel();
-    _stepCountSubscription = null;
-    await _removeRoute();
-  }
-
-  Future<void> _removeRoute() async {
-    await _routeManager?.deleteAll();
-    await _destinationManager?.deleteAll();
-    if (mounted) {
-      setState(() {
-        _destination = null;
-        _route = null;
-        _navigating = false;
-        _stepIndex = 0;
-        _tripStartedAt = null;
-        _tripStepBaseline = null;
-      });
-    }
-  }
-
-  Future<void> _speak(String instruction) async {
-    await _tts.stop();
-    await _tts.speak(instruction);
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
   @override
   Widget build(BuildContext context) {
-    final activeUser = context.watch<AppState>().activeUser;
-    final padding = MediaQuery.paddingOf(context);
-
-    final initialCoordinate =
-        _lastKnownCoordinate ??
-        const NavigationCoordinate(latitude: csulbLat, longitude: csulbLng);
-
-    return Scaffold(
-      backgroundColor: AppColors.map,
-      bottomNavigationBar: _navigating
-          ? null
-          : const NaviBottomNav(active: NaviTab.location),
-      body: Stack(
-        children: [
-          MapWidget(
-            key: const ValueKey('navipet-map'),
-            styleUri: mapboxStyle,
-            viewport: CameraViewportState(
-              center: Point(
-                coordinates: Position(
-                  initialCoordinate.longitude,
-                  initialCoordinate.latitude,
-                ),
-              ),
-              zoom: csulbZoom,
-            ),
-            onMapCreated: _onMapCreated,
-          ),
-          if (!_navigating)
-            Positioned(
-              top: padding.top + AppSpacing.sm,
-              left: AppSpacing.lg,
-              right: AppSpacing.lg,
-              child: SearchBarField(
-                placeholder: _destination?.name ?? 'Where to?',
-                onPressed: _openSearch,
-                right: GestureDetector(
-                  onTap: () => context.push('/account'),
-                  child: _avatar(
-                    activeUser?.name ?? '?',
-                    activeUser?.avatarColor ?? AppColors.amber,
-                  ),
-                ),
-              ),
-            ),
-          if (_navigating && _route != null)
-            Positioned(
-              top: padding.top + 8,
-              left: 12,
-              right: 12,
-              child: _instructionCard(_route!),
-            ),
-          Positioned(
-            right: 16,
-            bottom: _route == null
-                ? 24
-                : (_navigating ? 142 + padding.bottom : 294),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+    final flow = _flow;
+    return AnimatedBuilder(
+      animation: flow,
+      builder: (context, _) {
+        final state = flow.state;
+        final padding = MediaQuery.paddingOf(context);
+        final locationMessage = flow.locationNotice ?? _locationMessage;
+        return PopScope(
+          canPop: state is FlowIdle,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) flow.back();
+          },
+          child: Scaffold(
+            backgroundColor: AppColors.map,
+            bottomNavigationBar: state is FlowActiveNavigation
+                ? null
+                : const NaviBottomNav(active: NaviTab.location),
+            body: Stack(
               children: [
-                _mapControl(
-                  heroTag: 'map-style',
-                  tooltip: 'Map details and type',
-                  icon: Icons.layers_outlined,
-                  onPressed: _showMapStyles,
-                ),
-                const SizedBox(height: 12),
-                _mapControl(
-                  heroTag: 'recenter',
-                  tooltip: _locationMode3d
-                      ? 'Switch to 2D location view'
-                      : _locationModeActive
-                      ? 'Switch to 3D heading view'
-                      : 'Center on my location',
-                  icon: _locationMode3d
-                      ? Icons.threed_rotation
-                      : Icons.my_location,
-                  onPressed: _onLocationControlPressed,
-                ),
+                _mapWidget(),
+                if (state is FlowIdle) _searchBar(context, padding),
+                if (locationMessage != null && state is! FlowSearching)
+                  _locationBanner(padding, state, locationMessage),
+                if (_showsRecenterButton(state))
+                  _recenterButton(padding, state),
+                if (state is FlowSearching)
+                  Positioned.fill(child: SearchOverlay(controller: flow)),
+                if (state is FlowPlacePreview)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: PlacePreviewSheet(
+                      state: state,
+                      onDirections: flow.requestDirections,
+                      onClose: flow.back,
+                    ),
+                  ),
+                if (state is FlowConfiguringRoute)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _routeSetup(state, flow),
+                  ),
+                if (state is FlowCalculatingRoute) _calculating(),
+                if (state is FlowRoutePreview)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: RoutePreviewSheet(
+                      destination: state.destination,
+                      origin: state.origin,
+                      plan: state.plan,
+                      expanded: false,
+                      onPrimary: flow.startRoute,
+                      onToggleSteps: flow.showSteps,
+                      onModeChanged: flow.setMode,
+                      onSelectRoute: flow.selectRoute,
+                      onEditOrigin: () => flow.openSearch(pickingOrigin: true),
+                    ),
+                  ),
+                if (state is FlowRouteSteps)
+                  // Positioned(left: 0, right: 0, bottom: 0, child: ...) —
+                  // the container the task brief suggested — gives its child
+                  // an *unbounded* height (a Positioned only gets a bounded
+                  // main-axis constraint from the Stack when both edges on
+                  // that axis are pinned; with only `bottom` set here, height
+                  // is unconstrained). RoutePreviewSheet's expanded step list
+                  // is a Flexible(ListView) inside a mainAxisSize.min Column,
+                  // which throws under an unbounded height. Positioned.fill +
+                  // Align gives the FractionallySizedBox a bounded height to
+                  // take 80% of instead.
+                  Positioned.fill(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: FractionallySizedBox(
+                        heightFactor: 0.8,
+                        child: RoutePreviewSheet(
+                          destination: state.destination,
+                          origin: state.origin,
+                          plan: state.plan,
+                          expanded: true,
+                          onPrimary: flow.startRoute,
+                          onToggleSteps: flow.hideSteps,
+                          onModeChanged: flow.setMode,
+                          onSelectRoute: flow.selectRoute,
+                          onEditOrigin: () =>
+                              flow.openSearch(pickingOrigin: true),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (state is FlowActiveNavigation)
+                  _activeNavigation(state, flow, padding),
+                if (state is FlowError) _error(state, flow),
               ],
             ),
           ),
-          if (_locationMessage != null)
-            Positioned(
-              left: 16,
-              right: 16,
-              top: padding.top + (_navigating ? 112 : 80),
-              child: Material(
-                color: const Color(0xFFFFF4D6),
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(_locationMessage!),
+        );
+      },
+    );
+  }
+
+  Widget _mapWidget() {
+    final initialCoordinate =
+        _lastKnownCoordinate ??
+        const NavigationCoordinate(latitude: csulbLat, longitude: csulbLng);
+    return MapWidget(
+      key: const ValueKey('navipet-map'),
+      styleUri: mapboxStyle,
+      viewport: CameraViewportState(
+        center: Point(
+          coordinates: Position(
+            initialCoordinate.longitude,
+            initialCoordinate.latitude,
+          ),
+        ),
+        zoom: csulbZoom,
+      ),
+      onMapCreated: _onMapCreated,
+    );
+  }
+
+  Widget _searchBar(BuildContext context, EdgeInsets padding) {
+    final activeUser = context.watch<AppState>().activeUser;
+    return Positioned(
+      top: padding.top + AppSpacing.sm,
+      left: AppSpacing.lg,
+      right: AppSpacing.lg,
+      child: SearchBarField(
+        placeholder: 'Where to?',
+        onPressed: _flow.openSearch,
+        right: Semantics(
+          label: 'Account settings',
+          button: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => context.push('/account'),
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(
+                child: _avatar(
+                  activeUser?.name ?? '?',
+                  activeUser?.avatarColor ?? AppColors.amber,
                 ),
               ),
             ),
-          if (_loadingRoute)
-            Positioned.fill(
-              child: ColoredBox(
-                color: const Color(0x3D002B5B),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 22,
-                      vertical: 18,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Hidden whenever a full-screen surface (the search overlay, the
+  /// calculating spinner, or the mostly-full-height steps sheet) already
+  /// covers the map it would float over.
+  bool _showsRecenterButton(NavigationFlowState state) =>
+      state is! FlowSearching &&
+      state is! FlowCalculatingRoute &&
+      state is! FlowRouteSteps;
+
+  Widget _recenterButton(EdgeInsets padding, NavigationFlowState state) {
+    final double bottom;
+    if (state is FlowActiveNavigation) {
+      bottom = 142 + padding.bottom;
+    } else if (state is FlowPlacePreview ||
+        state is FlowConfiguringRoute ||
+        state is FlowRoutePreview) {
+      bottom = 294;
+    } else {
+      bottom = 24;
+    }
+    return Positioned(
+      right: 16,
+      bottom: bottom,
+      child: Semantics(
+        label: 'Center map on your location',
+        button: true,
+        child: FloatingActionButton.small(
+          heroTag: 'recenter',
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.navy,
+          onPressed: _centerOnBestKnownLocation,
+          child: const Icon(Icons.my_location),
+        ),
+      ),
+    );
+  }
+
+  Widget _locationBanner(
+    EdgeInsets padding,
+    NavigationFlowState state,
+    String message,
+  ) {
+    final top = padding.top + (state is FlowActiveNavigation ? 112 : 80);
+    return Positioned(
+      left: 16,
+      right: 16,
+      top: top,
+      child: Material(
+        color: AppColors.accentSoft,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(padding: const EdgeInsets.all(12), child: Text(message)),
+      ),
+    );
+  }
+
+  Widget _calculating() => Positioned.fill(
+    child: ColoredBox(
+      // Same navy scrim as before (0x3D002B5B), expressed as a token instead
+      // of a new hex literal: 0x3D / 0xFF is ~24% opacity.
+      color: AppColors.navy.withValues(alpha: 0x3D / 0xFF),
+      child: const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.xl),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: AppColors.navy,
+                  ),
+                ),
+                SizedBox(width: AppSpacing.lg),
+                Text('Finding your walking route…'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _routeSetup(
+    FlowConfiguringRoute state,
+    NavigationFlowController flow,
+  ) {
+    return Material(
+      color: AppColors.surface,
+      elevation: 8,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadius.lg),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.my_location, color: AppColors.navy),
+              title: Text(state.origin.label),
+              trailing: TextButton(
+                onPressed: () => flow.openSearch(pickingOrigin: true),
+                child: const Text('Change'),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.place_outlined, color: AppColors.navy),
+              title: Text(state.destination.name),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TravelModeSelector(selected: state.mode, onChanged: flow.setMode),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              height: 48,
+              child: FilledButton(
+                onPressed: state.origin.coordinate == null
+                    ? null
+                    : flow.calculateRoute,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.navy,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                ),
+                child: Text(
+                  state.origin.canStartGuidance
+                      ? 'Start route'
+                      : 'Preview route',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _error(FlowError state, NavigationFlowController flow) => Positioned(
+    left: AppSpacing.lg,
+    right: AppSpacing.lg,
+    bottom: AppSpacing.xl,
+    child: Material(
+      color: AppColors.surface,
+      elevation: 8,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Row(
+          children: [
+            Expanded(child: Text(state.message)),
+            if (state.retryable)
+              TextButton(onPressed: flow.retry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _activeNavigation(
+    FlowActiveNavigation state,
+    NavigationFlowController flow,
+    EdgeInsets padding,
+  ) {
+    final route = state.plan.selected;
+    return Stack(
+      children: [
+        Positioned(
+          top: padding.top + AppSpacing.sm,
+          left: AppSpacing.md,
+          right: AppSpacing.md,
+          child: _instructionCard(route, state.stepIndex),
+        ),
+        Positioned(
+          left: AppSpacing.md,
+          right: AppSpacing.md,
+          bottom: padding.bottom + AppSpacing.md,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            color: AppColors.surface,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: AppColors.accentSoft,
+                    child: Icon(
+                      Icons.directions_walk,
+                      color: AppColors.amberInk,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: AppShadows.card,
-                    ),
-                    child: const Row(
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
+                        Text(
+                          state.destination.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
                             color: AppColors.navy,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        SizedBox(width: 14),
                         Text(
-                          'Finding the best walking route…',
-                          style: TextStyle(
-                            color: AppColors.navy,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          '${route.durationLabel} · ${route.distanceLabel}',
+                          style: const TextStyle(color: AppColors.muted),
                         ),
                       ],
                     ),
                   ),
-                ),
+                  TextButton(
+                    onPressed: flow.back,
+                    child: const Text('Overview'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _confirmEnd(flow),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                    ),
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: const Text('End'),
+                  ),
+                ],
               ),
             ),
-          if (_route != null && _destination != null)
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: _navigating ? padding.bottom + 12 : 12,
-              child: _routeCard(_route!, _destination!),
-            ),
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _instructionCard(NavigationRoute route) {
+  Future<void> _confirmEnd(NavigationFlowController flow) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('End this route?'),
+        content: const Text('Guidance stops and the route stays on the map.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep going'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('End route'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) await flow.endRoute();
+  }
+
+  Widget _instructionCard(NavigationRoute route, int stepIndex) {
     final step = route.steps.isEmpty
         ? null
-        : route.steps[_stepIndex.clamp(0, route.steps.length - 1)];
+        : route.steps[stepIndex.clamp(0, route.steps.length - 1)];
     return Material(
       elevation: 5,
       borderRadius: BorderRadius.circular(16),
@@ -1048,213 +681,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _mapControl({
-    required String heroTag,
-    required String tooltip,
-    required IconData icon,
-    required VoidCallback onPressed,
-  }) {
-    return FloatingActionButton.small(
-      heroTag: heroTag,
-      tooltip: tooltip,
-      backgroundColor: Colors.white,
-      foregroundColor: AppColors.navy,
-      elevation: 5,
-      onPressed: onPressed,
-      child: Icon(icon),
-    );
-  }
-
-  Widget _routeCard(NavigationRoute route, NaviDestination destination) {
-    if (_navigating) {
-      return Material(
-        elevation: 8,
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.white,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              const CircleAvatar(
-                backgroundColor: AppColors.accentSoft,
-                child: Icon(Icons.directions_walk, color: AppColors.amberInk),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      destination.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      '${route.durationLabel} • ${route.distanceLabel}',
-                      style: const TextStyle(color: AppColors.muted),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton.icon(
-                onPressed: _stopNavigation,
-                style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-                icon: const Icon(Icons.stop_circle_outlined),
-                label: const Text('End'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(24),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentSoft,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: const Text(
-                    'ROUTE PREVIEW',
-                    style: TextStyle(
-                      color: AppColors.amberInk,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: .8,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: _clearRoute,
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Close route preview',
-                  icon: const Icon(Icons.close, color: AppColors.muted),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              destination.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (destination.address.isNotEmpty) ...[
-              const SizedBox(height: 3),
-              Text(
-                destination.address,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _routeStat(
-                    Icons.schedule_rounded,
-                    route.durationLabel,
-                    'Estimated',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _routeStat(
-                    Icons.straighten_rounded,
-                    route.distanceLabel,
-                    'Distance',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _routeStat(
-                    Icons.directions_walk_rounded,
-                    'Walking',
-                    'Route type',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            ElevatedButton.icon(
-              key: const ValueKey('confirm-navigation-button'),
-              onPressed: _startNavigation,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.navy,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: const StadiumBorder(),
-              ),
-              icon: const Icon(Icons.navigation_rounded),
-              label: const Text(
-                'Confirm navigation',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _routeStat(IconData icon, String value, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.screenBg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 18, color: AppColors.navy),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.ink,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.muted, fontSize: 9),
-          ),
-        ],
       ),
     );
   }

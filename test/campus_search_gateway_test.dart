@@ -3,9 +3,25 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:navipet/data/auth_token_provider.dart';
 import 'package:navipet/data/campus_place.dart';
 import 'package:navipet/data/campus_search_gateway.dart';
 import 'package:navipet/data/navigation_models.dart';
+
+class FakeAuth implements AuthTokenProvider {
+  FakeAuth(this.tokens);
+  final List<String?> tokens;
+  final List<bool> refreshCalls = [];
+  int _index = 0;
+
+  @override
+  Future<String?> token({bool forceRefresh = false}) async {
+    refreshCalls.add(forceRefresh);
+    final value = tokens[_index.clamp(0, tokens.length - 1)];
+    _index++;
+    return value;
+  }
+}
 
 Map<String, Object?> placeJson(int index) => {
   'id': '00000000-0000-4000-8000-${index.toString().padLeft(12, '0')}',
@@ -140,6 +156,73 @@ void main() {
     await expectLater(
       gateway.autocomplete('COB'),
       throwsA(isA<CampusSearchException>()),
+    );
+  });
+
+  test('sends the bearer token on autocomplete', () async {
+    late String? sentHeader;
+    final client = MockClient((request) async {
+      sentHeader = request.headers['Authorization'];
+      return http.Response('{"query":"vec","results":[]}', 200);
+    });
+    final gateway = HttpCampusSearchGateway(
+      baseUrl: 'https://api.test',
+      auth: FakeAuth(['token-a']),
+      client: client,
+    );
+
+    await gateway.autocomplete('vec');
+
+    expect(sentHeader, 'Bearer token-a');
+  });
+
+  test('refreshes once and retries after a 401', () async {
+    var calls = 0;
+    final auth = FakeAuth(['stale', 'fresh']);
+    final client = MockClient((request) async {
+      calls++;
+      if (calls == 1) {
+        return http.Response(
+          '{"error":{"code":"INVALID_ACCESS_TOKEN","message":"Authentication required"}}',
+          401,
+        );
+      }
+      return http.Response('{"query":"vec","results":[]}', 200);
+    });
+    final gateway = HttpCampusSearchGateway(
+      baseUrl: 'https://api.test',
+      auth: auth,
+      client: client,
+    );
+
+    await gateway.autocomplete('vec');
+
+    expect(calls, 2);
+    expect(auth.refreshCalls, [false, true]);
+  });
+
+  test('reports unauthorized when the retry also fails', () async {
+    final client = MockClient(
+      (request) async => http.Response(
+        '{"error":{"code":"INVALID_ACCESS_TOKEN","message":"Authentication required"}}',
+        401,
+      ),
+    );
+    final gateway = HttpCampusSearchGateway(
+      baseUrl: 'https://api.test',
+      auth: FakeAuth(['stale', 'also-stale']),
+      client: client,
+    );
+
+    expect(
+      () => gateway.autocomplete('vec'),
+      throwsA(
+        isA<CampusSearchException>().having(
+          (error) => error.failure,
+          'failure',
+          CampusSearchFailure.unauthorized,
+        ),
+      ),
     );
   });
 }
