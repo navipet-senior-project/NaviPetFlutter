@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'course_class.dart';
+import 'classes_gateway.dart';
 import 'registration_gateway.dart';
 import 'user_account.dart';
 
@@ -20,6 +21,7 @@ class AppState extends ChangeNotifier {
     )?
     recoverySessionRefresher,
     Future<void> Function(String newPassword)? recoveryPasswordFallback,
+    ClassesGateway? classesGateway,
   }) : this._(
          supabase,
          registrationGateway,
@@ -27,6 +29,7 @@ class AppState extends ChangeNotifier {
          signupCodeResender,
          recoverySessionRefresher,
          recoveryPasswordFallback,
+         classesGateway,
        );
 
   AppState._(
@@ -36,6 +39,7 @@ class AppState extends ChangeNotifier {
     this._signupCodeResender,
     this._recoverySessionRefresher,
     this._recoveryPasswordFallback,
+    this._classesGateway,
   ) {
     if (_supabase == null) return;
 
@@ -47,6 +51,7 @@ class AppState extends ChangeNotifier {
 
   final SupabaseClient? _supabase;
   final RegistrationGateway? _registrationGateway;
+  final ClassesGateway? _classesGateway;
   final Future<void> Function(RegistrationVerificationSuccess tokens)?
   _verificationSessionHandler;
   final Future<void> Function(String email)? _signupCodeResender;
@@ -112,18 +117,22 @@ class AppState extends ChangeNotifier {
     _classesBusy = true;
     notifyListeners();
     try {
+      // Classes are persisted in Supabase. The currently deployed NaviPet
+      // backend does not expose a /classes route, so using the optional HTTP
+      // gateway here makes class loading fail with 404 before Supabase can be
+      // queried.
       final classRows = await client
           .from('classes')
           .select()
           .eq('user_id', user.id)
           .order('start_time');
+      _classes = (classRows as List<dynamic>)
+          .map((row) => CourseClass.fromJson(row as Map<String, dynamic>))
+          .toList();
       final completionRows = await client
           .from('task_completions')
           .select('class_id, task_date, task_kind')
           .eq('user_id', user.id);
-      _classes = (classRows as List<dynamic>)
-          .map((row) => CourseClass.fromJson(row as Map<String, dynamic>))
-          .toList();
       final keys = <String>{};
       final counts = <String, int>{};
       for (final value in completionRows as List<dynamic>) {
@@ -163,7 +172,8 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> deleteClass(String id) async {
-    await _requireClient().from('classes').delete().eq('id', id);
+    final client = _requireClient();
+    await client.from('classes').delete().eq('id', id);
     await refreshClasses();
   }
 

@@ -7,6 +7,8 @@ import 'navigation_models.dart';
 import 'outdoor_route_gateway.dart';
 
 class MapboxNavigationService implements OutdoorRouteGateway {
+  static const _requestTimeout = Duration(seconds: 12);
+
   MapboxNavigationService({required this.accessToken, http.Client? client})
     : _client = client ?? http.Client();
 
@@ -33,9 +35,15 @@ class MapboxNavigationService implements OutdoorRouteGateway {
       if (proximity != null)
         'proximity': '${proximity.longitude},${proximity.latitude}',
     };
-    final response = await _client.get(
-      Uri.https('api.mapbox.com', '/search/searchbox/v1/suggest', parameters),
-    );
+    final response = await _client
+        .get(
+          Uri.https(
+            'api.mapbox.com',
+            '/search/searchbox/v1/suggest',
+            parameters,
+          ),
+        )
+        .timeout(_requestTimeout);
     final body = _decodeResponse(response);
     final suggestions = body['suggestions'] as List<dynamic>? ?? const [];
 
@@ -60,13 +68,15 @@ class MapboxNavigationService implements OutdoorRouteGateway {
 
   Future<NaviDestination> retrievePlace(PlaceSuggestion suggestion) async {
     _ensureConfigured();
-    final response = await _client.get(
-      Uri.https(
-        'api.mapbox.com',
-        '/search/searchbox/v1/retrieve/${suggestion.mapboxId}',
-        {'session_token': _sessionToken, 'access_token': accessToken},
-      ),
-    );
+    final response = await _client
+        .get(
+          Uri.https(
+            'api.mapbox.com',
+            '/search/searchbox/v1/retrieve/${suggestion.mapboxId}',
+            {'session_token': _sessionToken, 'access_token': accessToken},
+          ),
+        )
+        .timeout(_requestTimeout);
     final body = _decodeResponse(response);
     final features = body['features'] as List<dynamic>? ?? const [];
     if (features.isEmpty) {
@@ -113,22 +123,24 @@ class MapboxNavigationService implements OutdoorRouteGateway {
     final coordinates =
         '${origin.longitude},${origin.latitude};'
         '${destination.longitude},${destination.latitude}';
-    final response = await _client.get(
-      Uri.https(
-        'api.mapbox.com',
-        '/directions/v5/mapbox/$profile/$coordinates',
-        {
-          'alternatives': 'false',
-          'banner_instructions': 'true',
-          'geometries': 'geojson',
-          'overview': 'full',
-          'steps': 'true',
-          'voice_instructions': 'true',
-          'voice_units': 'imperial',
-          'access_token': accessToken,
-        },
-      ),
-    );
+    final response = await _client
+        .get(
+          Uri.https(
+            'api.mapbox.com',
+            '/directions/v5/mapbox/$profile/$coordinates',
+            {
+              'alternatives': 'false',
+              'banner_instructions': 'true',
+              'geometries': 'geojson',
+              'overview': 'full',
+              'steps': 'true',
+              'voice_instructions': 'true',
+              'voice_units': 'imperial',
+              'access_token': accessToken,
+            },
+          ),
+        )
+        .timeout(_requestTimeout);
     final body = _decodeResponse(response);
     final routes = body['routes'] as List<dynamic>? ?? const [];
     if (routes.isEmpty) {

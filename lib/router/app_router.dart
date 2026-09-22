@@ -77,6 +77,22 @@ GoRouter createAppRouter(AppState appState) => GoRouter(
       builder: (context, state) => const AccountSettingsScreen(),
     ),
     GoRoute(
+      path: '/account/edit',
+      builder: (context, state) => const EditProfileScreen(),
+    ),
+    GoRoute(
+      path: '/account/manage',
+      builder: (context, state) => const ManageAccountScreen(),
+    ),
+    GoRoute(
+      path: '/account/accessibility',
+      builder: (context, state) => const AccessibilityScreen(),
+    ),
+    GoRoute(
+      path: '/account/privacy',
+      builder: (context, state) => const PrivacyPermissionsScreen(),
+    ),
+    GoRoute(
       path: '/ar',
       builder: (context, state) => const ArNavigationScreen(),
     ),

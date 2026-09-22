@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -25,6 +27,7 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
   late final TextEditingController _room;
   late Set<int> _weekdays;
   late TimeOfDay _time;
+  late TimeOfDay _endTime;
   bool _saving = false;
 
   static const _dayNames = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -42,6 +45,10 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
     _time = parts == null
         ? const TimeOfDay(hour: 9, minute: 0)
         : TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    final endParts = course?.endTime.split(':');
+    _endTime = endParts == null
+        ? TimeOfDay(hour: (_time.hour + 1) % 24, minute: _time.minute)
+        : TimeOfDay(hour: int.parse(endParts[0]), minute: int.parse(endParts[1]));
   }
 
   @override
@@ -56,11 +63,25 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'Required' : null;
 
+  String _databaseTime(TimeOfDay value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    // Keep the value explicitly 24-hour and include seconds for PostgreSQL
+    // time columns and stricter API validators.
+    return '$hour:$minute:00';
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_weekdays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Choose at least one class day.')),
+      );
+      return;
+    }
+    if (_toMinutes(_endTime) <= _toMinutes(_time)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('End time must be after start time.')),
       );
       return;
     }
@@ -70,17 +91,29 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
       var coordinate =
           widget.course?.coordinate ??
           const NavigationCoordinate(latitude: csulbLat, longitude: csulbLng);
-      final suggestions = await service.suggestPlaces(
-        '${_building.text}, CSULB',
-        proximity: const NavigationCoordinate(
-          latitude: csulbLat,
-          longitude: csulbLng,
-        ),
-      );
-      if (suggestions.isNotEmpty) {
-        coordinate = (await service.retrievePlace(
-          suggestions.first,
-        )).coordinate;
+      // Geocoding improves the pin, but it must not prevent a class from
+      // being saved when Mapbox is unavailable or does not recognize a
+      // campus building name.
+      try {
+        final suggestions = await service
+            .suggestPlaces(
+              '${_building.text}, CSULB',
+              proximity: const NavigationCoordinate(
+                latitude: csulbLat,
+                longitude: csulbLng,
+              ),
+            )
+            .timeout(const Duration(seconds: 8));
+        if (suggestions.isNotEmpty) {
+          coordinate = (await service
+                  .retrievePlace(suggestions.first)
+                  .timeout(const Duration(seconds: 8)))
+              .coordinate;
+        }
+      } on TimeoutException {
+        // Keep the campus fallback and continue saving.
+      } on NavigationServiceException {
+        // Keep the campus fallback and continue saving.
       }
       if (!mounted) return;
       await context.read<AppState>().saveClass(
@@ -91,8 +124,8 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
           building: _building.text,
           room: _room.text,
           weekdays: _weekdays.toList()..sort(),
-          startTime:
-              '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}',
+          startTime: _databaseTime(_time),
+          endTime: _databaseTime(_endTime),
           latitude: coordinate.latitude,
           longitude: coordinate.longitude,
         ),
@@ -198,6 +231,21 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
                   child: Text(_time.format(context)),
                 ),
               ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.schedule, color: AppColors.petInk),
+                title: const Text('End time'),
+                trailing: TextButton(
+                  onPressed: () async {
+                    final value = await showTimePicker(
+                      context: context,
+                      initialTime: _endTime,
+                    );
+                    if (value != null) setState(() => _endTime = value);
+                  },
+                  child: Text(_endTime.format(context)),
+                ),
+              ),
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
@@ -207,7 +255,7 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
                     backgroundColor: AppColors.petInk,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                   ),
-                  child: Text(_saving ? 'Finding location…' : 'Save class'),
+                  child: Text(_saving ? 'Saving class…' : 'Save class'),
                 ),
               ),
             ],
@@ -216,6 +264,8 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
       ),
     );
   }
+
+  int _toMinutes(TimeOfDay value) => value.hour * 60 + value.minute;
 
   Widget _field(
     TextEditingController controller,

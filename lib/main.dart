@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'data/app_config.dart';
 import 'data/app_state.dart';
+import 'data/classes_gateway.dart';
 import 'data/auth_token_provider.dart';
 import 'data/campus_search_controller.dart';
 import 'data/campus_search_gateway.dart';
@@ -42,6 +43,9 @@ Future<void> main() async {
   final registrationGateway = AppConfig.hasBackend
       ? HttpRegistrationGateway(baseUrl: AppConfig.backendBaseUrl)
       : null;
+  final classesGateway = AppConfig.hasBackend
+      ? HttpClassesGateway(baseUrl: AppConfig.backendBaseUrl)
+      : null;
 
   // Hand the public token to the native Mapbox SDK.
   MapboxOptions.setAccessToken(mapboxPublicToken);
@@ -57,6 +61,7 @@ Future<void> main() async {
       appState: AppState(
         supabase: supabase,
         registrationGateway: registrationGateway,
+        classesGateway: classesGateway,
       ),
       authTokenProvider: authTokenProvider,
     ),
