@@ -51,6 +51,8 @@ class AppState extends ChangeNotifier {
 
   final SupabaseClient? _supabase;
   final RegistrationGateway? _registrationGateway;
+  // Kept for when the backend exposes /classes; see refreshClasses().
+  // ignore: unused_field
   final ClassesGateway? _classesGateway;
   final Future<void> Function(RegistrationVerificationSuccess tokens)?
   _verificationSessionHandler;

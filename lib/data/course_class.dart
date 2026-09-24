@@ -40,8 +40,11 @@ class CourseClass {
   bool occursOn(int weekday) => weekdays.contains(weekday);
 
   factory CourseClass.fromJson(Map<String, dynamic> json) {
-    final startTime = (json['startTime'] ?? json['start_time'])?.toString() ?? '09:00';
-    final endTime = (json['endTime'] ?? json['end_time'])?.toString() ?? _addHour(startTime);
+    final startTime =
+        (json['startTime'] ?? json['start_time'])?.toString() ?? '09:00';
+    final endTime =
+        (json['endTime'] ?? json['end_time'])?.toString() ??
+        _addHour(startTime);
     final weekdays = json['weekdays'] as List<dynamic>? ?? const [];
     return CourseClass(
       id: json['id'].toString(),
@@ -54,7 +57,9 @@ class CourseClass {
           .map((value) => value.toInt())
           .toList(),
       startTime: startTime.length >= 5 ? startTime.substring(0, 5) : '09:00',
-      endTime: endTime.length >= 5 ? endTime.substring(0, 5) : _addHour(startTime),
+      endTime: endTime.length >= 5
+          ? endTime.substring(0, 5)
+          : _addHour(startTime),
       latitude: (json['latitude'] as num?)?.toDouble() ?? 33.7838,
       longitude: (json['longitude'] as num?)?.toDouble() ?? -118.1141,
     );

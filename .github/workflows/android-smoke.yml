@@ -1,0 +1,102 @@
+name: Android smoke build
+
+on:
+  pull_request:
+    branches: [main]
+  # Runs on main populate the Flutter/Gradle caches that PR runs restore.
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep in sync with the revision in .metadata.
+  FLUTTER_VERSION: 3.47.0
+
+jobs:
+  android-debug-build:
+    name: android-debug-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      # fetch-depth 2 lets the PR merge commit be diffed against its base parent.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      # Dart code is covered by analyze-and-test, so PRs that touch no Android,
+      # dependency or workflow files skip the build. The check still reports a
+      # result, which keeps it usable as a required status check.
+      #
+      # GitHub withholds secrets from fork pull requests, so those runs skip the
+      # build with a warning instead of failing. A missing secret on a same-repo
+      # run is a configuration error and fails immediately.
+      - name: Decide whether to build
+        id: gate
+        env:
+          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork == true }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            if ! grep -qE '^(android/|pubspec\.(yaml|lock)$|\.github/workflows/android-smoke\.yml$)' <<< "$changed"; then
+              echo "::notice::Skipping Android build: no Android, dependency or workflow changes."
+              echo "build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          if [ -n "$MAPBOX_DOWNLOADS_TOKEN" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          elif [ "$IS_FORK" = "true" ]; then
+            echo "::warning::Skipping Android build: repository secrets are not available to pull requests from forks."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Repository secret MAPBOX_DOWNLOADS_TOKEN is missing. Add a Mapbox secret token (sk.*) with DOWNLOADS:READ under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - if: steps.gate.outputs.build == 'true'
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - if: steps.gate.outputs.build == 'true'
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - if: steps.gate.outputs.build == 'true'
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
+          # PR runs save their own cache so later pushes to the same PR start
+          # warm; main's cache is the fallback every PR can restore.
+          cache-read-only: false
+
+      # pubspec.yaml bundles .env as an asset. Placeholders only; the debug build
+      # must not depend on production configuration.
+      - name: Create placeholder .env
+        if: steps.gate.outputs.build == 'true'
+        run: cp .env.example .env
+
+      - name: Resolve dependencies
+        if: steps.gate.outputs.build == 'true'
+        run: flutter pub get --enforce-lockfile
+
+      # Gradle reads ORG_GRADLE_PROJECT_* variables as project properties, so the
+      # token reaches android/build.gradle.kts without writing it to disk.
+      - name: Build debug APK
+        if: steps.gate.outputs.build == 'true'
+        env:
+          ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+        run: flutter build apk --debug
