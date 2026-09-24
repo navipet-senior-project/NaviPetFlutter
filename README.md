@@ -301,10 +301,13 @@ Pull requests to `main` run two GitHub Actions workflows on Flutter 3.47.0:
 
 - **Pull request / analyze-and-test** runs the format check, `flutter analyze`
   and `flutter test`. If formatting fails, run `dart format .` and commit.
-- **Android smoke build / android-debug-build** runs `flutter build apk --debug`.
-  It needs the repository Actions secret `MAPBOX_DOWNLOADS_TOKEN` (the same
-  `sk.*` token with `DOWNLOADS:READ` used locally). Pull requests from forks
-  cannot read secrets, so this job skips with a warning for them.
+- **Android smoke build / android-debug-build** runs
+  `flutter build apk --debug --target-platform android-arm64`, but only when a
+  pull request changes `android/`, `pubspec.yaml`, `pubspec.lock` or the
+  workflow itself; otherwise it passes without building. It needs the
+  repository Actions secret `MAPBOX_DOWNLOADS_TOKEN` (the same `sk.*` token
+  with `DOWNLOADS:READ` used locally). Pull requests from forks cannot read
+  secrets, so this job skips with a warning for them.
 
 CI copies `.env.example` to `.env` because `pubspec.yaml` bundles `.env` as an
 asset. No real keys are used in CI.
