@@ -1,0 +1,54 @@
+name: Pull request
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep in sync with the revision in .metadata.
+  FLUTTER_VERSION: 3.47.0
+
+jobs:
+  analyze-and-test:
+    name: analyze-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # pubspec.yaml bundles .env as an asset, so analyze and test fail without
+      # it. The example file holds placeholders only; no real secrets are used.
+      - name: Create placeholder .env
+        run: cp .env.example .env
+
+      - name: Resolve dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Check formatting
+        run: |
+          if ! dart format --output=none --set-exit-if-changed .; then
+            echo "::error::Files above need formatting. Run 'dart format .' locally and commit the result."
+            exit 1
+          fi
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
