@@ -48,7 +48,10 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
     final endParts = course?.endTime.split(':');
     _endTime = endParts == null
         ? TimeOfDay(hour: (_time.hour + 1) % 24, minute: _time.minute)
-        : TimeOfDay(hour: int.parse(endParts[0]), minute: int.parse(endParts[1]));
+        : TimeOfDay(
+            hour: int.parse(endParts[0]),
+            minute: int.parse(endParts[1]),
+          );
   }
 
   @override
@@ -105,10 +108,11 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
             )
             .timeout(const Duration(seconds: 8));
         if (suggestions.isNotEmpty) {
-          coordinate = (await service
-                  .retrievePlace(suggestions.first)
-                  .timeout(const Duration(seconds: 8)))
-              .coordinate;
+          coordinate =
+              (await service
+                      .retrievePlace(suggestions.first)
+                      .timeout(const Duration(seconds: 8)))
+                  .coordinate;
         }
       } on TimeoutException {
         // Keep the campus fallback and continue saving.
