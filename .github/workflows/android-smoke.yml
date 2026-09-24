@@ -99,5 +99,4 @@ jobs:
         if: steps.gate.outputs.build == 'true'
         env:
           ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
-        # One ABI is enough to prove the build compiles and links.
-        run: flutter build apk --debug --target-platform android-arm64
+        run: flutter build apk --debug
