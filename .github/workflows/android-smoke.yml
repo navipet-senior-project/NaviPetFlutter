@@ -79,7 +79,9 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
           cache-provider: basic
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          # PR runs save their own cache so later pushes to the same PR start
+          # warm; main's cache is the fallback every PR can restore.
+          cache-read-only: false
 
       # pubspec.yaml bundles .env as an asset. Placeholders only; the debug build
       # must not depend on production configuration.
@@ -97,4 +99,5 @@ jobs:
         if: steps.gate.outputs.build == 'true'
         env:
           ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
-        run: flutter build apk --debug
+        # One ABI is enough to prove the build compiles and links.
+        run: flutter build apk --debug --target-platform android-arm64
