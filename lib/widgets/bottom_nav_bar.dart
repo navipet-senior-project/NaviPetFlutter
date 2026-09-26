@@ -59,7 +59,7 @@ class NaviBottomNav extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _iconButton(context, tab: NaviTab.menu, icon: Icons.menu),
-                const SizedBox(width: 64), // room for the centre FAB
+                _petsFab(context),
                 _iconButton(
                   context,
                   tab: NaviTab.location,
@@ -69,13 +69,6 @@ class NaviBottomNav extends StatelessWidget {
             ),
           ),
 
-          // Centre paw floating action button (Pets).
-          Positioned(
-            top: -24,
-            left: 0,
-            right: 0,
-            child: Center(child: _petsFab(context)),
-          ),
         ],
       ),
     );
@@ -90,13 +83,29 @@ class NaviBottomNav extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _goTo(context, tab),
-      child: SizedBox(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         width: 48,
         height: 48,
-        child: Icon(
-          icon,
-          size: 24,
-          color: isActive ? AppColors.petInk : AppColors.faint,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isActive ? AppColors.accentSoft : Colors.transparent,
+          boxShadow: isActive
+              ? const [
+                  BoxShadow(
+                    color: Color(0x66F5A623),
+                    blurRadius: 14,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Icon(
+            icon,
+            size: 24,
+            color: isActive ? AppColors.petInk : AppColors.faint,
+          ),
         ),
       ),
     );
@@ -106,24 +115,28 @@ class NaviBottomNav extends StatelessWidget {
     final isActive = active == NaviTab.pets;
     return GestureDetector(
       onTap: () => _goTo(context, NaviTab.pets),
-      child: Container(
-        width: 64,
-        height: 64,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
-          color: AppColors.pinOrange,
+          color: isActive ? AppColors.accentSoft : Colors.transparent,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.surface, width: 4),
-          boxShadow: [
-            BoxShadow(
-              color: isActive
-                  ? const Color(0x33F5A623)
-                  : const Color(0x1A101828),
-              offset: const Offset(0, 8),
-              blurRadius: 10,
-            ),
-          ],
+          boxShadow: isActive
+              ? const [
+                  BoxShadow(
+                    color: Color(0x99002B5B),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ]
+              : null,
         ),
-        child: const Icon(Icons.pets, size: 26, color: AppColors.surface),
+        child: Icon(
+          Icons.pets,
+          size: 24,
+          color: isActive ? AppColors.petInk : AppColors.faint,
+        ),
       ),
     );
   }

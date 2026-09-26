@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../data/app_state.dart';
 import '../data/campus_place.dart';
 import '../data/campus_search_controller.dart';
 import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
+import '../data/navigation_models.dart';
 import '../theme/app_theme.dart';
 import 'campus_search_result_tile.dart';
 
@@ -18,6 +21,42 @@ class SearchOverlay extends StatefulWidget {
 }
 
 class _SearchOverlayState extends State<SearchOverlay> {
+  static const _popularLocations = <CampusPlace>[
+    CampusPlace(
+      id: 'horn-center',
+      type: CampusDestinationType.building,
+      title: 'CSULB Horn Center',
+      subtitle: '1250 N Bellflower Blvd, Long Beach, California 90815',
+      source: 'cache',
+      outdoorDestination: NavigationCoordinate(
+        latitude: 33.78372,
+        longitude: -118.11482,
+      ),
+    ),
+    CampusPlace(
+      id: 'college-of-business',
+      type: CampusDestinationType.building,
+      title: 'College of Business',
+      subtitle: '1250 N Bellflower Blvd, Long Beach, California 90815',
+      source: 'cache',
+      outdoorDestination: NavigationCoordinate(
+        latitude: 33.78326,
+        longitude: -118.11444,
+      ),
+    ),
+    CampusPlace(
+      id: 'university-student-union',
+      type: CampusDestinationType.building,
+      title: 'University Student Union',
+      subtitle: 'Food, events, services & lounge',
+      source: 'cache',
+      outdoorDestination: NavigationCoordinate(
+        latitude: 33.78305,
+        longitude: -118.11278,
+      ),
+    ),
+  ];
+
   final _field = TextEditingController();
   final _focus = FocusNode();
 
@@ -224,9 +263,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
 
   Widget _recents() {
     final recents = widget.controller.recents;
-    if (recents.isEmpty) {
-      return _message('Search a building, parking lot, or campus service.');
-    }
+    final popular = _popularPlaces();
     return ListView(
       padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
       children: [
@@ -247,25 +284,77 @@ class _SearchOverlayState extends State<SearchOverlay> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              TextButton(
-                onPressed: widget.controller.clearRecents,
-                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                child: const Text('Clear all'),
-              ),
+              if (recents.isNotEmpty)
+                TextButton(
+                  onPressed: widget.controller.clearRecents,
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  child: const Text('Clear all'),
+                ),
             ],
           ),
         ),
-        for (final place in recents)
-          CampusSearchResultTile(
-            place: place,
-            onTap: () {
-              FocusScope.of(context).unfocus();
-              widget.controller.selectPlace(place);
-            },
+        if (recents.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('No recent searches yet.', style: TextStyle(color: AppColors.muted)),
+            ),
+          )
+        else
+          for (final place in recents) _placeTile(place),
+        const Divider(height: AppSpacing.xl),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.sm,
           ),
+          child: Text(
+            'Popular locations',
+            style: TextStyle(
+              color: AppColors.navy,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        for (final place in popular) _placeTile(place),
       ],
     );
   }
+
+  List<CampusPlace> _popularPlaces() {
+    // SearchOverlay is also used standalone in widget tests and embeddable
+    // contexts, so class-aware suggestions remain optional.
+    final classes = context.read<AppState?>()?.classes ?? const [];
+    final classPlaces = <CampusPlace>[];
+    final seen = <String>{};
+    for (final course in classes) {
+      if (course.isOnline || course.building.trim().isEmpty) continue;
+      final key = course.building.trim().toLowerCase();
+      if (!seen.add(key)) continue;
+      classPlaces.add(
+        CampusPlace(
+          id: 'class-${course.id}',
+          type: CampusDestinationType.building,
+          title: course.building.trim(),
+          subtitle: 'Your class building · ${course.courseCode}',
+          source: 'classes',
+          outdoorDestination: course.coordinate,
+        ),
+      );
+    }
+    return [...classPlaces, ..._popularLocations];
+  }
+
+  Widget _placeTile(CampusPlace place) => CampusSearchResultTile(
+    place: place,
+    onTap: () {
+      FocusScope.of(context).unfocus();
+      widget.controller.selectPlace(place);
+    },
+  );
 
   /// Shown while `configuringRoute` is set, i.e. this search is choosing a
   /// starting point rather than a destination — so a tap here does not look
