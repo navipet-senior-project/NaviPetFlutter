@@ -12,6 +12,7 @@ class CourseClass {
     required this.endTime,
     required this.latitude,
     required this.longitude,
+    this.isOnline = false,
   });
 
   final String id;
@@ -24,9 +25,13 @@ class CourseClass {
   final String endTime;
   final double latitude;
   final double longitude;
+  final bool isOnline;
 
-  String get locationLabel =>
-      room.trim().isEmpty ? building : '$building $room';
+  String get locationLabel => isOnline
+      ? 'Online class'
+      : room.trim().isEmpty
+      ? building
+      : '$building $room';
 
   NavigationCoordinate get coordinate =>
       NavigationCoordinate(latitude: latitude, longitude: longitude);
@@ -62,6 +67,7 @@ class CourseClass {
           : _addHour(startTime),
       latitude: (json['latitude'] as num?)?.toDouble() ?? 33.7838,
       longitude: (json['longitude'] as num?)?.toDouble() ?? -118.1141,
+      isOnline: (json['isOnline'] ?? json['is_online']) == true,
     );
   }
 }
@@ -78,6 +84,7 @@ class CourseClassInput {
     required this.endTime,
     required this.latitude,
     required this.longitude,
+    this.isOnline = false,
   });
 
   final String? id;
@@ -90,6 +97,7 @@ class CourseClassInput {
   final String endTime;
   final double latitude;
   final double longitude;
+  final bool isOnline;
 
   Map<String, dynamic> toJson(String userId) => {
     'user_id': userId,
@@ -102,6 +110,7 @@ class CourseClassInput {
     'end_time': endTime,
     'latitude': latitude,
     'longitude': longitude,
+    'is_online': isOnline,
   };
 
   Map<String, dynamic> toApiJson() => {
@@ -114,6 +123,7 @@ class CourseClassInput {
     'endTime': endTime,
     'latitude': latitude,
     'longitude': longitude,
+    'isOnline': isOnline,
   };
 }
 

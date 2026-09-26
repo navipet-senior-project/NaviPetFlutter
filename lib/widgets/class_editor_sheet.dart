@@ -28,6 +28,7 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
   late Set<int> _weekdays;
   late TimeOfDay _time;
   late TimeOfDay _endTime;
+  late bool _isOnline;
   bool _saving = false;
 
   static const _dayNames = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -52,6 +53,7 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
             hour: int.parse(endParts[0]),
             minute: int.parse(endParts[1]),
           );
+    _isOnline = course?.isOnline ?? false;
   }
 
   @override
@@ -98,6 +100,7 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
       // being saved when Mapbox is unavailable or does not recognize a
       // campus building name.
       try {
+        if (_isOnline) throw const NavigationServiceException('online');
         final suggestions = await service
             .suggestPlaces(
               '${_building.text}, CSULB',
@@ -132,6 +135,7 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
           endTime: _databaseTime(_endTime),
           latitude: coordinate.latitude,
           longitude: coordinate.longitude,
+          isOnline: _isOnline,
         ),
       );
       if (mounted) Navigator.of(context).pop();
@@ -198,6 +202,20 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
                 _building,
                 'Building or address',
                 'Vivian Engineering Center',
+                required: !_isOnline,
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Online class'),
+                subtitle: Text(
+                  _isOnline
+                      ? 'No campus location needed'
+                      : 'Use your location to check attendance',
+                ),
+                value: _isOnline,
+                activeColor: AppColors.petInk,
+                onChanged: (value) => setState(() => _isOnline = value),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -251,6 +269,22 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
                 ),
               ),
               const SizedBox(height: 8),
+              if (widget.course != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _saving ? null : _delete,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Delete class'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: const BorderSide(color: AppColors.danger),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -267,6 +301,40 @@ class _ClassEditorSheetState extends State<ClassEditorSheet> {
         ),
       ),
     );
+  }
+
+  Future<void> _delete() async {
+    final course = widget.course;
+    if (course == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete class?'),
+        content: Text('Remove ${course.courseCode} from your schedule?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await context.read<AppState>().deleteClass(course.id);
+      if (mounted) Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not delete class: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   int _toMinutes(TimeOfDay value) => value.hour * 60 + value.minute;

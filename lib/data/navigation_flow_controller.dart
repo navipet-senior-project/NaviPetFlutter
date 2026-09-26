@@ -296,6 +296,7 @@ class NavigationFlowController extends ChangeNotifier {
       }
       _set(configuring);
       setOrigin(PlaceOrigin(place: destination));
+      _rememberRecent(resolved);
       unawaited(recentSearches.save(resolved));
       return;
     }
@@ -308,6 +309,7 @@ class NavigationFlowController extends ChangeNotifier {
       ),
     );
 
+    _rememberRecent(resolved);
     unawaited(recentSearches.save(resolved));
     if (destination != null) {
       await _queueMap(
@@ -316,8 +318,22 @@ class NavigationFlowController extends ChangeNotifier {
           label: destination.name,
           bottomInset: placeSheetInset,
         ),
+        stillCurrent: () {
+          final state = _state;
+          return state is FlowPlacePreview &&
+              state.place.id == resolved.id;
+        },
       );
     }
+  }
+
+  void _rememberRecent(CampusPlace place) {
+    if (place.external || place.outdoorDestination == null) return;
+    _recents = [
+      place,
+      ..._recents.where((item) => item.id != place.id),
+    ].take(3).toList(growable: false);
+    notifyListeners();
   }
 
   Future<void> requestDirections() async {
@@ -432,6 +448,7 @@ class NavigationFlowController extends ChangeNotifier {
           destination: current.destination,
           bottomInset: routeSheetInset,
         ),
+        stillCurrent: () => generation == _generation,
       );
     } on RouteFailure catch (error) {
       if (generation != _generation) return;
@@ -513,6 +530,9 @@ class NavigationFlowController extends ChangeNotifier {
     // Guidance is only offered when the route starts where the user is.
     if (!origin.canStartGuidance) return;
 
+    // Invalidate any preview camera operation that is still queued. The
+    // guidance camera must be the next camera state the user sees.
+    _generation++;
     _set(
       FlowActiveNavigation(
         destination: destination,
@@ -530,14 +550,10 @@ class NavigationFlowController extends ChangeNotifier {
   Future<void> endRoute() async {
     final current = _state;
     if (current is! FlowActiveNavigation) return;
-    _set(
-      FlowRoutePreview(
-        destination: current.destination,
-        origin: current.origin,
-        plan: current.plan,
-        place: current.place,
-      ),
-    );
+    _generation++;
+    _set(const FlowIdle());
+    search.reset();
+    await _queueMap(() => _map.clear());
   }
 
   Future<void> retry() async {
@@ -609,6 +625,11 @@ class NavigationFlowController extends ChangeNotifier {
               label: destination.name,
               bottomInset: placeSheetInset,
             ),
+            stillCurrent: () {
+              final state = _state;
+              return state is FlowPlacePreview &&
+                  state.place.id == (place?.id ?? destination.id ?? destination.name);
+            },
           ),
         );
       case FlowRouteSteps():
@@ -639,8 +660,14 @@ class NavigationFlowController extends ChangeNotifier {
 
   /// Queues [action] behind whatever map work is already in flight, so map
   /// mutations complete in request order instead of finish order.
-  Future<void> _queueMap(Future<void> Function() action) {
-    final result = _mapWork.then((_) => action());
+  Future<void> _queueMap(
+    Future<void> Function() action, {
+    bool Function()? stillCurrent,
+  }) {
+    final result = _mapWork.then<void>((_) async {
+      if (stillCurrent != null && !stillCurrent()) return;
+      await action();
+    });
     // The queue itself must stay resolved even when a call fails, or every
     // later map call would wait forever behind a permanently-rejected
     // future. The caller's own awaited [result] still carries the error.

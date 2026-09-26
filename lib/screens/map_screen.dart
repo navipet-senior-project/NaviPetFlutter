@@ -98,7 +98,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
 
     await _lastLocationReady;
-    await _centerOnBestKnownLocation();
+    if (_flow.state is FlowIdle) await _centerOnBestKnownLocation();
     await _initializeLocation();
   }
 
@@ -148,14 +148,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ? 'Location is disabled for NaviPet. Enable it in Settings.'
               : 'Location permission is required for navigation.';
         });
-        await _centerOnBestKnownLocation();
+        if (_flow.state is FlowIdle || _flow.state is FlowActiveNavigation) {
+          await _centerOnBestKnownLocation();
+        }
       }
       return;
     }
     if (!await geo.Geolocator.isLocationServiceEnabled()) {
       if (mounted) {
         setState(() => _locationMessage = 'Turn on Location Services.');
-        await _centerOnBestKnownLocation();
+        if (_flow.state is FlowIdle || _flow.state is FlowActiveNavigation) {
+          await _centerOnBestKnownLocation();
+        }
       }
       return;
     }
@@ -182,7 +186,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       await _rememberPosition(_position!);
       if (mounted) {
         setState(() => _locationMessage = null);
-        await _centerOnUser();
+        // A live GPS fix must not replace the route camera while a route is
+        // being previewed. Active guidance intentionally follows the user;
+        // idle mode may recenter normally.
+        if (_flow.state is FlowIdle || _flow.state is FlowActiveNavigation) {
+          await _centerOnUser();
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -677,6 +686,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
+              ),
+            ),
+            Semantics(
+              label: 'Cancel navigation',
+              button: true,
+              child: IconButton(
+                tooltip: 'Cancel navigation',
+                onPressed: () => _confirmEnd(_flow),
+                icon: const Icon(Icons.close, color: Colors.white),
               ),
             ),
           ],

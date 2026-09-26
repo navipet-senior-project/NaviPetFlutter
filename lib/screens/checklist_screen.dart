@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -8,8 +10,30 @@ import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/class_editor_sheet.dart';
 
-class ChecklistScreen extends StatelessWidget {
+class ChecklistScreen extends StatefulWidget {
   const ChecklistScreen({super.key});
+
+  @override
+  State<ChecklistScreen> createState() => _ChecklistScreenState();
+}
+
+class _ChecklistScreenState extends State<ChecklistScreen> {
+  DateTime _selectedDate = DateTime.now();
+  Timer? _onlineTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _onlineTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _onlineTimer?.cancel();
+    super.dispose();
+  }
 
   void _edit(BuildContext context, [CourseClass? course]) {
     showModalBottomSheet<void>(
@@ -27,7 +51,7 @@ class ChecklistScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final tasks = state.dailyTasks();
+    final tasks = state.dailyTasks(_selectedDate);
     return Scaffold(
       backgroundColor: AppColors.screenBg,
       appBar: AppBar(
@@ -61,33 +85,8 @@ class ChecklistScreen extends StatelessWidget {
           children: [
             _intro(context),
             const SizedBox(height: 24),
-            _sectionTitle(
-              'Class achievements',
-              '${state.classes.length} classes',
-            ),
-            const SizedBox(height: 12),
-            if (state.classesBusy && state.classes.isEmpty)
-              const Center(child: CircularProgressIndicator())
-            else if (state.classes.isEmpty)
-              _emptyClasses(context)
-            else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: .9,
-                ),
-                itemCount: state.classes.length,
-                itemBuilder: (_, index) => _achievementCard(
-                  context,
-                  state.classes[index],
-                  state.completionCountFor(state.classes[index].id),
-                ),
-              ),
-            const SizedBox(height: 28),
+            _scheduleCalendar(state.classes),
+            const SizedBox(height: 24),
             _sectionTitle(
               'Daily tasks',
               '${tasks.where((task) => task.done).length}/${tasks.length} done',
@@ -109,6 +108,149 @@ class ChecklistScreen extends StatelessWidget {
       ),
       bottomNavigationBar: const NaviBottomNav(active: NaviTab.menu),
     );
+  }
+
+  Widget _scheduleCalendar(List<CourseClass> classes) {
+    final today = DateTime.now();
+    final start = today.subtract(Duration(days: today.weekday - 1));
+    const dayWidth = 96.0;
+    const timeWidth = 58.0;
+    const rowHeight = 68.0;
+    const startHour = 8;
+    const endHour = 19;
+    final gridHeight = (endHour - startHour) * rowHeight;
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.soft,
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(
+          width: timeWidth + dayWidth * 7,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Schedule',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.petInk),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 42,
+                child: Row(
+                  children: [
+                    const SizedBox(width: timeWidth),
+                    ...List.generate(7, (index) {
+                      final date = start.add(Duration(days: index));
+                      return SizedBox(
+                        width: dayWidth,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedDate = date),
+                          child: Column(
+                            children: [
+                              Text(dayNames[index], style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+                              Text('${date.month}/${date.day}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.petInk)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: gridHeight,
+                child: Stack(
+                  children: [
+                    for (var row = 0; row <= endHour - startHour; row++)
+                      Positioned(
+                        top: row * rowHeight,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: timeWidth,
+                              child: Text(
+                                _hourLabel(startHour + row),
+                                style: const TextStyle(fontSize: 10, color: AppColors.muted),
+                              ),
+                            ),
+                            Container(width: dayWidth * 7, height: 1, color: AppColors.cardBorder),
+                          ],
+                        ),
+                      ),
+                    for (var day = 0; day < 7; day++)
+                      Positioned(
+                        left: timeWidth + day * dayWidth,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(width: 1, color: AppColors.cardBorder),
+                      ),
+                    for (final course in classes)
+                      for (final weekday in course.weekdays)
+                        if (weekday >= 1 && weekday <= 7)
+                          _classBlock(course, weekday - 1, dayWidth, timeWidth, rowHeight, startHour),
+                  ],
+                ),
+              ),
+              if (classes.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text('Add a class to populate your schedule.', style: TextStyle(color: AppColors.muted)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _hourLabel(int hour) {
+    final suffix = hour >= 12 ? 'PM' : 'AM';
+    final display = hour % 12 == 0 ? 12 : hour % 12;
+    return '$display:00 $suffix';
+  }
+
+  Widget _classBlock(CourseClass course, int day, double dayWidth, double timeWidth, double rowHeight, int startHour) {
+    final start = _minutes(course.startTime);
+    final end = _minutes(course.endTime);
+    final top = ((start - startHour * 60) / 60 * rowHeight)
+        .clamp(0.0, 740.0)
+        .toDouble();
+    final height = (((end - start) / 60 * rowHeight).clamp(42.0, 740.0)).toDouble();
+    return Positioned(
+      left: timeWidth + day * dayWidth + 4,
+      top: top,
+      width: dayWidth - 8,
+      height: height,
+      child: GestureDetector(
+        onTap: () => _edit(context, course),
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: course.isOnline ? const Color(0xFFD9E8F7) : const Color(0xFFC5DDA2),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: AppColors.petInk.withValues(alpha: .18)),
+          ),
+          child: Text(
+            '${course.courseCode}\n${course.courseName}\n${course.startTime}-${course.endTime}\n${course.locationLabel}',
+            maxLines: 8,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10, height: 1.15, color: AppColors.petInk, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+    );
+  }
+
+  int _minutes(String value) {
+    final parts = value.split(':');
+    return (int.tryParse(parts.first) ?? 8) * 60 + (int.tryParse(parts.elementAt(1)) ?? 0);
   }
 
   Widget _intro(BuildContext context) => Container(
@@ -214,8 +356,10 @@ class ChecklistScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Icon(
-              Icons.workspace_premium_outlined,
+            Icon(
+              course.isOnline
+                  ? Icons.video_camera_front_outlined
+                  : Icons.workspace_premium_outlined,
               size: 30,
               color: AppColors.petInk,
             ),
@@ -234,6 +378,12 @@ class ChecklistScreen extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+                Text(
+                  course.locationLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.faint, fontSize: 11),
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -280,21 +430,11 @@ class ChecklistScreen extends StatelessWidget {
       children: [
         for (var index = 0; index < tasks.length; index++) ...[
           ListTile(
-            onTap: () async {
-              try {
-                await state.toggleTask(tasks[index], DateTime.now());
-              } catch (error) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Could not update task: $error')),
-                  );
-                }
-              }
-            },
+            onTap: () => _handleTask(context, state, tasks[index]),
             leading: Checkbox(
               value: tasks[index].done,
               activeColor: AppColors.petInk,
-              onChanged: (_) => state.toggleTask(tasks[index], DateTime.now()),
+              onChanged: (_) => _handleTask(context, state, tasks[index]),
             ),
             title: Text(
               tasks[index].label,
@@ -304,13 +444,35 @@ class ChecklistScreen extends StatelessWidget {
                     : null,
               ),
             ),
-            subtitle: Text(
+            subtitle: tasks[index].kind == 'attend_online'
+                ? Text(
+                    'Online session: ${_durationLabel(state.onlineSessionDuration(tasks[index].course.id))} / ${_durationLabel(state.onlineSessionRequirement(tasks[index].course))} required',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : Text(
               '${tasks[index].course.startTime} · ${tasks[index].course.courseName}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             trailing: tasks[index].done
                 ? const Icon(Icons.check_circle, color: AppColors.green)
+                : tasks[index].kind == 'attend_online'
+                ? TextButton(
+                    onPressed: () {
+                      final id = tasks[index].course.id;
+                      if (state.onlineSessionRunning(id)) {
+                        _handleTask(context, state, tasks[index]);
+                      } else {
+                        state.startOnlineSession(id);
+                      }
+                    },
+                    child: Text(
+                      state.onlineSessionRunning(tasks[index].course.id)
+                          ? 'Claim'
+                          : 'Start',
+                    ),
+                  )
                 : Text(
                     '+${tasks[index].reward} 💎',
                     style: const TextStyle(
@@ -324,4 +486,37 @@ class ChecklistScreen extends StatelessWidget {
       ],
     ),
   );
+
+  Future<void> _handleTask(
+    BuildContext context,
+    AppState state,
+    DailyClassTask task,
+  ) async {
+    try {
+      final completed = await state.verifyAndToggleTask(task, _selectedDate);
+      if (!completed && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              task.kind == 'attend_online'
+                  ? 'Keep the online session running for the scheduled class duration before claiming points.'
+                  : 'You need to be near the class building to complete this task.',
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update task: $error')),
+        );
+      }
+    }
+  }
+
+  String _durationLabel(Duration duration) {
+    final minutes = duration.inMinutes.toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
 }
