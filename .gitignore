@@ -51,3 +51,16 @@ app.*.map.json
 # Local isolated development worktrees
 /.worktrees/
 /docs/superpowers/
+
+# Environment variants (keep the committed example)
+.env.*
+!.env.example
+
+# Flutter Version Management
+.fvm/
+
+# Personal agent/editor settings
+.claude/settings.local.json
+
+# OS files
+Thumbs.db
