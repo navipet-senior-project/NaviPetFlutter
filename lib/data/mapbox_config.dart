@@ -14,6 +14,11 @@ String get mapboxPublicToken => dotenv.maybeGet('MAPBOX_PUBLIC_TOKEN') ?? '';
 /// Mapbox Standard is the base for the pitched 3D campus experience.
 const String mapboxStyle = 'mapbox://styles/mapbox/standard';
 
+const String mapboxStreetsStyle = 'mapbox://styles/mapbox/streets-v12';
+const String mapboxSatelliteStyle =
+    'mapbox://styles/mapbox/satellite-streets-v12';
+const String mapboxTerrainStyle = 'mapbox://styles/mapbox/outdoors-v12';
+
 /// California State University, Long Beach — campus center. The focus point the
 /// map opens on and where the "You" pet marker is dropped.
 const double csulbLat = 33.7838;
