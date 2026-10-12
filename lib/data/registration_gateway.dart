@@ -56,6 +56,7 @@ abstract interface class RegistrationGateway {
     required String lastName,
     required String email,
     required String password,
+    required String role,
   });
 
   Future<RegistrationVerificationSuccess> verifyRegistrationCode({
@@ -104,6 +105,7 @@ class HttpRegistrationGateway implements RegistrationGateway {
     required String lastName,
     required String email,
     required String password,
+    required String role,
   }) async {
     final response = await _post(
       path: '/auth/register',
@@ -112,6 +114,7 @@ class HttpRegistrationGateway implements RegistrationGateway {
         'lastName': lastName,
         'email': email,
         'password': password,
+        'role': role,
       },
     );
     final body = _tryDecode(response.body);

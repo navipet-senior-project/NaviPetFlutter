@@ -38,6 +38,7 @@ void main() {
           lastName: 'Shark',
           email: 'person@example.com',
           password: 'Password1!',
+          role: 'student',
         );
 
         expect(result.status, AuthActionStatus.failure);

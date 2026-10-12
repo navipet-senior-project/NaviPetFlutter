@@ -13,6 +13,7 @@ class _FakeRegistrationGateway implements RegistrationGateway {
   String? capturedLastName;
   String? capturedEmail;
   String? capturedPassword;
+  String? capturedRole;
   int callCount = 0;
   String? capturedVerificationEmail;
   String? capturedCode;
@@ -38,12 +39,14 @@ class _FakeRegistrationGateway implements RegistrationGateway {
     required String lastName,
     required String email,
     required String password,
+    required String role,
   }) async {
     callCount++;
     capturedFirstName = firstName;
     capturedLastName = lastName;
     capturedEmail = email;
     capturedPassword = password;
+    capturedRole = role;
     if (_error != null) throw _error;
     return _result!;
   }
@@ -107,6 +110,7 @@ void main() {
           lastName: 'Shark',
           email: 'person@example.com',
           password: 'Password1!',
+          role: 'professor',
         );
 
         expect(gateway.callCount, 1);
@@ -114,6 +118,7 @@ void main() {
         expect(gateway.capturedLastName, 'Shark');
         expect(gateway.capturedEmail, 'person@example.com');
         expect(gateway.capturedPassword, 'Password1!');
+        expect(gateway.capturedRole, 'professor');
 
         expect(result.status, AuthActionStatus.emailVerificationRequired);
         expect(result.message, 'Verification code sent. Check your inbox.');
@@ -137,6 +142,7 @@ void main() {
         lastName: 'Shark',
         email: 'person@example.com',
         password: 'Password1!',
+        role: 'student',
       );
 
       expect(result.status, AuthActionStatus.failure);

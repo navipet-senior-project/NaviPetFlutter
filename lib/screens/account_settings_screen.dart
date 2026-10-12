@@ -15,6 +15,12 @@ import 'avatar_crop_screen.dart';
 const _navy = Color(0xFF001A3D);
 const _page = Color(0xFFFAFAFA);
 
+String _roleLabel(String? role) => switch (role) {
+  'student' => 'Student',
+  'professor' => 'Professor',
+  _ => 'Role not set',
+};
+
 class AccountSettingsScreen extends StatelessWidget {
   const AccountSettingsScreen({super.key});
 
@@ -44,8 +50,8 @@ class AccountSettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Student',
+          Text(
+            _roleLabel(user?.role),
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 16, color: Color(0xFF555861)),
           ),
@@ -159,7 +165,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _name;
-  String _role = 'Student';
+  String? _role;
 
   /// Null when the avatar cannot be edited (guest session or no backend).
   AvatarDraftController? _avatar;
@@ -173,6 +179,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _name = TextEditingController(
       text: current?.isNotEmpty == true ? current : 'Khoi Do',
     );
+    final savedRole = appState.activeUser?.role;
+    _role = savedRole == 'student' || savedRole == 'professor'
+        ? savedRole
+        : null;
     final gateway = appState.profileGateway;
     if (gateway != null && appState.canEditAvatar) {
       _avatar = AvatarDraftController(gateway)..addListener(_onAvatarChanged);
@@ -203,6 +213,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _save() async {
+    if (_role == null) {
+      _prototypeNotice(context, 'Choose a role before saving your profile.');
+      return;
+    }
     final appState = context.read<AppState>();
     final avatar = _avatar;
     final user = appState.activeUser;
@@ -221,7 +235,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
     final nameChanged = name != user.name;
     if (avatar.isUploading) return;
-    if (!nameChanged && avatar.pendingUploadId == null) {
+    final roleChanged = _role != user.role;
+    if (!nameChanged && !roleChanged && avatar.pendingUploadId == null) {
       context.pop();
       return;
     }
@@ -232,6 +247,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await appState.saveProfile(
         displayName: nameChanged ? name : null,
         avatarUploadId: uploadId,
+        role: roleChanged ? _role : null,
       );
       if (!mounted) return;
       _prototypeNotice(context, 'Profile saved.');
@@ -259,6 +275,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final email = appState.activeUser?.email ?? 'khoi.do@student.csulb.edu';
+    final fetchedRole = appState.activeUser?.role;
+    if (_role == null &&
+        (fetchedRole == 'student' || fetchedRole == 'professor')) {
+      _role = fetchedRole;
+    }
     final avatar = _avatar;
     final uploading = avatar?.isUploading ?? false;
     final previewUrl = avatar?.previewUrl;
@@ -314,16 +335,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             decoration: _fieldDecoration(Icons.mail_outline),
           ),
           const SizedBox(height: 16),
-          _label('Campus Role'),
+          _label('Role *'),
           DropdownButtonFormField<String>(
+            key: ValueKey('profile-role-$_role'),
             initialValue: _role,
+            hint: const Text('Select a role'),
             decoration: _fieldDecoration(Icons.school_outlined),
             items: const [
-              'Student',
-              'Faculty',
-              'Staff',
-            ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-            onChanged: (v) => setState(() => _role = v ?? _role),
+              DropdownMenuItem(value: 'student', child: Text('Student')),
+              DropdownMenuItem(value: 'professor', child: Text('Professor')),
+            ],
+            onChanged: (v) => setState(() => _role = v),
           ),
           const SizedBox(height: 48),
           Container(
@@ -406,9 +428,9 @@ class ManageAccountScreen extends StatelessWidget {
           _plainCard(
             Column(
               children: [
-                const _KeyValue(
+                _KeyValue(
                   label: 'Campus Role',
-                  value: 'Student',
+                  value: _roleLabel(user?.role),
                   valueColor: Color(0xFFDCE9FF),
                 ),
                 const Divider(height: 1),

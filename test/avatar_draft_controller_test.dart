@@ -32,6 +32,7 @@ class FakeProfileGateway implements ProfileGateway {
   Future<RemoteProfile> updateProfile({
     String? displayName,
     String? avatarUploadId,
+    String? role,
   }) => throw UnimplementedError();
 }
 

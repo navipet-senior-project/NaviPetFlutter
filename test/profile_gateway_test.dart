@@ -69,6 +69,7 @@ void main() {
       expect(requests.single.url.toString(), 'https://api.test/profiles/me');
       expect(requests.single.headers['Authorization'], 'Bearer token-1');
       expect(profile.displayName, 'Jane');
+      expect(profile.role, 'student');
       expect(profile.avatarUrl, 'https://cdn.test/a.webp?token=1');
     });
 
@@ -227,6 +228,17 @@ void main() {
         'displayName': 'Jane',
         'avatarUploadId': 'u1',
       });
+    });
+
+    test('sends and reads the selected role', () async {
+      final profile = await gateway(
+        (_) => _json({
+          'profile': {'displayName': 'Jane', 'role': 'professor'},
+        }, 200),
+      ).updateProfile(role: 'professor');
+
+      expect(jsonDecode(requests.single.body), {'role': 'professor'});
+      expect(profile.role, 'professor');
     });
 
     test('surfaces a 404 for an upload that no longer exists', () async {

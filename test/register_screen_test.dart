@@ -18,6 +18,7 @@ class _FakeRegistrationGateway implements RegistrationGateway {
   String? capturedLastName;
   String? capturedEmail;
   String? capturedPassword;
+  String? capturedRole;
 
   @override
   Future<RegistrationVerificationSuccess> signIn({
@@ -34,12 +35,14 @@ class _FakeRegistrationGateway implements RegistrationGateway {
     required String lastName,
     required String email,
     required String password,
+    required String role,
   }) async {
     callCount++;
     capturedFirstName = firstName;
     capturedLastName = lastName;
     capturedEmail = email;
     capturedPassword = password;
+    capturedRole = role;
     if (error != null) throw error!;
     return result!;
   }
@@ -104,12 +107,22 @@ Widget _harness(AppState appState) {
   );
 }
 
-Future<void> _fillValidForm(WidgetTester tester) async {
+Future<void> _fillValidForm(
+  WidgetTester tester, {
+  String? role = 'Student',
+}) async {
   await tester.enterText(find.byType(TextField).at(0), 'Elbee');
   await tester.enterText(find.byType(TextField).at(1), 'Shark');
   await tester.enterText(find.byType(TextField).at(2), 'person@example.com');
   await tester.enterText(find.byType(TextField).at(3), 'Password1!');
   await tester.enterText(find.byType(TextField).at(4), 'Password1!');
+  if (role != null) {
+    final dropdown = find.byKey(const ValueKey('registration-role'));
+    await tester.ensureVisible(dropdown);
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(role).last);
+  }
   await tester.pump();
 }
 
@@ -127,6 +140,30 @@ Future<void> _acceptTerms(WidgetTester tester) async {
 
 void main() {
   group('RegisterScreen validation', () {
+    testWidgets('requires a role and offers exactly Student and Professor', (
+      tester,
+    ) async {
+      final appState = AppState(
+        registrationGateway: _FakeRegistrationGateway(),
+      );
+      addTearDown(appState.dispose);
+      await tester.pumpWidget(_harness(appState));
+
+      final dropdown = tester.widget<DropdownButton<String>>(
+        find.descendant(
+          of: find.byKey(const ValueKey('registration-role')),
+          matching: find.byType(DropdownButton<String>),
+        ),
+      );
+      expect(dropdown.items!.map((item) => item.value).toList(), [
+        'student',
+        'professor',
+      ]);
+      await _fillValidForm(tester, role: null);
+      await _acceptTerms(tester);
+      expect(_submitButton(tester).onPressed, isNull);
+    });
+
     testWidgets('shows an inline error for an invalid email format', (
       tester,
     ) async {
@@ -339,10 +376,29 @@ void main() {
         expect(gateway.callCount, 1);
         expect(gateway.capturedFirstName, 'Elbee');
         expect(gateway.capturedLastName, 'Shark');
+        expect(gateway.capturedRole, 'student');
         expect(find.text('Verify person@example.com'), findsOneWidget);
         expect(find.text('Map screen'), findsNothing);
         expect(appState.isAuthenticated, isFalse);
       },
     );
+
+    testWidgets('sends Professor when selected', (tester) async {
+      final gateway = _FakeRegistrationGateway(
+        result: const RegistrationSuccess(message: 'Sent', otpRequired: true),
+      );
+      final appState = AppState(registrationGateway: gateway);
+      addTearDown(appState.dispose);
+      await tester.pumpWidget(_harness(appState));
+
+      await _fillValidForm(tester, role: 'Professor');
+      await _acceptTerms(tester);
+      final submit = find.widgetWithText(ElevatedButton, 'Create account');
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+
+      expect(gateway.capturedRole, 'professor');
+    });
   });
 }

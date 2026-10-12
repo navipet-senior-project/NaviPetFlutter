@@ -151,7 +151,10 @@ class AppState extends ChangeNotifier {
       final current = _activeUser;
       if (current == null || current.id != userId) return;
       _profileFetchedAt = DateTime.now();
-      _activeUser = current.copyWith(avatarUrl: () => profile.avatarUrl);
+      _activeUser = current.copyWith(
+        avatarUrl: () => profile.avatarUrl,
+        role: profile.role,
+      );
       notifyListeners();
     } on Object {
       // The avatar is optional; sign-in and the rest of the profile do not
@@ -179,6 +182,7 @@ class AppState extends ChangeNotifier {
   Future<void> saveProfile({
     String? displayName,
     String? avatarUploadId,
+    String? role,
   }) async {
     final gateway = _profileGateway;
     final user = _activeUser;
@@ -188,6 +192,7 @@ class AppState extends ChangeNotifier {
     final profile = await gateway.updateProfile(
       displayName: displayName,
       avatarUploadId: avatarUploadId,
+      role: role,
     );
     final current = _activeUser;
     if (current == null || current.id != user.id) return;
@@ -196,6 +201,7 @@ class AppState extends ChangeNotifier {
     _activeUser = current.copyWith(
       name: name.isEmpty ? null : name,
       avatarUrl: () => profile.avatarUrl,
+      role: profile.role,
     );
     notifyListeners();
   }
@@ -473,6 +479,7 @@ class AppState extends ChangeNotifier {
     required String lastName,
     required String email,
     required String password,
+    required String role,
   }) async {
     return _runAuthAction(() async {
       final gateway = _requireRegistrationGateway();
@@ -483,6 +490,7 @@ class AppState extends ChangeNotifier {
           lastName: lastName.trim(),
           email: email.trim(),
           password: password,
+          role: role,
         );
       } on RegistrationException catch (error) {
         if (_isExistingAccountError(error)) {
@@ -813,10 +821,15 @@ class AppState extends ChangeNotifier {
     if (_supabase?.auth.currentUser?.id != user.id) return;
     // `profiles.avatar_path` is a storage path, not a URL; the avatar URL only
     // comes from the backend, so keep whichever one is already loaded.
-    _activeUser = UserAccount.fromSupabase(
+    final hydrated = UserAccount.fromSupabase(
       user,
       profile: profile,
       avatarUrl: _activeUser?.id == user.id ? _activeUser?.avatarUrl : null,
+    );
+    _activeUser = hydrated.copyWith(
+      role:
+          hydrated.role ??
+          (_activeUser?.id == user.id ? _activeUser?.role : null),
     );
     notifyListeners();
   }

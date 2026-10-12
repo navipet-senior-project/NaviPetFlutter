@@ -36,6 +36,7 @@ class _FakeProfileGateway implements ProfileGateway {
   Future<RemoteProfile> updateProfile({
     String? displayName,
     String? avatarUploadId,
+    String? role,
   }) => throw UnimplementedError();
 
   @override
@@ -125,6 +126,42 @@ Future<void> _settleUntil(
 
 void main() {
   final pencil = find.byTooltip('Change profile photo');
+
+  testWidgets('Edit Profile requires Student or Professor role', (
+    tester,
+  ) async {
+    final state = AppState(
+      supabase: await _signedIn(anonymous: false),
+      profileGateway: _FakeProfileGateway(),
+    );
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: state,
+        child: const MaterialApp(home: EditProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final dropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byType(DropdownButtonFormField<String>),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(dropdown.items!.map((item) => item.value).toList(), [
+      'student',
+      'professor',
+    ]);
+    await tester.tap(find.text('Save Changes'));
+    await tester.pump();
+    expect(
+      find.text('Choose a role before saving your profile.'),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(const SizedBox());
+    state.dispose();
+  });
 
   testWidgets('Edit Profile: pencil, pick, crop and upload a PNG', (
     tester,

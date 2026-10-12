@@ -11,6 +11,7 @@ class UserAccount {
     required this.level,
     this.isAnonymous = false,
     this.avatarUrl,
+    this.role,
   });
 
   final String id;
@@ -24,6 +25,7 @@ class UserAccount {
   /// Signed avatar URL from the NaviPet backend; it expires after about an
   /// hour. `null` means show the initials avatar instead.
   final String? avatarUrl;
+  final String? role;
 
   factory UserAccount.fromSupabase(
     User user, {
@@ -49,21 +51,26 @@ class UserAccount {
       level: _asInt(profile?['level'], fallback: 1),
       isAnonymous: user.isAnonymous,
       avatarUrl: avatarUrl,
+      role: profile?['role']?.toString(),
     );
   }
 
   /// [avatarUrl] is a getter so callers can clear it by returning `null`.
-  UserAccount copyWith({String? name, String? Function()? avatarUrl}) =>
-      UserAccount(
-        id: id,
-        name: name ?? this.name,
-        email: email,
-        avatarColor: avatarColor,
-        gems: gems,
-        level: level,
-        isAnonymous: isAnonymous,
-        avatarUrl: avatarUrl == null ? this.avatarUrl : avatarUrl(),
-      );
+  UserAccount copyWith({
+    String? name,
+    String? Function()? avatarUrl,
+    String? role,
+  }) => UserAccount(
+    id: id,
+    name: name ?? this.name,
+    email: email,
+    avatarColor: avatarColor,
+    gems: gems,
+    level: level,
+    isAnonymous: isAnonymous,
+    avatarUrl: avatarUrl == null ? this.avatarUrl : avatarUrl(),
+    role: role ?? this.role,
+  );
 
   static String _emailName(String? email) {
     final value = email?.split('@').first.trim() ?? '';

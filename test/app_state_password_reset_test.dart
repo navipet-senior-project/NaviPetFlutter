@@ -25,6 +25,7 @@ class _FakeRegistrationGateway implements RegistrationGateway {
     required String lastName,
     required String email,
     required String password,
+    required String role,
   }) async => const RegistrationSuccess(message: 'ok', otpRequired: true);
 
   @override

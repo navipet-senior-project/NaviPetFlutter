@@ -43,6 +43,7 @@ class _FakeAuthGateway implements RegistrationGateway {
     required String lastName,
     required String email,
     required String password,
+    required String role,
   }) async => const RegistrationSuccess(
     message: 'Verification code sent. Check your inbox.',
     otpRequired: true,

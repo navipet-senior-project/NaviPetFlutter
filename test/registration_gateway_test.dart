@@ -31,6 +31,7 @@ void main() {
         lastName: 'Shark',
         email: 'person@example.com',
         password: 'Password1!',
+        role: 'professor',
       );
 
       expect(capturedRequest.method, 'POST');
@@ -43,6 +44,7 @@ void main() {
         'lastName': 'Shark',
         'email': 'person@example.com',
         'password': 'Password1!',
+        'role': 'professor',
       });
       expect(result.message, 'Verification code sent. Check your inbox.');
       expect(result.otpRequired, isTrue);
@@ -209,6 +211,7 @@ void main() {
             lastName: 'Shark',
             email: 'person@example.com',
             password: 'Password1!',
+            role: 'student',
           ),
           throwsA(
             isA<RegistrationException>()
@@ -242,6 +245,7 @@ void main() {
             lastName: 'Shark',
             email: 'person@example.com',
             password: 'Password1!',
+            role: 'student',
           ),
           throwsA(
             isA<RegistrationException>()

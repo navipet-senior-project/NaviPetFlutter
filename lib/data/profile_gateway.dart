@@ -53,6 +53,7 @@ abstract interface class ProfileGateway {
   Future<RemoteProfile> updateProfile({
     String? displayName,
     String? avatarUploadId,
+    String? role,
   });
 
   /// Deletes a pending upload. An upload that is already gone counts as
@@ -117,10 +118,12 @@ class HttpProfileGateway implements ProfileGateway {
   Future<RemoteProfile> updateProfile({
     String? displayName,
     String? avatarUploadId,
+    String? role,
   }) async {
     final body = jsonEncode({
       'displayName': ?displayName,
       'avatarUploadId': ?avatarUploadId,
+      'role': ?role,
     });
     final response = await _send(
       () => http.Request('PATCH', _uri('/profiles/me'))

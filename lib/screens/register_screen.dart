@@ -30,6 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   bool _agreedToTerms = false;
+  String? _role;
   String? _statusMessage;
   bool _statusIsError = false;
 
@@ -67,6 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _passwordMeetsRules &&
       _confirmPasswordController.text == _passwordController.text &&
       _confirmPasswordController.text.isNotEmpty &&
+      _role != null &&
       _agreedToTerms;
 
   void _goToSignIn() => context.go('/signin');
@@ -92,6 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
+      role: _role!,
     );
     if (!mounted) return;
 
@@ -193,6 +196,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _lastNameController,
                     hint: 'e.g. Shark',
                     textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Role *',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF18181B)),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    key: const ValueKey('registration-role'),
+                    initialValue: _role,
+                    hint: const Text('Select a role'),
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Color(0xFFF7F7F8),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'student',
+                        child: Text('Student'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'professor',
+                        child: Text('Professor'),
+                      ),
+                    ],
+                    onChanged: (value) => setState(() => _role = value),
                   ),
                   const SizedBox(height: 16),
                   _field(
