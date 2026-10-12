@@ -35,6 +35,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   static const _lastLatitudeKey = 'last_location_latitude';
   static const _lastLongitudeKey = 'last_location_longitude';
+  String _mapStyle = mapboxStyle;
 
   late final Future<void> _lastLocationReady;
 
@@ -273,6 +274,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               children: [
                 _mapWidget(),
                 if (state is FlowIdle) _searchBar(context, padding),
+                if (state is! FlowSearching && state is! FlowRouteSteps)
+                  _mapTypeControls(padding),
                 if (locationMessage != null && state is! FlowSearching)
                   _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
@@ -363,7 +366,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         const NavigationCoordinate(latitude: csulbLat, longitude: csulbLng);
     return MapWidget(
       key: const ValueKey('navipet-map'),
-      styleUri: mapboxStyle,
+      styleUri: _mapStyle,
       viewport: CameraViewportState(
         center: Point(
           coordinates: Position(
@@ -376,6 +379,89 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       onMapCreated: _onMapCreated,
     );
   }
+
+  Widget _mapTypeControls(EdgeInsets padding) => Positioned(
+    top: padding.top + 72,
+    right: AppSpacing.lg,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _mapControlButton(
+          icon: Icons.layers_outlined,
+          label: 'Map type',
+          onPressed: _showMapTypePicker,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _mapControlButton(
+          icon: Icons.threed_rotation,
+          label: '2D / 3D map view',
+          // Reserved for the Unity map integration.
+          onPressed: () {},
+        ),
+      ],
+    ),
+  );
+
+  Widget _mapControlButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) => Material(
+    color: Colors.white,
+    elevation: 3,
+    shape: const CircleBorder(),
+    child: Semantics(
+      label: label,
+      button: true,
+      child: IconButton(
+        tooltip: label,
+        onPressed: onPressed,
+        icon: Icon(icon, color: AppColors.navy),
+      ),
+    ),
+  );
+
+  Future<void> _showMapTypePicker() async {
+    final style = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Map type',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            _mapStyleOption('Standard', mapboxStyle),
+            _mapStyleOption('Satellite', mapboxSatelliteStyle),
+            _mapStyleOption('Terrain', mapboxTerrainStyle),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || style == null || style == _mapStyle) return;
+    setState(() => _mapStyle = style);
+    await _map?.loadStyleURI(style);
+  }
+
+  Widget _mapStyleOption(String title, String style) => ListTile(
+    leading: Icon(
+      style == mapboxSatelliteStyle
+          ? Icons.satellite_alt_outlined
+          : style == mapboxTerrainStyle
+          ? Icons.terrain_outlined
+          : Icons.map_outlined,
+    ),
+    title: Text(title),
+    trailing: style == _mapStyle
+        ? const Icon(Icons.check, color: AppColors.navy)
+        : null,
+    onTap: () => Navigator.of(context).pop(style),
+  );
 
   Widget _searchBar(BuildContext context, EdgeInsets padding) {
     final appState = context.watch<AppState>();
