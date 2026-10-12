@@ -28,6 +28,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   CalendarView _view = CalendarView.week;
   int _scrollToNowRequest = 0;
   Timer? _onlineTimer;
+  final _pageController = ScrollController();
+  final _dailyTasksKey = GlobalKey();
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   @override
   void dispose() {
     _onlineTimer?.cancel();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -76,10 +79,25 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  void _goToToday() => setState(() {
-    _selectedDate = DateTime.now();
-    _scrollToNowRequest++;
-  });
+  void _goToToday() {
+    setState(() {
+      _selectedDate = DateTime.now();
+      _view = CalendarView.day;
+      _scrollToNowRequest++;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final context = _dailyTasksKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeOut,
+          alignment: 0.08,
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +128,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       body: RefreshIndicator(
         onRefresh: state.refreshClasses,
         child: ListView(
+          controller: _pageController,
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
             AppSpacing.md,
@@ -157,9 +176,12 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 ),
               ),
             const SizedBox(height: AppSpacing.xl),
-            _sectionTitle(
-              'Daily tasks',
-              '${tasks.where((task) => task.done).length}/${tasks.length} done',
+            Container(
+              key: _dailyTasksKey,
+              child: _sectionTitle(
+                'Daily tasks',
+                '${tasks.where((task) => task.done).length}/${tasks.length} done',
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             if (tasks.isEmpty)

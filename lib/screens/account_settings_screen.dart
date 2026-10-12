@@ -83,11 +83,6 @@ class AccountSettingsScreen extends StatelessWidget {
                 'Manage Account',
                 () => context.push('/account/manage'),
               ),
-              _SettingsItem(
-                Icons.gps_fixed,
-                'Pet Customization',
-                () => context.push('/pet'),
-              ),
             ],
           ),
           const SizedBox(height: 32),
