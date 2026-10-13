@@ -69,6 +69,7 @@ Future<void> main() async {
         // expose the /classes route and returns 422 for these requests.
         classesGateway: null,
         profileGateway: profileGateway,
+        authTokenProvider: authTokenProvider,
       ),
       authTokenProvider: authTokenProvider,
     ),

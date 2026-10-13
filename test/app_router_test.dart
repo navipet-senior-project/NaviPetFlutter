@@ -4,6 +4,11 @@ import 'package:provider/provider.dart';
 
 import 'package:navipet/data/app_state.dart';
 import 'package:navipet/router/app_router.dart';
+import 'package:navipet/screens/account_settings_screen.dart';
+import 'package:navipet/screens/change_email_screen.dart';
+import 'package:navipet/screens/verify_email_screen.dart';
+
+import 'email_change_test_support.dart';
 import 'package:navipet/screens/reset_password_screen.dart';
 import 'package:navipet/screens/sign_in_screen.dart';
 
@@ -81,4 +86,87 @@ void main() {
       expect(find.byType(ResetPasswordScreen), findsOneWidget);
     },
   );
+  group('email change routes', () {
+    Future<void> open(
+      WidgetTester tester,
+      EmailChangeHarness harness,
+      String location,
+    ) async {
+      final router = createAppRouter(harness.state, initialLocation: location);
+      addTearDown(router.dispose);
+      await ignoringInkSplashReports(() async {
+        await tester.pumpWidget(
+          ChangeNotifierProvider<AppState>.value(
+            value: harness.state,
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await tester.pumpAndSettle();
+      });
+    }
+
+    testWidgets('a guest opening /account/email lands on Account', (
+      tester,
+    ) async {
+      final harness = await EmailChangeHarness.create(tester, anonymous: true);
+      addTearDown(harness.state.dispose);
+
+      await open(tester, harness, '/account/email');
+
+      expect(find.byType(ChangeEmailScreen), findsNothing);
+      expect(find.byType(AccountSettingsScreen), findsOneWidget);
+    });
+
+    testWidgets('a guest opening the code route lands on Account', (
+      tester,
+    ) async {
+      final harness = await EmailChangeHarness.create(tester, anonymous: true);
+      addTearDown(harness.state.dispose);
+
+      await open(
+        tester,
+        harness,
+        '/account/email/verify?email=new%40example.com',
+      );
+
+      expect(find.byType(VerifyEmailScreen), findsNothing);
+      expect(find.byType(AccountSettingsScreen), findsOneWidget);
+    });
+
+    testWidgets('a signed-in user reaches the change-email screen with the '
+        'password step', (tester) async {
+      final harness = await EmailChangeHarness.create(tester);
+      addTearDown(harness.state.dispose);
+
+      await open(
+        tester,
+        harness,
+        '/account/email?email=new%40example.com&reauth=1',
+      );
+
+      expect(find.byType(ChangeEmailScreen), findsOneWidget);
+      expect(find.text('new@example.com'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('change-email-password-field')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a signed-in user reaches the code screen for the new email', (
+      tester,
+    ) async {
+      final harness = await EmailChangeHarness.create(tester);
+      addTearDown(harness.state.dispose);
+
+      await open(
+        tester,
+        harness,
+        '/account/email/verify?email=new%40example.com',
+      );
+
+      expect(find.byType(VerifyEmailScreen), findsOneWidget);
+      expect(find.text('Confirm your new email'), findsOneWidget);
+      expect(find.textContaining('new@example.com'), findsOneWidget);
+    });
+  });
 }

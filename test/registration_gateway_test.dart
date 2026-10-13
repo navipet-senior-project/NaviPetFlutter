@@ -320,4 +320,196 @@ void main() {
       });
     });
   });
+  group('HttpRegistrationGateway email change', () {
+    HttpRegistrationGateway gatewayFor(MockClient client) =>
+        HttpRegistrationGateway(
+          baseUrl: 'https://navipetbackend.onrender.com/',
+          client: client,
+        );
+
+    http.Response errorResponse(int status, String code, String message) =>
+        http.Response(
+          jsonEncode({
+            'error': {'code': code, 'message': message, 'requestId': 'req-1'},
+          }),
+          status,
+          headers: {'content-type': 'application/json'},
+        );
+
+    test('posts the new email with the bearer token and accepts 202', () async {
+      late http.Request capturedRequest;
+      final gateway = gatewayFor(
+        MockClient((request) async {
+          capturedRequest = request;
+          return http.Response(
+            jsonEncode({'status': 'verification_required'}),
+            202,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      await gateway.requestEmailChange(
+        accessToken: 'access-token',
+        newEmail: 'new@example.com',
+      );
+
+      expect(capturedRequest.method, 'POST');
+      expect(
+        capturedRequest.url,
+        Uri.parse('https://navipetbackend.onrender.com/auth/change-email'),
+      );
+      expect(capturedRequest.headers['authorization'], 'Bearer access-token');
+      expect(jsonDecode(capturedRequest.body), {'email': 'new@example.com'});
+    });
+
+    test('surfaces REAUTH_REQUIRED with its status code', () async {
+      final gateway = gatewayFor(
+        MockClient(
+          (request) async => errorResponse(
+            401,
+            'REAUTH_REQUIRED',
+            'Sign in again with your password before changing your email.',
+          ),
+        ),
+      );
+
+      expect(
+        () => gateway.requestEmailChange(
+          accessToken: 'access-token',
+          newEmail: 'new@example.com',
+        ),
+        throwsA(
+          isA<RegistrationException>()
+              .having((error) => error.code, 'code', 'REAUTH_REQUIRED')
+              .having((error) => error.statusCode, 'statusCode', 401),
+        ),
+      );
+    });
+
+    test('treats a 200 from change-email as an error', () async {
+      final gateway = gatewayFor(
+        MockClient((request) async => http.Response('{}', 200)),
+      );
+
+      expect(
+        () => gateway.requestEmailChange(
+          accessToken: 'access-token',
+          newEmail: 'new@example.com',
+        ),
+        throwsA(isA<RegistrationException>()),
+      );
+    });
+
+    test('verifies with type email_change and no bearer token', () async {
+      late http.Request capturedRequest;
+      final gateway = gatewayFor(
+        MockClient((request) async {
+          capturedRequest = request;
+          return http.Response(
+            jsonEncode({
+              'access_token': 'new-access',
+              'refresh_token': 'new-refresh',
+              'message':
+                  'Email updated. Use this email the next time you '
+                  'sign in.',
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final result = await gateway.verifyEmailChangeCode(
+        newEmail: 'new@example.com',
+        code: '123456',
+      );
+
+      expect(
+        capturedRequest.url,
+        Uri.parse('https://navipetbackend.onrender.com/auth/verify-otp'),
+      );
+      expect(capturedRequest.headers.containsKey('authorization'), isFalse);
+      expect(jsonDecode(capturedRequest.body), {
+        'email': 'new@example.com',
+        'code': '123456',
+        'type': 'email_change',
+      });
+      expect(result.tokens.accessToken, 'new-access');
+      expect(result.tokens.refreshToken, 'new-refresh');
+      expect(
+        result.message,
+        'Email updated. Use this email the next time you sign in.',
+      );
+    });
+
+    test('falls back to the standard message when none is returned', () async {
+      final gateway = gatewayFor(
+        MockClient(
+          (request) async => http.Response(
+            jsonEncode({
+              'access_token': 'new-access',
+              'refresh_token': 'new-refresh',
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+
+      final result = await gateway.verifyEmailChangeCode(
+        newEmail: 'new@example.com',
+        code: '123456',
+      );
+
+      expect(result.message, emailChangedFallbackMessage);
+    });
+
+    test('surfaces INVALID_OTP', () async {
+      final gateway = gatewayFor(
+        MockClient(
+          (request) async =>
+              errorResponse(401, 'INVALID_OTP', 'Invalid or expired code.'),
+        ),
+      );
+
+      expect(
+        () => gateway.verifyEmailChangeCode(
+          newEmail: 'new@example.com',
+          code: '000000',
+        ),
+        throwsA(
+          isA<RegistrationException>()
+              .having((error) => error.code, 'code', 'INVALID_OTP')
+              .having((error) => error.statusCode, 'statusCode', 401),
+        ),
+      );
+    });
+
+    test('rejects a verify response without tokens', () async {
+      final gateway = gatewayFor(
+        MockClient(
+          (request) async => http.Response(
+            jsonEncode({'message': 'Email updated.'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+
+      expect(
+        () => gateway.verifyEmailChangeCode(
+          newEmail: 'new@example.com',
+          code: '123456',
+        ),
+        throwsA(
+          isA<RegistrationException>().having(
+            (error) => error.code,
+            'code',
+            'INVALID_SESSION',
+          ),
+        ),
+      );
+    });
+  });
 }

@@ -6,9 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
+import '../data/email_change.dart';
+import '../data/registration_gateway.dart';
 import '../theme/app_theme.dart';
 
-enum VerificationPurpose { registration, passwordRecovery }
+enum VerificationPurpose { registration, passwordRecovery, emailChange }
 
 class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({
@@ -25,7 +27,14 @@ class VerifyEmailScreen extends StatefulWidget {
 }
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
-  static const _otpLifetimeSeconds = 3 * 60;
+  /// Supabase keeps an email-change code for an hour. Registration and
+  /// recovery codes keep the shorter window this screen has always shown.
+  static const _emailChangeLifetimeSeconds = 60 * 60;
+  static const _defaultLifetimeSeconds = 3 * 60;
+
+  /// The project may send 30 emails an hour across every flow, so a resend
+  /// is held back after each send.
+  static const _resendHoldSeconds = 60;
 
   late final List<TextEditingController> _controllers;
   late final List<FocusNode> _focusNodes;
@@ -33,7 +42,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   String? _errorMessage;
   String? _successMessage;
   Timer? _countdownTimer;
-  int _secondsRemaining = _otpLifetimeSeconds;
+  // Both are set by _startCountdown, which initState calls before the first
+  // build.
+  int _secondsRemaining = 0;
+  int _resendHoldRemaining = 0;
 
   String get _code => _controllers.map((controller) => controller.text).join();
   bool get _hasCompleteCode => RegExp(r'^\d{6}$').hasMatch(_code);
@@ -42,6 +54,21 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       '${(_secondsRemaining ~/ 60).toString()}:${(_secondsRemaining % 60).toString().padLeft(2, '0')}';
   bool get _isRecovery =>
       widget.purpose == VerificationPurpose.passwordRecovery;
+  bool get _isEmailChange => widget.purpose == VerificationPurpose.emailChange;
+  int get _otpLifetimeSeconds =>
+      _isEmailChange ? _emailChangeLifetimeSeconds : _defaultLifetimeSeconds;
+  String get _title => switch (widget.purpose) {
+    VerificationPurpose.registration => 'Verify your email',
+    VerificationPurpose.passwordRecovery => 'Verify reset code',
+    VerificationPurpose.emailChange => 'Confirm your new email',
+  };
+  String get _submitLabel => switch (widget.purpose) {
+    VerificationPurpose.registration => 'Verify and continue',
+    VerificationPurpose.passwordRecovery => 'Verify reset code',
+    VerificationPurpose.emailChange => 'Confirm new email',
+  };
+  String get _emailChangeLocation =>
+      '/account/email?email=${Uri.encodeQueryComponent(widget.email)}';
 
   @override
   void initState() {
@@ -65,14 +92,15 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   void _startCountdown() {
     _countdownTimer?.cancel();
-    _secondsRemaining = _otpLifetimeSeconds;
+    final lifetime = _otpLifetimeSeconds;
+    final hold = _isEmailChange ? _resendHoldSeconds : 0;
+    _secondsRemaining = lifetime;
+    _resendHoldRemaining = hold;
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
       setState(() {
-        _secondsRemaining = (_otpLifetimeSeconds - timer.tick).clamp(
-          0,
-          _otpLifetimeSeconds,
-        );
+        _secondsRemaining = (lifetime - timer.tick).clamp(0, lifetime);
+        _resendHoldRemaining = (hold - timer.tick).clamp(0, hold);
         if (_secondsRemaining == 0) {
           timer.cancel();
           _successMessage = null;
@@ -117,6 +145,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   Future<void> _submit() async {
     if (!_hasCompleteCode || widget.email.isEmpty || _isExpired) return;
+    if (_isEmailChange) return _confirmEmailChange();
     final appState = context.read<AppState>();
     final result = _isRecovery
         ? await appState.verifyPasswordRecoveryCode(
@@ -148,8 +177,47 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
+  Future<void> _confirmEmailChange() async {
+    final appState = context.read<AppState>();
+    // Captured first: replacing or discarding the session can make the router
+    // redirect and unmount this screen before the result is handled.
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final result = await appState.confirmEmailChange(
+      newEmail: widget.email,
+      code: _code,
+    );
+
+    switch (result.status) {
+      case EmailChangeStatus.changed:
+        router.go('/account');
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(result.message ?? emailChangedFallbackMessage),
+          ),
+        );
+      case EmailChangeStatus.changedSignInRequired:
+        router.go('/signin');
+        messenger.showSnackBar(
+          SnackBar(content: Text(result.message ?? emailChangeSignInNotice)),
+        );
+      case EmailChangeStatus.failure:
+        if (!mounted) return;
+        setState(() {
+          _errorMessage =
+              result.message ??
+              'We could not confirm the code. Please try again.';
+          _successMessage = null;
+        });
+      case EmailChangeStatus.codeSent:
+      case EmailChangeStatus.reauthRequired:
+        break;
+    }
+  }
+
   Future<void> _resend() async {
     if (widget.email.isEmpty) return;
+    if (_isEmailChange) return _resendEmailChange();
     final appState = context.read<AppState>();
     final result = _isRecovery
         ? await appState.resendPasswordRecoveryCode(widget.email)
@@ -157,17 +225,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     if (!mounted) return;
 
     if (result.status == AuthActionStatus.codeResent) {
-      _updatingCode = true;
-      for (final controller in _controllers) {
-        controller.clear();
-      }
-      _updatingCode = false;
-      _focusNodes.first.requestFocus();
-      setState(() {
-        _startCountdown();
-        _errorMessage = null;
-        _successMessage = result.message ?? 'A new code was sent.';
-      });
+      _restartAfterResend(result.message ?? 'A new code was sent.');
     } else {
       setState(() {
         _successMessage = null;
@@ -176,7 +234,48 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
-  void _goBack() => context.go(_isRecovery ? '/forgot-password' : '/register');
+  /// There is no resend endpoint for an email change: the request is sent
+  /// again. A code already in the inbox stays valid if this fails.
+  Future<void> _resendEmailChange() async {
+    final appState = context.read<AppState>();
+    final result = await appState.requestEmailChange(widget.email);
+    if (!mounted) return;
+
+    switch (result.status) {
+      case EmailChangeStatus.codeSent:
+        _restartAfterResend('A new code was sent.');
+      case EmailChangeStatus.reauthRequired:
+        // The password sign-in is good for ten minutes, the code for sixty.
+        context.go('$_emailChangeLocation&reauth=1');
+      case EmailChangeStatus.failure:
+        setState(() {
+          _successMessage = null;
+          _errorMessage = result.message ?? 'Could not resend the code.';
+        });
+      case EmailChangeStatus.changed:
+      case EmailChangeStatus.changedSignInRequired:
+        break;
+    }
+  }
+
+  void _restartAfterResend(String message) {
+    _updatingCode = true;
+    for (final controller in _controllers) {
+      controller.clear();
+    }
+    _updatingCode = false;
+    _focusNodes.first.requestFocus();
+    setState(() {
+      _startCountdown();
+      _errorMessage = null;
+      _successMessage = message;
+    });
+  }
+
+  void _goBack() {
+    if (_isEmailChange) return context.go(_emailChangeLocation);
+    context.go(_isRecovery ? '/forgot-password' : '/register');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -212,7 +311,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    _isRecovery ? 'Verify reset code' : 'Verify your email',
+                    _title,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -297,9 +396,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                               ),
                             )
                           : Text(
-                              _isRecovery
-                                  ? 'Verify reset code'
-                                  : 'Verify and continue',
+                              _submitLabel,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -309,9 +406,29 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   ),
                   const SizedBox(height: 8),
                   TextButton(
-                    onPressed: appState.isBusy ? null : _resend,
-                    child: const Text('Resend Code'),
+                    onPressed: appState.isBusy || _resendHoldRemaining > 0
+                        ? null
+                        : _resend,
+                    child: Text(
+                      _resendHoldRemaining > 0
+                          ? 'Resend code in ${_resendHoldRemaining}s'
+                          : 'Resend Code',
+                    ),
                   ),
+                  if (_isEmailChange) ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'No code? Check the address and your spam folder. A '
+                      'code is only sent if the address can be used.',
+                      key: ValueKey('email-change-hint'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.labelInk,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

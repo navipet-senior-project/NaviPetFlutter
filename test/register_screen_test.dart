@@ -78,6 +78,17 @@ class _FakeRegistrationGateway implements RegistrationGateway {
     required String newPassword,
     required String confirmPassword,
   }) async {}
+  @override
+  Future<void> requestEmailChange({
+    required String accessToken,
+    required String newEmail,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<EmailChangeVerificationSuccess> verifyEmailChangeCode({
+    required String newEmail,
+    required String code,
+  }) => throw UnimplementedError();
 }
 
 Widget _harness(AppState appState) {

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../data/app_state.dart';
 import '../screens/account_settings_screen.dart';
 import '../screens/ar_navigation_screen.dart';
+import '../screens/change_email_screen.dart';
 import '../screens/checklist_screen.dart';
 import '../screens/email_sent_screen.dart';
 import '../screens/forgot_password_screen.dart';
@@ -13,8 +14,14 @@ import '../screens/reset_password_screen.dart';
 import '../screens/sign_in_screen.dart';
 import '../screens/verify_email_screen.dart';
 
-GoRouter createAppRouter(AppState appState) => GoRouter(
-  initialLocation: appState.isAuthenticated ? '/map' : '/signin',
+/// [initialLocation] overrides the start route. Production leaves it null;
+/// tests use it to open a route without building the map first.
+GoRouter createAppRouter(
+  AppState appState, {
+  String? initialLocation,
+}) => GoRouter(
+  initialLocation:
+      initialLocation ?? (appState.isAuthenticated ? '/map' : '/signin'),
   refreshListenable: appState,
   redirect: (context, state) {
     final location = state.matchedLocation;
@@ -32,6 +39,11 @@ GoRouter createAppRouter(AppState appState) => GoRouter(
     }
     if (!appState.isAuthenticated && !onPublicRoute) return '/signin';
     if (appState.isAuthenticated && onPublicRoute) return '/map';
+    // Guests have no email to change. This also covers typed or deep-linked
+    // URLs, where the Edit Profile button was never shown.
+    if (location.startsWith('/account/email') && !appState.canChangeEmail) {
+      return '/account';
+    }
     return null;
   },
   routes: [
@@ -83,6 +95,20 @@ GoRouter createAppRouter(AppState appState) => GoRouter(
     GoRoute(
       path: '/account/manage',
       builder: (context, state) => const ManageAccountScreen(),
+    ),
+    GoRoute(
+      path: '/account/email',
+      builder: (context, state) => ChangeEmailScreen(
+        initialEmail: state.uri.queryParameters['email'] ?? '',
+        requirePassword: state.uri.queryParameters['reauth'] == '1',
+      ),
+    ),
+    GoRoute(
+      path: '/account/email/verify',
+      builder: (context, state) => VerifyEmailScreen(
+        email: state.uri.queryParameters['email'] ?? '',
+        purpose: VerificationPurpose.emailChange,
+      ),
     ),
     GoRoute(
       path: '/account/accessibility',

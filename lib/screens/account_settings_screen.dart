@@ -334,6 +334,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             initialValue: email,
             decoration: _fieldDecoration(Icons.mail_outline),
           ),
+          // The address is never edited here: it changes only after a code
+          // sent to the new address is confirmed.
+          if (appState.canChangeEmail)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const ValueKey('change-email-entry'),
+                onPressed: _saving
+                    ? null
+                    : () => context.push('/account/email'),
+                child: const Text('Change email'),
+              ),
+            ),
           const SizedBox(height: 16),
           _label('Role *'),
           DropdownButtonFormField<String>(

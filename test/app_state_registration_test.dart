@@ -89,6 +89,18 @@ class _FakeRegistrationGateway implements RegistrationGateway {
   }) async {
     if (_error != null) throw _error;
   }
+
+  @override
+  Future<void> requestEmailChange({
+    required String accessToken,
+    required String newEmail,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<EmailChangeVerificationSuccess> verifyEmailChangeCode({
+    required String newEmail,
+    required String code,
+  }) => throw UnimplementedError();
 }
 
 void main() {
