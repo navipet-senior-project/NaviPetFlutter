@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'auth_token_provider.dart';
 import 'course_class.dart';
 import 'classes_gateway.dart';
+import 'email_change.dart';
 import 'profile_gateway.dart';
 import 'registration_gateway.dart';
 import 'user_account.dart';
@@ -34,6 +36,8 @@ class AppState extends ChangeNotifier {
     Future<void> Function(String newPassword)? recoveryPasswordFallback,
     ClassesGateway? classesGateway,
     ProfileGateway? profileGateway,
+    AuthTokenProvider? authTokenProvider,
+    Future<void> Function()? sessionDiscarder,
   }) : this._(
          supabase,
          registrationGateway,
@@ -43,6 +47,8 @@ class AppState extends ChangeNotifier {
          recoveryPasswordFallback,
          classesGateway,
          profileGateway,
+         authTokenProvider,
+         sessionDiscarder,
        );
 
   AppState._(
@@ -54,6 +60,8 @@ class AppState extends ChangeNotifier {
     this._recoveryPasswordFallback,
     this._classesGateway,
     this._profileGateway,
+    this._authTokenProvider,
+    this._sessionDiscarder,
   ) {
     if (_supabase == null) return;
 
@@ -75,6 +83,13 @@ class AppState extends ChangeNotifier {
   )?
   _recoverySessionRefresher;
   final Future<void> Function(String newPassword)? _recoveryPasswordFallback;
+
+  /// Source of the backend bearer token. Null falls back to the Supabase
+  /// client's current session.
+  final AuthTokenProvider? _authTokenProvider;
+
+  /// Test seam for dropping the session; production signs out of Supabase.
+  final Future<void> Function()? _sessionDiscarder;
   StreamSubscription<AuthState>? _authSubscription;
   RegistrationVerificationSuccess? _pendingRecoverySession;
   bool _passwordRecoveryInProgress = false;
@@ -117,6 +132,12 @@ class AppState extends ChangeNotifier {
   /// sessions is unverified.
   bool get canEditAvatar =>
       _profileGateway != null &&
+      _activeUser != null &&
+      !_activeUser!.isAnonymous;
+
+  /// Guests have no email to change, and the change needs the backend.
+  bool get canChangeEmail =>
+      _registrationGateway != null &&
       _activeUser != null &&
       !_activeUser!.isAnonymous;
 
@@ -631,6 +652,170 @@ class AppState extends ChangeNotifier {
       }
       return const AuthActionResult.authenticated();
     });
+  }
+
+  /// Asks the backend to send a six-digit code to [newEmail]. Also used to
+  /// resend: there is no separate resend endpoint.
+  Future<EmailChangeResult> requestEmailChange(String newEmail) async {
+    _setBusy(true);
+    try {
+      final gateway = _requireRegistrationGateway();
+      final email = normalizeEmail(newEmail);
+      final token = await _currentAccessToken();
+      if (token == null) {
+        return _emailChangeFailure(
+          _missingSessionError,
+          EmailChangeStep.request,
+        );
+      }
+      try {
+        await gateway.requestEmailChange(accessToken: token, newEmail: email);
+      } on RegistrationException catch (error) {
+        if (error.code != 'INVALID_ACCESS_TOKEN') rethrow;
+        // The stored token may simply have expired. Refresh once, retry once.
+        final refreshed = await _currentAccessToken(forceRefresh: true);
+        if (refreshed == null) rethrow;
+        await gateway.requestEmailChange(
+          accessToken: refreshed,
+          newEmail: email,
+        );
+      }
+      return const EmailChangeResult.codeSent();
+    } on RegistrationException catch (error) {
+      if (error.code == 'REAUTH_REQUIRED') {
+        return const EmailChangeResult.reauthRequired();
+      }
+      return _emailChangeFailure(error, EmailChangeStep.request);
+    } catch (_) {
+      return _emailChangeFailure(
+        _unexpectedEmailChangeError,
+        EmailChangeStep.request,
+      );
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Signs in again with the current email and [password], stores that
+  /// session, then retries the request with its access token.
+  Future<EmailChangeResult> reauthenticateAndRequestEmailChange({
+    required String newEmail,
+    required String password,
+  }) async {
+    _setBusy(true);
+    var step = EmailChangeStep.reauthenticate;
+    try {
+      final gateway = _requireRegistrationGateway();
+      final tokens = await gateway.signIn(
+        email: _activeUser?.email ?? '',
+        password: password,
+      );
+      await _establishSession(tokens);
+      step = EmailChangeStep.request;
+      await gateway.requestEmailChange(
+        accessToken: tokens.accessToken,
+        newEmail: normalizeEmail(newEmail),
+      );
+      return const EmailChangeResult.codeSent();
+    } on RegistrationException catch (error) {
+      // REAUTH_REQUIRED straight after a password sign-in is reported as a
+      // failure, never as another prompt, so the screen cannot loop.
+      return _emailChangeFailure(error, step);
+    } catch (_) {
+      return _emailChangeFailure(_unexpectedEmailChangeError, step);
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Confirms the code sent to [newEmail] and replaces the stored session
+  /// with the one the backend returns.
+  Future<EmailChangeResult> confirmEmailChange({
+    required String newEmail,
+    required String code,
+  }) async {
+    _setBusy(true);
+    try {
+      final result = await _requireRegistrationGateway().verifyEmailChangeCode(
+        newEmail: normalizeEmail(newEmail),
+        code: code,
+      );
+      // From here the email has changed and the code is spent. Every path
+      // below must report success of the change itself.
+      if (!isStandardSessionToken(result.tokens.accessToken)) {
+        await _discardSession();
+        return const EmailChangeResult.changedSignInRequired(
+          emailChangeSignInNotice,
+        );
+      }
+      try {
+        await _establishSession(result.tokens);
+      } catch (_) {
+        await _discardSession();
+        return const EmailChangeResult.changedSignInRequired(
+          emailChangeSignInNotice,
+        );
+      }
+      return EmailChangeResult.changed(result.message);
+    } on RegistrationException catch (error) {
+      return _emailChangeFailure(error, EmailChangeStep.verify);
+    } catch (_) {
+      return _emailChangeFailure(
+        _unexpectedEmailChangeError,
+        EmailChangeStep.verify,
+      );
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  static const _missingSessionError = RegistrationException(
+    message: 'No active session.',
+    statusCode: 401,
+    code: 'INVALID_ACCESS_TOKEN',
+  );
+
+  static const _unexpectedEmailChangeError = RegistrationException(
+    message: 'Unexpected error.',
+    statusCode: 500,
+  );
+
+  EmailChangeResult _emailChangeFailure(
+    RegistrationException error,
+    EmailChangeStep step,
+  ) => EmailChangeResult.failure(
+    emailChangeErrorMessage(error, step),
+    errorCode: error.code,
+    statusCode: error.statusCode,
+  );
+
+  Future<String?> _currentAccessToken({bool forceRefresh = false}) async {
+    final provider = _authTokenProvider;
+    if (provider != null) return provider.token(forceRefresh: forceRefresh);
+    final auth = _supabase?.auth;
+    if (auth == null) return null;
+    if (!forceRefresh) return auth.currentSession?.accessToken;
+    final response = await auth.refreshSession();
+    return response.session?.accessToken;
+  }
+
+  /// Drops the session without installing a replacement. Local state is
+  /// cleared even when the sign-out call fails, because the caller has
+  /// already decided this session must not be used.
+  Future<void> _discardSession() async {
+    try {
+      final discard = _sessionDiscarder;
+      if (discard != null) {
+        await discard();
+      } else {
+        await _requireClient().auth.signOut();
+      }
+    } catch (_) {
+      // Fall through to clearing local state.
+    }
+    _activeUser = null;
+    _pendingRecoverySession = null;
+    notifyListeners();
   }
 
   Future<void> signOut() async {
