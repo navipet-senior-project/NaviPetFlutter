@@ -59,6 +59,18 @@ class _FakeRegistrationGateway implements RegistrationGateway {
     capturedNewPassword = newPassword;
     if (resetError != null) throw resetError!;
   }
+
+  @override
+  Future<void> requestEmailChange({
+    required String accessToken,
+    required String newEmail,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<EmailChangeVerificationSuccess> verifyEmailChangeCode({
+    required String newEmail,
+    required String code,
+  }) => throw UnimplementedError();
 }
 
 AppState _state(_FakeRegistrationGateway gateway) => AppState(

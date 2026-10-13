@@ -26,6 +26,21 @@ class PasswordResetRequestSuccess {
   final String message;
 }
 
+/// Shown when the backend confirms an email change without its own message.
+const emailChangedFallbackMessage =
+    'Email updated. Use this email the next time you sign in.';
+
+class EmailChangeVerificationSuccess {
+  const EmailChangeVerificationSuccess({
+    required this.tokens,
+    required this.message,
+  });
+
+  /// The session that carries the new email. It replaces the stored session.
+  final RegistrationVerificationSuccess tokens;
+  final String message;
+}
+
 class RegistrationException implements Exception {
   const RegistrationException({
     required this.message,
@@ -77,6 +92,19 @@ abstract interface class RegistrationGateway {
     required String accessToken,
     required String newPassword,
     required String confirmPassword,
+  });
+
+  /// Asks the backend to email a six-digit code to [newEmail]. Completes on
+  /// 202, which is also returned when the address belongs to another account.
+  Future<void> requestEmailChange({
+    required String accessToken,
+    required String newEmail,
+  });
+
+  /// Confirms the code sent to [newEmail]. No bearer token is sent.
+  Future<EmailChangeVerificationSuccess> verifyEmailChangeCode({
+    required String newEmail,
+    required String code,
   });
 }
 
@@ -168,6 +196,36 @@ class HttpRegistrationGateway implements RegistrationGateway {
     );
   }
 
+  @override
+  Future<void> requestEmailChange({
+    required String accessToken,
+    required String newEmail,
+  }) async {
+    await _post(
+      path: '/auth/change-email',
+      body: {'email': newEmail},
+      headers: {'Authorization': 'Bearer $accessToken'},
+      expectedStatus: 202,
+    );
+  }
+
+  @override
+  Future<EmailChangeVerificationSuccess> verifyEmailChangeCode({
+    required String newEmail,
+    required String code,
+  }) async {
+    final response = await _post(
+      path: '/auth/verify-otp',
+      body: {'email': newEmail, 'code': code, 'type': 'email_change'},
+    );
+    final decoded = _tryDecode(response.body);
+    final message = decoded?['message']?.toString() ?? '';
+    return EmailChangeVerificationSuccess(
+      tokens: _tokensFrom(decoded),
+      message: message.isEmpty ? emailChangedFallbackMessage : message,
+    );
+  }
+
   Future<RegistrationVerificationSuccess> _verifyCode({
     required String email,
     required String code,
@@ -182,7 +240,10 @@ class HttpRegistrationGateway implements RegistrationGateway {
     required Map<String, dynamic> body,
   }) async {
     final response = await _post(path: path, body: body);
-    final decoded = _tryDecode(response.body);
+    return _tokensFrom(_tryDecode(response.body));
+  }
+
+  RegistrationVerificationSuccess _tokensFrom(Map<String, dynamic>? decoded) {
     final accessToken = decoded?['access_token']?.toString() ?? '';
     final refreshToken = decoded?['refresh_token']?.toString() ?? '';
     if (accessToken.isEmpty || refreshToken.isEmpty) {
