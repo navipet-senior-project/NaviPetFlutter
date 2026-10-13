@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:navipet/data/app_state.dart';
 import 'package:navipet/data/registration_gateway.dart';
+import 'package:navipet/screens/account_settings_screen.dart';
 import 'package:navipet/screens/change_email_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -32,6 +33,28 @@ Widget _app(AppState state, {String location = '/account/email'}) {
         builder: (_, state) => Scaffold(
           body: Text('Verify ${state.uri.queryParameters['email']}'),
         ),
+      ),
+    ],
+  );
+  return ChangeNotifierProvider<AppState>.value(
+    value: state,
+    child: MaterialApp.router(routerConfig: router),
+  );
+}
+
+const _entry = ValueKey('change-email-entry');
+
+Widget _editProfileApp(AppState state) {
+  final router = GoRouter(
+    initialLocation: '/account/edit',
+    routes: [
+      GoRoute(
+        path: '/account/edit',
+        builder: (_, _) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/account/email',
+        builder: (_, _) => const Scaffold(body: Text('Change email screen')),
       ),
     ],
   );
@@ -213,5 +236,42 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Account screen'), findsOneWidget);
+  });
+  group('Edit Profile entry point', () {
+    testWidgets('opens the change-email screen for a signed-in account', (
+      tester,
+    ) async {
+      final harness = await EmailChangeHarness.create(tester);
+      addTearDown(harness.state.dispose);
+
+      await ignoringInkSplashReports(() async {
+        await tester.pumpWidget(_editProfileApp(harness.state));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_entry), findsOneWidget);
+        expect(find.text('Change email'), findsOneWidget);
+
+        await tester.ensureVisible(find.byKey(_entry));
+        await tester.tap(find.byKey(_entry));
+        await tester.pumpAndSettle();
+      });
+
+      expect(find.text('Change email screen'), findsOneWidget);
+      expect(harness.gateway.requests, isEmpty);
+    });
+
+    testWidgets('is absent for a guest', (tester) async {
+      final harness = await EmailChangeHarness.create(tester, anonymous: true);
+      addTearDown(harness.state.dispose);
+
+      await ignoringInkSplashReports(() async {
+        await tester.pumpWidget(_editProfileApp(harness.state));
+        await tester.pumpAndSettle();
+      });
+
+      expect(harness.state.activeUser?.isAnonymous, isTrue);
+      expect(find.byKey(_entry), findsNothing);
+      expect(find.text('Change email'), findsNothing);
+    });
   });
 }
