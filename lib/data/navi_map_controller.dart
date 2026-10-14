@@ -6,17 +6,14 @@ import 'navigation_models.dart';
 
 /// Builds a complete camera configuration for a route, replacing any padding
 /// left behind by the place sheet before Mapbox calculates the fit.
-CameraOptions routeCameraOptions({required double bottomInset, double pitch = 0}) =>
-    CameraOptions(
-      bearing: 0,
-      pitch: pitch,
-      padding: MbxEdgeInsets(
-        top: 140,
-        left: 48,
-        bottom: bottomInset,
-        right: 48,
-      ),
-    );
+CameraOptions routeCameraOptions({
+  required double bottomInset,
+  double pitch = 0,
+}) => CameraOptions(
+  bearing: 0,
+  pitch: pitch,
+  padding: MbxEdgeInsets(top: 140, left: 48, bottom: bottomInset, right: 48),
+);
 
 /// Everything the flow needs from the map, and nothing else.
 abstract interface class NaviMapController {
