@@ -6,10 +6,10 @@ import 'navigation_models.dart';
 
 /// Builds a complete camera configuration for a route, replacing any padding
 /// left behind by the place sheet before Mapbox calculates the fit.
-CameraOptions routeCameraOptions({required double bottomInset}) =>
+CameraOptions routeCameraOptions({required double bottomInset, double pitch = 0}) =>
     CameraOptions(
       bearing: 0,
-      pitch: 0,
+      pitch: pitch,
       padding: MbxEdgeInsets(
         top: 140,
         left: 48,
@@ -56,6 +56,27 @@ class MapboxNaviMapController implements NaviMapController {
   final MapboxMap _map;
   final PolylineAnnotationManager _routes;
   final PointAnnotationManager _markers;
+  double _pitch = 0;
+  int _pitchRevision = 0;
+
+  /// Updates the camera pitch used by the live map and all future previews.
+  /// Keeping it here prevents route fitting from silently undoing 3D mode.
+  Future<void> setPitch(double pitch) async {
+    final revision = ++_pitchRevision;
+    _pitch = pitch;
+    final camera = await _map.getCameraState();
+    if (revision != _pitchRevision) return;
+    await _map.easeTo(
+      CameraOptions(
+        center: camera.center,
+        padding: camera.padding,
+        zoom: camera.zoom,
+        bearing: camera.bearing,
+        pitch: pitch,
+      ),
+      MapAnimationOptions(duration: 500),
+    );
+  }
 
   @override
   Future<void> showPlace(
@@ -69,6 +90,7 @@ class MapboxNaviMapController implements NaviMapController {
       CameraOptions(
         center: _point(coordinate),
         zoom: 17,
+        pitch: _pitch,
         padding: MbxEdgeInsets(
           top: 120,
           left: 40,
@@ -103,7 +125,7 @@ class MapboxNaviMapController implements NaviMapController {
     if (coordinates.isEmpty) return;
     final camera = await _map.cameraForCoordinatesPadding(
       coordinates.map(_point).toList(),
-      routeCameraOptions(bottomInset: bottomInset),
+      routeCameraOptions(bottomInset: bottomInset, pitch: _pitch),
       null,
       17,
       null,
@@ -120,7 +142,7 @@ class MapboxNaviMapController implements NaviMapController {
       CameraOptions(
         center: _point(coordinate),
         zoom: 17.5,
-        pitch: 0,
+        pitch: _pitch,
         bearing: bearing != null && bearing >= 0 ? bearing : 0,
       ),
       MapAnimationOptions(duration: 500),
