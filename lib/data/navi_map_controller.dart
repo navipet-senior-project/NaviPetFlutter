@@ -1,10 +1,39 @@
 import 'package:flutter/material.dart' show Colors;
-import 'dart:math' as math;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../theme/app_theme.dart';
 import 'navigation_models.dart';
-import 'route_progress.dart';
+
+/// Visual settings shared by preview and live guidance.
+const selectedRouteWidth = 14.0;
+const guidanceRouteWidth = 16.0;
+const userArrowSize = 64.0;
+
+PointAnnotationOptions userArrowOptions(
+  NavigationCoordinate position, {
+  double? bearing,
+}) => PointAnnotationOptions(
+  geometry: Point(coordinates: Position(position.longitude, position.latitude)),
+  textField: '▲',
+  textSize: userArrowSize,
+  textRotate: bearing != null && bearing >= 0 ? bearing : 0,
+  textColor: AppColors.amber.toARGB32(),
+  textHaloColor: AppColors.navy.toARGB32(),
+  textHaloWidth: 5,
+);
+
+PointAnnotationOptions destinationPinOptions(
+  NavigationCoordinate destination,
+) => PointAnnotationOptions(
+  geometry: Point(
+    coordinates: Position(destination.longitude, destination.latitude),
+  ),
+  textField: '◆',
+  textSize: 42,
+  textColor: AppColors.amber.toARGB32(),
+  textHaloColor: AppColors.navy.toARGB32(),
+  textHaloWidth: 4,
+);
 
 /// Builds a complete camera configuration for a route, replacing any padding
 /// left behind by the place sheet before Mapbox calculates the fit.
@@ -69,6 +98,7 @@ class MapboxNaviMapController implements NaviMapController {
   final PolylineAnnotationManager _routes;
   final PointAnnotationManager _markers;
   final PointAnnotationManager _arrowMarkers;
+  bool _guidanceActive = false;
 
   @override
   Future<void> showPlace(
@@ -110,7 +140,7 @@ class MapboxNaviMapController implements NaviMapController {
     await _routes.create(_line(plan.selected, selected: true));
 
     await _markers.create(_marker(origin, 'Start'));
-    await _markers.create(_marker(destination.coordinate, destination.name));
+    await _showDestination(destination);
 
     final coordinates = plan.selected.coordinates;
     if (coordinates.isEmpty) return;
@@ -147,7 +177,13 @@ class MapboxNaviMapController implements NaviMapController {
     required NaviDestination destination,
     double? bearing,
   }) async {
-    await clear();
+    await _clearAnnotations();
+    if (!_guidanceActive) {
+      _guidanceActive = true;
+      await _map.location.updateSettings(
+        LocationComponentSettings(enabled: false),
+      );
+    }
     if (remaining.length >= 2) {
       await _routes.create(
         PolylineAnnotationOptions(
@@ -158,58 +194,40 @@ class MapboxNaviMapController implements NaviMapController {
           ),
           lineColor: AppColors.navy.toARGB32(),
           lineBorderColor: Colors.white.toARGB32(),
-          lineBorderWidth: 2,
-          lineWidth: 10,
+          lineBorderWidth: 3,
+          lineWidth: guidanceRouteWidth,
           lineJoin: LineJoin.ROUND,
         ),
       );
-      await _drawArrows(remaining);
     }
-    await _markers.create(_marker(destination.coordinate, destination.name));
+    await _showDestination(destination);
+    await _arrowMarkers.create(userArrowOptions(position, bearing: bearing));
     await followUser(position, bearing: bearing);
   }
 
-  Future<void> _drawArrows(List<NavigationCoordinate> points) async {
-    const spacing = 35.0;
-    var distanceToNext = 20.0;
-    var count = 0;
-    final arrows = <PointAnnotationOptions>[];
-    for (var i = 0; i < points.length - 1 && count < 40; i++) {
-      final a = points[i];
-      final b = points[i + 1];
-      final length = distanceMeters(a, b);
-      if (length < 0.01) continue;
-      final east =
-          (b.longitude - a.longitude) * math.cos(a.latitude * math.pi / 180);
-      final north = b.latitude - a.latitude;
-      final rotation = math.atan2(east, north) * 180 / math.pi;
-      while (distanceToNext <= length && count < 40) {
-        final fraction = distanceToNext / length;
-        final point = NavigationCoordinate(
-          latitude: a.latitude + (b.latitude - a.latitude) * fraction,
-          longitude: a.longitude + (b.longitude - a.longitude) * fraction,
-        );
-        arrows.add(
-          PointAnnotationOptions(
-            geometry: _point(point),
-            textField: '▲',
-            textSize: 42,
-            textRotate: rotation,
-            textColor: AppColors.amber.toARGB32(),
-            textHaloColor: AppColors.navy.toARGB32(),
-            textHaloWidth: 2,
-          ),
-        );
-        distanceToNext += spacing;
-        count++;
-      }
-      distanceToNext -= length;
-    }
-    if (arrows.isNotEmpty) await _arrowMarkers.createMulti(arrows);
+  Future<void> _showDestination(NaviDestination destination) async {
+    await _markers.create(destinationPinOptions(destination.coordinate));
+    await _markers.create(
+      _marker(
+        destination.coordinate,
+        'Destination: ${destination.name}',
+        textOffset: [0, -3.2],
+      ),
+    );
   }
 
   @override
   Future<void> clear() async {
+    await _clearAnnotations();
+    if (_guidanceActive) {
+      _guidanceActive = false;
+      await _map.location.updateSettings(
+        LocationComponentSettings(enabled: true),
+      );
+    }
+  }
+
+  Future<void> _clearAnnotations() async {
     await _routes.deleteAll();
     await _markers.deleteAll();
     await _arrowMarkers.deleteAll();
@@ -230,21 +248,24 @@ class MapboxNaviMapController implements NaviMapController {
         ? AppColors.navy.toARGB32()
         : AppColors.faint.toARGB32(),
     lineBorderColor: Colors.white.toARGB32(),
-    lineBorderWidth: selected ? 2 : 1,
-    lineWidth: selected ? 7 : 5,
+    lineBorderWidth: selected ? 3 : 1,
+    lineWidth: selected ? selectedRouteWidth : 5,
     lineJoin: LineJoin.ROUND,
   );
 
-  PointAnnotationOptions _marker(NavigationCoordinate at, String label) =>
-      PointAnnotationOptions(
-        geometry: _point(at),
-        textField: label,
-        textOffset: [0, -1.8],
-        textColor: AppColors.navy.toARGB32(),
-        textHaloColor: Colors.white.toARGB32(),
-        textHaloWidth: 2,
-        textSize: 13,
-      );
+  PointAnnotationOptions _marker(
+    NavigationCoordinate at,
+    String label, {
+    List<double> textOffset = const [0, -1.8],
+  }) => PointAnnotationOptions(
+    geometry: _point(at),
+    textField: label,
+    textOffset: textOffset,
+    textColor: AppColors.navy.toARGB32(),
+    textHaloColor: Colors.white.toARGB32(),
+    textHaloWidth: 2,
+    textSize: 13,
+  );
 
   Point _point(NavigationCoordinate at) =>
       Point(coordinates: Position(at.longitude, at.latitude));

@@ -49,6 +49,33 @@ void main() {
     expect(camera.padding?.right, 48);
   });
 
+  test('guidance arrow stays at the user and follows their heading', () {
+    const position = NavigationCoordinate(latitude: 33.78, longitude: -118.11);
+    final arrow = userArrowOptions(position, bearing: 125);
+
+    expect(arrow.geometry.coordinates.lat, position.latitude);
+    expect(arrow.geometry.coordinates.lng, position.longitude);
+    expect(arrow.textField, '▲');
+    expect(arrow.textRotate, 125);
+    expect(arrow.textSize, userArrowSize);
+    expect(userArrowSize, greaterThan(42));
+    expect(guidanceRouteWidth, greaterThan(selectedRouteWidth));
+    expect(selectedRouteWidth, greaterThan(7));
+  });
+
+  test('destination has a visible pin at its exact coordinate', () {
+    const destination = NavigationCoordinate(
+      latitude: 33.79,
+      longitude: -118.10,
+    );
+    final pin = destinationPinOptions(destination);
+
+    expect(pin.geometry.coordinates.lat, destination.latitude);
+    expect(pin.geometry.coordinates.lng, destination.longitude);
+    expect(pin.textField, '◆');
+    expect(pin.textSize, greaterThan(30));
+  });
+
   test('the recording controller satisfies the interface', () async {
     final controller = RecordingMapController();
 

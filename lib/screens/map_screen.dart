@@ -118,6 +118,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
+    await markers.setTextAllowOverlap(true);
     final arrowMarkers = await mapboxMap.annotations
         .createPointAnnotationManager();
     await arrowMarkers.setTextRotationAlignment(TextRotationAlignment.MAP);
@@ -207,7 +208,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     await _map?.location.updateSettings(
       LocationComponentSettings(
-        enabled: true,
+        enabled: _flow.state is! FlowActiveNavigation,
         pulsingEnabled: true,
         pulsingColor: AppColors.amber.toARGB32(),
         showAccuracyRing: true,
