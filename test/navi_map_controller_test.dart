@@ -28,6 +28,14 @@ class RecordingMapController implements NaviMapController {
   }) async => calls.add('followUser');
 
   @override
+  Future<void> showGuidance(
+    List<NavigationCoordinate> remaining, {
+    required NavigationCoordinate position,
+    required NaviDestination destination,
+    double? bearing,
+  }) async => calls.add('showGuidance');
+
+  @override
   Future<void> clear() async => calls.add('clear');
 }
 

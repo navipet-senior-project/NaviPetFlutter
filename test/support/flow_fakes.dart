@@ -170,6 +170,8 @@ class FakeRecents implements RecentSearchesGateway {
 class FakeRouteGateway implements OutdoorRouteGateway {
   Object? error;
   int calls = 0;
+  NavigationRoute? answer;
+  NavigationCoordinate? lastOrigin;
 
   Completer<void>? _blocked;
 
@@ -190,10 +192,12 @@ class FakeRouteGateway implements OutdoorRouteGateway {
     String profile = 'walking',
   }) async {
     calls++;
+    lastOrigin = origin;
     final gate = _blocked;
     if (gate != null) await gate.future;
     final failure = error;
     if (failure != null) throw failure;
+    if (answer != null) return answer!;
     return const NavigationRoute(
       coordinates: [hornCoordinate],
       steps: [
@@ -213,6 +217,8 @@ class FakeRouteGateway implements OutdoorRouteGateway {
 
 class RecordingMap implements NaviMapController {
   final List<String> calls = [];
+  final List<NavigationCoordinate> guidancePositions = [];
+  final List<List<NavigationCoordinate>> guidanceRoutes = [];
 
   Completer<void>? _blockedShowPlace;
 
@@ -252,6 +258,18 @@ class RecordingMap implements NaviMapController {
     NavigationCoordinate coordinate, {
     double? bearing,
   }) async => calls.add('followUser');
+
+  @override
+  Future<void> showGuidance(
+    List<NavigationCoordinate> remaining, {
+    required NavigationCoordinate position,
+    required NaviDestination destination,
+    double? bearing,
+  }) async {
+    guidancePositions.add(position);
+    guidanceRoutes.add(List.of(remaining));
+    calls.add('showGuidance:${remaining.length}');
+  }
 
   @override
   Future<void> clear() async => calls.add('clear');

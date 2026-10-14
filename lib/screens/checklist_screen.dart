@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/class_detail_sheet.dart';
 import '../widgets/class_editor_sheet.dart';
+import '../widgets/profile_avatar.dart';
 import '../widgets/schedule_calendar.dart';
 
 class ChecklistScreen extends StatefulWidget {
@@ -117,9 +118,12 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           IconButton(
             tooltip: 'Account',
             onPressed: () => context.push('/account'),
-            icon: const CircleAvatar(
-              radius: 16,
-              backgroundImage: AssetImage('assets/images/shark_face.png'),
+            icon: ProfileAvatar(
+              name: state.activeUser?.name ?? '?',
+              color: state.activeUser?.avatarColor ?? AppColors.amber,
+              imageUrl: state.activeUser?.avatarUrl,
+              size: 32,
+              onImageError: state.reportAvatarLoadFailed,
             ),
           ),
           const SizedBox(width: 8),

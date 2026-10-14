@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart' show Colors;
+import 'dart:math' as math;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../theme/app_theme.dart';
 import 'navigation_models.dart';
+import 'route_progress.dart';
 
 /// Builds a complete camera configuration for a route, replacing any padding
 /// left behind by the place sheet before Mapbox calculates the fit.
@@ -35,6 +37,13 @@ abstract interface class NaviMapController {
 
   Future<void> followUser(NavigationCoordinate coordinate, {double? bearing});
 
+  Future<void> showGuidance(
+    List<NavigationCoordinate> remaining, {
+    required NavigationCoordinate position,
+    required NaviDestination destination,
+    double? bearing,
+  });
+
   Future<void> clear();
 }
 
@@ -43,6 +52,7 @@ class MapboxNaviMapController implements NaviMapController {
     required MapboxMap map,
     required PolylineAnnotationManager routes,
     required PointAnnotationManager markers,
+    required PointAnnotationManager arrowMarkers,
   }) : // Initializing formals would force the private field names into the
        // public constructor signature, making it unusable from other
        // libraries. Same resolution as HttpCampusSearchGateway.
@@ -51,11 +61,14 @@ class MapboxNaviMapController implements NaviMapController {
        // ignore: prefer_initializing_formals
        _routes = routes,
        // ignore: prefer_initializing_formals
-       _markers = markers;
+       _markers = markers,
+       // ignore: prefer_initializing_formals
+       _arrowMarkers = arrowMarkers;
 
   final MapboxMap _map;
   final PolylineAnnotationManager _routes;
   final PointAnnotationManager _markers;
+  final PointAnnotationManager _arrowMarkers;
 
   @override
   Future<void> showPlace(
@@ -128,9 +141,78 @@ class MapboxNaviMapController implements NaviMapController {
   }
 
   @override
+  Future<void> showGuidance(
+    List<NavigationCoordinate> remaining, {
+    required NavigationCoordinate position,
+    required NaviDestination destination,
+    double? bearing,
+  }) async {
+    await clear();
+    if (remaining.length >= 2) {
+      await _routes.create(
+        PolylineAnnotationOptions(
+          geometry: LineString(
+            coordinates: remaining
+                .map((point) => Position(point.longitude, point.latitude))
+                .toList(),
+          ),
+          lineColor: AppColors.navy.toARGB32(),
+          lineBorderColor: Colors.white.toARGB32(),
+          lineBorderWidth: 2,
+          lineWidth: 10,
+          lineJoin: LineJoin.ROUND,
+        ),
+      );
+      await _drawArrows(remaining);
+    }
+    await _markers.create(_marker(destination.coordinate, destination.name));
+    await followUser(position, bearing: bearing);
+  }
+
+  Future<void> _drawArrows(List<NavigationCoordinate> points) async {
+    const spacing = 35.0;
+    var distanceToNext = 20.0;
+    var count = 0;
+    final arrows = <PointAnnotationOptions>[];
+    for (var i = 0; i < points.length - 1 && count < 40; i++) {
+      final a = points[i];
+      final b = points[i + 1];
+      final length = distanceMeters(a, b);
+      if (length < 0.01) continue;
+      final east =
+          (b.longitude - a.longitude) * math.cos(a.latitude * math.pi / 180);
+      final north = b.latitude - a.latitude;
+      final rotation = math.atan2(east, north) * 180 / math.pi;
+      while (distanceToNext <= length && count < 40) {
+        final fraction = distanceToNext / length;
+        final point = NavigationCoordinate(
+          latitude: a.latitude + (b.latitude - a.latitude) * fraction,
+          longitude: a.longitude + (b.longitude - a.longitude) * fraction,
+        );
+        arrows.add(
+          PointAnnotationOptions(
+            geometry: _point(point),
+            textField: '▲',
+            textSize: 42,
+            textRotate: rotation,
+            textColor: AppColors.amber.toARGB32(),
+            textHaloColor: AppColors.navy.toARGB32(),
+            textHaloWidth: 2,
+          ),
+        );
+        distanceToNext += spacing;
+        count++;
+      }
+      distanceToNext -= length;
+    }
+    if (arrows.isNotEmpty) await _arrowMarkers.createMulti(arrows);
+  }
+
+  @override
   Future<void> clear() async {
     await _routes.deleteAll();
     await _markers.deleteAll();
+    await _arrowMarkers.deleteAll();
   }
 
   PolylineAnnotationOptions _line(

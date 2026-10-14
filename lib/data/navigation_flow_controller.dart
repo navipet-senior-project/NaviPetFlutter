@@ -12,6 +12,7 @@ import 'navigation_flow_state.dart';
 import 'navigation_models.dart';
 import 'recent_searches_gateway.dart';
 import 'route_repository.dart';
+import 'route_progress.dart';
 import 'travel_mode.dart';
 
 /// Owns which part of the search-to-route flow the user is in.
@@ -53,6 +54,14 @@ class NavigationFlowController extends ChangeNotifier {
   int _recentRevision = 0;
   int _generation = 0;
   int _resumeGeneration = 0;
+  NavigationCoordinate? _lastTripPosition;
+  DateTime? _tripStartedAt;
+  double _tripDistanceMeters = 0;
+  double _routeProgressMeters = 0;
+  int _offRouteFixes = 0;
+  int _arrivalFixes = 0;
+  DateTime? _lastRerouteAt;
+  bool _rerouteInFlight = false;
 
   // Chained so map mutations always apply in the order they were issued
   // rather than the order their underlying async work happens to finish.
@@ -143,15 +152,30 @@ class NavigationFlowController extends ChangeNotifier {
           origin: origin,
           plan: plan,
         );
-      case FlowActiveNavigation(:final origin):
-        final coordinate = origin.coordinate;
+      case FlowActiveNavigation(
+        :final destination,
+        :final origin,
+        :final plan,
+        :final position,
+        :final remainingGeometry,
+      ):
+        final coordinate = position ?? origin.coordinate;
         if (coordinate == null) return;
-        await _queueMap(() => _map.followUser(coordinate));
+        await _queueMap(
+          () => _map.showGuidance(
+            remainingGeometry.isEmpty
+                ? plan.selected.coordinates
+                : remainingGeometry,
+            position: coordinate,
+            destination: destination,
+          ),
+        );
       case FlowIdle():
       case FlowSearching():
       case FlowConfiguringRoute():
       case FlowCalculatingRoute():
       case FlowIndoorHandoff():
+      case FlowArrived():
       case FlowError():
       // Nothing was ever drawn for these states, so there is nothing to
       // replay.
@@ -600,17 +624,226 @@ class NavigationFlowController extends ChangeNotifier {
     // Invalidate any preview camera operation that is still queued. The
     // guidance camera must be the next camera state the user sees.
     _generation++;
+    _tripStartedAt = DateTime.now();
+    _tripDistanceMeters = 0;
+    _lastTripPosition = null;
+    _routeProgressMeters = 0;
+    _offRouteFixes = 0;
+    _arrivalFixes = 0;
+    _lastRerouteAt = null;
+    _rerouteInFlight = false;
     _set(
       FlowActiveNavigation(
         destination: destination,
         origin: origin,
         plan: plan,
         place: place,
+        position: origin.coordinate,
+        remainingGeometry: plan.selected.coordinates,
+        remainingMeters: plan.selected.distanceMeters,
       ),
     );
     final coordinate = origin.coordinate;
     if (coordinate != null) {
-      await _queueMap(() => _map.followUser(coordinate));
+      await _queueMap(
+        () => _map.showGuidance(
+          plan.selected.coordinates,
+          position: coordinate,
+          destination: destination,
+        ),
+      );
+    }
+  }
+
+  /// Receives fresh GPS fixes from the map screen while guidance is active.
+  Future<void> onLiveLocation(
+    NavigationCoordinate coordinate, {
+    required double accuracyMeters,
+    double? bearing,
+    DateTime? timestamp,
+  }) async {
+    final current = _state;
+    if (current is! FlowActiveNavigation) return;
+    final reliable = accuracyMeters.isFinite && accuracyMeters <= 20;
+    final now = timestamp ?? DateTime.now();
+    if (reliable) {
+      final previous = _lastTripPosition;
+      if (previous != null) {
+        final gap = distanceMeters(previous, coordinate);
+        if (gap >= 2 && gap <= 100) _tripDistanceMeters += gap;
+      }
+      _lastTripPosition = coordinate;
+    }
+    final destinationGap = distanceMeters(
+      coordinate,
+      current.destination.coordinate,
+    );
+    _arrivalFixes =
+        accuracyMeters.isFinite && accuracyMeters <= 10 && destinationGap <= 10
+        ? _arrivalFixes + 1
+        : 0;
+    if (_arrivalFixes >= 2) {
+      _generation++;
+      _set(
+        FlowArrived(
+          destination: current.destination,
+          summary: NavigationTripSummary(
+            elapsed: now.isAfter(_tripStartedAt ?? now)
+                ? now.difference(_tripStartedAt!)
+                : Duration.zero,
+            walkingSteps: null,
+            distanceMeters: _tripDistanceMeters,
+          ),
+        ),
+      );
+      await _queueMap(() => _map.clear());
+      return;
+    }
+
+    final projected = projectOntoRoute(
+      current.plan.selected.coordinates,
+      coordinate,
+      minimumProgressMeters: _routeProgressMeters,
+    );
+    final onRoute = reliable && projected.offRouteMeters <= 20;
+    if (onRoute) {
+      _routeProgressMeters = projected.traveledMeters;
+      _offRouteFixes = 0;
+    } else if (reliable) {
+      _offRouteFixes++;
+    }
+    final progress = onRoute
+        ? projected
+        : projectOntoRoute(
+            current.plan.selected.coordinates,
+            current.remainingGeometry.isEmpty
+                ? current.origin.coordinate ?? coordinate
+                : current.remainingGeometry.first,
+            minimumProgressMeters: _routeProgressMeters,
+          );
+    final nextIndex = _nextStepIndex(
+      current.plan.selected,
+      _routeProgressMeters,
+    );
+    _set(
+      FlowActiveNavigation(
+        destination: current.destination,
+        origin: current.origin,
+        plan: current.plan,
+        place: current.place,
+        stepIndex: nextIndex,
+        position: coordinate,
+        remainingGeometry: progress.remaining,
+        remainingMeters: progress.remainingMeters,
+        distanceTraveledMeters: _tripDistanceMeters,
+        rerouting: _rerouteInFlight,
+        routeNotice: onRoute && !_rerouteInFlight ? null : current.routeNotice,
+      ),
+    );
+    final generation = _generation;
+    if (_offRouteFixes >= 2 &&
+        !_rerouteInFlight &&
+        (_lastRerouteAt == null ||
+            now.difference(_lastRerouteAt!) >= const Duration(seconds: 15))) {
+      _lastRerouteAt = now;
+      unawaited(_rerouteFrom(coordinate, generation));
+    }
+    await _queueMap(
+      () => _map.showGuidance(
+        progress.remaining,
+        position: coordinate,
+        destination: current.destination,
+        bearing: bearing,
+      ),
+      stillCurrent: () =>
+          generation == _generation && _state is FlowActiveNavigation,
+    );
+  }
+
+  int _nextStepIndex(NavigationRoute route, double traveled) {
+    var result = 0;
+    for (var i = 0; i < route.steps.length; i++) {
+      if (route.steps[i].maneuverType == 'arrive') continue;
+      final step = projectOntoRoute(route.coordinates, route.steps[i].maneuver);
+      if (step.traveledMeters <= traveled + 5) result = i;
+    }
+    return result;
+  }
+
+  Future<void> _rerouteFrom(
+    NavigationCoordinate coordinate,
+    int generation,
+  ) async {
+    final current = _state;
+    if (current is! FlowActiveNavigation) return;
+    _rerouteInFlight = true;
+    _set(
+      FlowActiveNavigation(
+        destination: current.destination,
+        origin: current.origin,
+        plan: current.plan,
+        place: current.place,
+        stepIndex: current.stepIndex,
+        position: current.position,
+        remainingGeometry: current.remainingGeometry,
+        remainingMeters: current.remainingMeters,
+        distanceTraveledMeters: _tripDistanceMeters,
+        rerouting: true,
+        routeNotice: 'Finding a new route…',
+      ),
+    );
+    try {
+      final plan = await routes.plan(
+        origin: coordinate,
+        destination: current.destination,
+        mode: current.plan.mode,
+      );
+      if (generation != _generation || _state is! FlowActiveNavigation) return;
+      final active = _state as FlowActiveNavigation;
+      final position = active.position ?? coordinate;
+      final progress = projectOntoRoute(plan.selected.coordinates, position);
+      _routeProgressMeters = progress.traveledMeters;
+      _offRouteFixes = 0;
+      _set(
+        FlowActiveNavigation(
+          destination: active.destination,
+          origin: active.origin,
+          plan: plan,
+          place: active.place,
+          position: position,
+          remainingGeometry: progress.remaining,
+          remainingMeters: progress.remainingMeters,
+          distanceTraveledMeters: _tripDistanceMeters,
+        ),
+      );
+      await _queueMap(
+        () => _map.showGuidance(
+          progress.remaining,
+          position: position,
+          destination: active.destination,
+        ),
+        stillCurrent: () =>
+            generation == _generation && _state is FlowActiveNavigation,
+      );
+    } on RouteFailure {
+      if (generation != _generation || _state is! FlowActiveNavigation) return;
+      final active = _state as FlowActiveNavigation;
+      _set(
+        FlowActiveNavigation(
+          destination: active.destination,
+          origin: active.origin,
+          plan: active.plan,
+          place: active.place,
+          stepIndex: active.stepIndex,
+          position: active.position,
+          remainingGeometry: active.remainingGeometry,
+          remainingMeters: active.remainingMeters,
+          distanceTraveledMeters: _tripDistanceMeters,
+          routeNotice: 'Could not update the route. Retrying…',
+        ),
+      );
+    } finally {
+      if (generation == _generation) _rerouteInFlight = false;
     }
   }
 
@@ -621,6 +854,12 @@ class NavigationFlowController extends ChangeNotifier {
     _set(const FlowIdle());
     search.reset();
     await _queueMap(() => _map.clear());
+  }
+
+  Future<void> dismissArrival() async {
+    if (_state is! FlowArrived) return;
+    _set(const FlowIdle());
+    search.reset();
   }
 
   Future<void> retry() async {
@@ -713,16 +952,30 @@ class NavigationFlowController extends ChangeNotifier {
         // Back (and the "Overview" button) leaves guidance but keeps the
         // route. Only an explicit, confirmed endRoute() discards it.
         _generation++;
+        final overviewOrigin = plan.selected.coordinates.isEmpty
+            ? origin
+            : CurrentLocationOrigin(
+                coordinate: plan.selected.coordinates.first,
+              );
         _set(
           FlowRoutePreview(
             destination: destination,
-            origin: origin,
+            origin: overviewOrigin,
             plan: plan,
             place: place,
           ),
         );
+        unawaited(
+          _redrawRoute(
+            destination: destination,
+            origin: overviewOrigin,
+            plan: plan,
+          ),
+        );
       case FlowIndoorHandoff():
         _generation++;
+        _set(const FlowIdle());
+      case FlowArrived():
         _set(const FlowIdle());
       case FlowError(:final previous):
         _generation++;
@@ -801,6 +1054,14 @@ class _NoOpMapController implements NaviMapController {
   @override
   Future<void> followUser(
     NavigationCoordinate coordinate, {
+    double? bearing,
+  }) async {}
+
+  @override
+  Future<void> showGuidance(
+    List<NavigationCoordinate> remaining, {
+    required NavigationCoordinate position,
+    required NaviDestination destination,
     double? bearing,
   }) async {}
 
