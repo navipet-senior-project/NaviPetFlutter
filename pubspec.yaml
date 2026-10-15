@@ -48,6 +48,8 @@ dependencies:
   pedometer: ^4.2.0
   permission_handler: ^12.0.3
   image_picker: ^1.2.3
+  navipet_api:
+    path: packages/navipet_api
 
 dev_dependencies:
   flutter_test:
