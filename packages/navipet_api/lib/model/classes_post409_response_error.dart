@@ -37,31 +37,34 @@ class ClassesPost409ResponseError {
   String? existingClassId;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ClassesPost409ResponseError &&
-    other.code == code &&
-    other.message == message &&
-    other.requestId == requestId &&
-    _deepEquality.equals(other.conflicts, conflicts) &&
-    other.existingClassId == existingClassId;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClassesPost409ResponseError &&
+          other.code == code &&
+          other.message == message &&
+          other.requestId == requestId &&
+          _deepEquality.equals(other.conflicts, conflicts) &&
+          other.existingClassId == existingClassId;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (code.hashCode) +
-    (message.hashCode) +
-    (requestId.hashCode) +
-    (conflicts.hashCode) +
-    (existingClassId == null ? 0 : existingClassId!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (code.hashCode) +
+      (message.hashCode) +
+      (requestId.hashCode) +
+      (conflicts.hashCode) +
+      (existingClassId == null ? 0 : existingClassId!.hashCode);
 
   @override
-  String toString() => 'ClassesPost409ResponseError[code=$code, message=$message, requestId=$requestId, conflicts=$conflicts, existingClassId=$existingClassId]';
+  String toString() =>
+      'ClassesPost409ResponseError[code=$code, message=$message, requestId=$requestId, conflicts=$conflicts, existingClassId=$existingClassId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'code'] = this.code;
-      json[r'message'] = this.message;
-      json[r'requestId'] = this.requestId;
-      json[r'conflicts'] = this.conflicts;
+    json[r'code'] = this.code;
+    json[r'message'] = this.message;
+    json[r'requestId'] = this.requestId;
+    json[r'conflicts'] = this.conflicts;
     if (this.existingClassId != null) {
       json[r'existingClassId'] = this.existingClassId;
     } else {
@@ -82,8 +85,10 @@ class ClassesPost409ResponseError {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ClassesPost409ResponseError[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ClassesPost409ResponseError[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ClassesPost409ResponseError[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ClassesPost409ResponseError[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -92,14 +97,18 @@ class ClassesPost409ResponseError {
         code: mapValueOfType<String>(json, r'code')!,
         message: mapValueOfType<String>(json, r'message')!,
         requestId: mapValueOfType<String>(json, r'requestId')!,
-        conflicts: ClassesPost409ResponseErrorConflictsInner.listFromJson(json[r'conflicts']),
+        conflicts: ClassesPost409ResponseErrorConflictsInner.listFromJson(
+            json[r'conflicts']),
         existingClassId: mapValueOfType<String>(json, r'existingClassId'),
       );
     }
     return null;
   }
 
-  static List<ClassesPost409ResponseError> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ClassesPost409ResponseError> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ClassesPost409ResponseError>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -127,13 +136,19 @@ class ClassesPost409ResponseError {
   }
 
   // maps a json object with a list of ClassesPost409ResponseError-objects as value to a dart map
-  static Map<String, List<ClassesPost409ResponseError>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ClassesPost409ResponseError>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ClassesPost409ResponseError>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ClassesPost409ResponseError.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ClassesPost409ResponseError.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -146,4 +161,3 @@ class ClassesPost409ResponseError {
     'requestId',
   };
 }
-

@@ -22,30 +22,33 @@ class AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination {
   num longitude;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination &&
-    other.latitude == latitude &&
-    other.longitude == longitude;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination &&
+          other.latitude == latitude &&
+          other.longitude == longitude;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (latitude.hashCode) +
-    (longitude.hashCode);
+      // ignore: unnecessary_parenthesis
+      (latitude.hashCode) + (longitude.hashCode);
 
   @override
-  String toString() => 'AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination[latitude=$latitude, longitude=$longitude]';
+  String toString() =>
+      'AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination[latitude=$latitude, longitude=$longitude]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'latitude'] = this.latitude;
-      json[r'longitude'] = this.longitude;
+    json[r'latitude'] = this.latitude;
+    json[r'longitude'] = this.longitude;
     return json;
   }
 
   /// Returns a new [AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination] instance and imports its values from
   /// [value] if it's a [Map], null otherwise.
   // ignore: prefer_constructors_over_static_methods
-  static AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination? fromJson(dynamic value) {
+  static AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination?
+      fromJson(dynamic value) {
     if (value is Map) {
       final json = value.cast<String, dynamic>();
 
@@ -54,8 +57,10 @@ class AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -68,11 +73,19 @@ class AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination {
     return null;
   }
 
-  static List<AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>[];
+  static List<
+          AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>
+      listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
+    final result =
+        <AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination.fromJson(row);
+        final value =
+            AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination
+                .fromJson(row);
         if (value != null) {
           result.add(value);
         }
@@ -81,12 +94,17 @@ class AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination {
     return result.toList(growable: growable);
   }
 
-  static Map<String, AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination> mapFromJson(dynamic json) {
-    final map = <String, AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>{};
+  static Map<String,
+          AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>
+      mapFromJson(dynamic json) {
+    final map = <String,
+        AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination.fromJson(entry.value);
+        final value =
+            AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination
+                .fromJson(entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -96,13 +114,27 @@ class AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination {
   }
 
   // maps a json object with a list of AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination-objects as value to a dart map
-  static Map<String, List<AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>> mapListFromJson(dynamic json, {bool growable = false,}) {
-    final map = <String, List<AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>>{};
+  static Map<
+          String,
+          List<
+              AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
+    final map = <String,
+        List<
+            AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination.listFromJson(entry.value, growable: growable,);
+        map[entry.key] =
+            AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination
+                .listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -114,4 +146,3 @@ class AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination {
     'longitude',
   };
 }
-

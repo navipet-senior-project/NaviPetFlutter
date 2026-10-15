@@ -19,20 +19,21 @@ class AuthChangeEmailPost401Response {
   AuthLoginPost400ResponseError error;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthChangeEmailPost401Response &&
-    other.error == error;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthChangeEmailPost401Response && other.error == error;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (error.hashCode);
+      // ignore: unnecessary_parenthesis
+      (error.hashCode);
 
   @override
   String toString() => 'AuthChangeEmailPost401Response[error=$error]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'error'] = this.error;
+    json[r'error'] = this.error;
     return json;
   }
 
@@ -48,8 +49,10 @@ class AuthChangeEmailPost401Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthChangeEmailPost401Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthChangeEmailPost401Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthChangeEmailPost401Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthChangeEmailPost401Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class AuthChangeEmailPost401Response {
     return null;
   }
 
-  static List<AuthChangeEmailPost401Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthChangeEmailPost401Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthChangeEmailPost401Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +95,19 @@ class AuthChangeEmailPost401Response {
   }
 
   // maps a json object with a list of AuthChangeEmailPost401Response-objects as value to a dart map
-  static Map<String, List<AuthChangeEmailPost401Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthChangeEmailPost401Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthChangeEmailPost401Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthChangeEmailPost401Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthChangeEmailPost401Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +118,3 @@ class AuthChangeEmailPost401Response {
     'error',
   };
 }
-

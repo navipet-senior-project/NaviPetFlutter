@@ -31,25 +31,28 @@ class AutocompleteGet200Response {
   AutocompleteGet200ResponseProximity? proximity;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AutocompleteGet200Response &&
-    other.query == query &&
-    _deepEquality.equals(other.results, results) &&
-    other.proximity == proximity;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutocompleteGet200Response &&
+          other.query == query &&
+          _deepEquality.equals(other.results, results) &&
+          other.proximity == proximity;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (query.hashCode) +
-    (results.hashCode) +
-    (proximity == null ? 0 : proximity!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (query.hashCode) +
+      (results.hashCode) +
+      (proximity == null ? 0 : proximity!.hashCode);
 
   @override
-  String toString() => 'AutocompleteGet200Response[query=$query, results=$results, proximity=$proximity]';
+  String toString() =>
+      'AutocompleteGet200Response[query=$query, results=$results, proximity=$proximity]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'query'] = this.query;
-      json[r'results'] = this.results;
+    json[r'query'] = this.query;
+    json[r'results'] = this.results;
     if (this.proximity != null) {
       json[r'proximity'] = this.proximity;
     } else {
@@ -70,22 +73,29 @@ class AutocompleteGet200Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AutocompleteGet200Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AutocompleteGet200Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AutocompleteGet200Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AutocompleteGet200Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return AutocompleteGet200Response(
         query: mapValueOfType<String>(json, r'query')!,
-        results: AutocompleteGet200ResponseResultsInner.listFromJson(json[r'results']),
-        proximity: AutocompleteGet200ResponseProximity.fromJson(json[r'proximity']),
+        results: AutocompleteGet200ResponseResultsInner.listFromJson(
+            json[r'results']),
+        proximity:
+            AutocompleteGet200ResponseProximity.fromJson(json[r'proximity']),
       );
     }
     return null;
   }
 
-  static List<AutocompleteGet200Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AutocompleteGet200Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AutocompleteGet200Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -113,13 +123,19 @@ class AutocompleteGet200Response {
   }
 
   // maps a json object with a list of AutocompleteGet200Response-objects as value to a dart map
-  static Map<String, List<AutocompleteGet200Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AutocompleteGet200Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AutocompleteGet200Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AutocompleteGet200Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AutocompleteGet200Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -131,4 +147,3 @@ class AutocompleteGet200Response {
     'results',
   };
 }
-

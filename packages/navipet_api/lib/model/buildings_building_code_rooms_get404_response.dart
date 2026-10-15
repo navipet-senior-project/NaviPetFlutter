@@ -19,20 +19,21 @@ class BuildingsBuildingCodeRoomsGet404Response {
   AuthLoginPost400ResponseError error;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is BuildingsBuildingCodeRoomsGet404Response &&
-    other.error == error;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BuildingsBuildingCodeRoomsGet404Response && other.error == error;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (error.hashCode);
+      // ignore: unnecessary_parenthesis
+      (error.hashCode);
 
   @override
   String toString() => 'BuildingsBuildingCodeRoomsGet404Response[error=$error]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'error'] = this.error;
+    json[r'error'] = this.error;
     return json;
   }
 
@@ -48,8 +49,10 @@ class BuildingsBuildingCodeRoomsGet404Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "BuildingsBuildingCodeRoomsGet404Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "BuildingsBuildingCodeRoomsGet404Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "BuildingsBuildingCodeRoomsGet404Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "BuildingsBuildingCodeRoomsGet404Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class BuildingsBuildingCodeRoomsGet404Response {
     return null;
   }
 
-  static List<BuildingsBuildingCodeRoomsGet404Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<BuildingsBuildingCodeRoomsGet404Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <BuildingsBuildingCodeRoomsGet404Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -74,12 +80,14 @@ class BuildingsBuildingCodeRoomsGet404Response {
     return result.toList(growable: growable);
   }
 
-  static Map<String, BuildingsBuildingCodeRoomsGet404Response> mapFromJson(dynamic json) {
+  static Map<String, BuildingsBuildingCodeRoomsGet404Response> mapFromJson(
+      dynamic json) {
     final map = <String, BuildingsBuildingCodeRoomsGet404Response>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = BuildingsBuildingCodeRoomsGet404Response.fromJson(entry.value);
+        final value =
+            BuildingsBuildingCodeRoomsGet404Response.fromJson(entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -89,13 +97,20 @@ class BuildingsBuildingCodeRoomsGet404Response {
   }
 
   // maps a json object with a list of BuildingsBuildingCodeRoomsGet404Response-objects as value to a dart map
-  static Map<String, List<BuildingsBuildingCodeRoomsGet404Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<BuildingsBuildingCodeRoomsGet404Response>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<BuildingsBuildingCodeRoomsGet404Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = BuildingsBuildingCodeRoomsGet404Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = BuildingsBuildingCodeRoomsGet404Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +121,3 @@ class BuildingsBuildingCodeRoomsGet404Response {
     'error',
   };
 }
-

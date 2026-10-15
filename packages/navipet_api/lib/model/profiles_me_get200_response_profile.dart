@@ -29,26 +29,29 @@ class ProfilesMeGet200ResponseProfile {
   String? avatarUrl;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMeGet200ResponseProfile &&
-    other.displayName == displayName &&
-    other.email == email &&
-    other.role == role &&
-    other.avatarUrl == avatarUrl;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMeGet200ResponseProfile &&
+          other.displayName == displayName &&
+          other.email == email &&
+          other.role == role &&
+          other.avatarUrl == avatarUrl;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (displayName.hashCode) +
-    (email == null ? 0 : email!.hashCode) +
-    (role == null ? 0 : role!.hashCode) +
-    (avatarUrl == null ? 0 : avatarUrl!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (displayName.hashCode) +
+      (email == null ? 0 : email!.hashCode) +
+      (role == null ? 0 : role!.hashCode) +
+      (avatarUrl == null ? 0 : avatarUrl!.hashCode);
 
   @override
-  String toString() => 'ProfilesMeGet200ResponseProfile[displayName=$displayName, email=$email, role=$role, avatarUrl=$avatarUrl]';
+  String toString() =>
+      'ProfilesMeGet200ResponseProfile[displayName=$displayName, email=$email, role=$role, avatarUrl=$avatarUrl]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'displayName'] = this.displayName;
+    json[r'displayName'] = this.displayName;
     if (this.email != null) {
       json[r'email'] = this.email;
     } else {
@@ -79,8 +82,10 @@ class ProfilesMeGet200ResponseProfile {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMeGet200ResponseProfile[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMeGet200ResponseProfile[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMeGet200ResponseProfile[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMeGet200ResponseProfile[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -95,7 +100,10 @@ class ProfilesMeGet200ResponseProfile {
     return null;
   }
 
-  static List<ProfilesMeGet200ResponseProfile> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMeGet200ResponseProfile> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMeGet200ResponseProfile>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -108,7 +116,8 @@ class ProfilesMeGet200ResponseProfile {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ProfilesMeGet200ResponseProfile> mapFromJson(dynamic json) {
+  static Map<String, ProfilesMeGet200ResponseProfile> mapFromJson(
+      dynamic json) {
     final map = <String, ProfilesMeGet200ResponseProfile>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
@@ -123,13 +132,19 @@ class ProfilesMeGet200ResponseProfile {
   }
 
   // maps a json object with a list of ProfilesMeGet200ResponseProfile-objects as value to a dart map
-  static Map<String, List<ProfilesMeGet200ResponseProfile>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ProfilesMeGet200ResponseProfile>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ProfilesMeGet200ResponseProfile>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMeGet200ResponseProfile.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ProfilesMeGet200ResponseProfile.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -144,7 +159,6 @@ class ProfilesMeGet200ResponseProfile {
   };
 }
 
-
 class ProfilesMeGet200ResponseProfileRoleEnum {
   /// Instantiate a new enum with the provided [value].
   const ProfilesMeGet200ResponseProfileRoleEnum._(this.value);
@@ -158,7 +172,8 @@ class ProfilesMeGet200ResponseProfileRoleEnum {
   String toJson() => value;
 
   static const student = ProfilesMeGet200ResponseProfileRoleEnum._(r'student');
-  static const professor = ProfilesMeGet200ResponseProfileRoleEnum._(r'professor');
+  static const professor =
+      ProfilesMeGet200ResponseProfileRoleEnum._(r'professor');
 
   /// List of all possible values in this [enum][ProfilesMeGet200ResponseProfileRoleEnum].
   static const values = <ProfilesMeGet200ResponseProfileRoleEnum>[
@@ -166,9 +181,13 @@ class ProfilesMeGet200ResponseProfileRoleEnum {
     professor,
   ];
 
-  static ProfilesMeGet200ResponseProfileRoleEnum? fromJson(dynamic value) => ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer().decode(value);
+  static ProfilesMeGet200ResponseProfileRoleEnum? fromJson(dynamic value) =>
+      ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer().decode(value);
 
-  static List<ProfilesMeGet200ResponseProfileRoleEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMeGet200ResponseProfileRoleEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMeGet200ResponseProfileRoleEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -185,7 +204,9 @@ class ProfilesMeGet200ResponseProfileRoleEnum {
 /// Transformation class that can [encode] an instance of [ProfilesMeGet200ResponseProfileRoleEnum] to String,
 /// and [decode] dynamic data back to [ProfilesMeGet200ResponseProfileRoleEnum].
 class ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer {
-  factory ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer() => _instance ??= const ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer._();
+  factory ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer() =>
+      _instance ??=
+          const ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer._();
 
   const ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer._();
 
@@ -199,11 +220,14 @@ class ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  ProfilesMeGet200ResponseProfileRoleEnum? decode(dynamic data, {bool allowNull = true}) {
+  ProfilesMeGet200ResponseProfileRoleEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'student': return ProfilesMeGet200ResponseProfileRoleEnum.student;
-        case r'professor': return ProfilesMeGet200ResponseProfileRoleEnum.professor;
+        case r'student':
+          return ProfilesMeGet200ResponseProfileRoleEnum.student;
+        case r'professor':
+          return ProfilesMeGet200ResponseProfileRoleEnum.professor;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -216,5 +240,3 @@ class ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer {
   /// Singleton [ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer] instance.
   static ProfilesMeGet200ResponseProfileRoleEnumTypeTransformer? _instance;
 }
-
-

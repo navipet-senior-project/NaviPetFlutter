@@ -26,26 +26,27 @@ class AutocompleteGet200ResponseProximity {
   int radiusMeters;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AutocompleteGet200ResponseProximity &&
-    other.intent == intent &&
-    other.status == status &&
-    other.radiusMeters == radiusMeters;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutocompleteGet200ResponseProximity &&
+          other.intent == intent &&
+          other.status == status &&
+          other.radiusMeters == radiusMeters;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (intent.hashCode) +
-    (status.hashCode) +
-    (radiusMeters.hashCode);
+      // ignore: unnecessary_parenthesis
+      (intent.hashCode) + (status.hashCode) + (radiusMeters.hashCode);
 
   @override
-  String toString() => 'AutocompleteGet200ResponseProximity[intent=$intent, status=$status, radiusMeters=$radiusMeters]';
+  String toString() =>
+      'AutocompleteGet200ResponseProximity[intent=$intent, status=$status, radiusMeters=$radiusMeters]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'intent'] = this.intent;
-      json[r'status'] = this.status;
-      json[r'radiusMeters'] = this.radiusMeters;
+    json[r'intent'] = this.intent;
+    json[r'status'] = this.status;
+    json[r'radiusMeters'] = this.radiusMeters;
     return json;
   }
 
@@ -61,22 +62,29 @@ class AutocompleteGet200ResponseProximity {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AutocompleteGet200ResponseProximity[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AutocompleteGet200ResponseProximity[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AutocompleteGet200ResponseProximity[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AutocompleteGet200ResponseProximity[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return AutocompleteGet200ResponseProximity(
-        intent: AutocompleteGet200ResponseProximityIntentEnum.fromJson(json[r'intent'])!,
-        status: AutocompleteGet200ResponseProximityStatusEnum.fromJson(json[r'status'])!,
+        intent: AutocompleteGet200ResponseProximityIntentEnum.fromJson(
+            json[r'intent'])!,
+        status: AutocompleteGet200ResponseProximityStatusEnum.fromJson(
+            json[r'status'])!,
         radiusMeters: mapValueOfType<int>(json, r'radiusMeters')!,
       );
     }
     return null;
   }
 
-  static List<AutocompleteGet200ResponseProximity> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AutocompleteGet200ResponseProximity> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AutocompleteGet200ResponseProximity>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,7 +97,8 @@ class AutocompleteGet200ResponseProximity {
     return result.toList(growable: growable);
   }
 
-  static Map<String, AutocompleteGet200ResponseProximity> mapFromJson(dynamic json) {
+  static Map<String, AutocompleteGet200ResponseProximity> mapFromJson(
+      dynamic json) {
     final map = <String, AutocompleteGet200ResponseProximity>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
@@ -104,13 +113,19 @@ class AutocompleteGet200ResponseProximity {
   }
 
   // maps a json object with a list of AutocompleteGet200ResponseProximity-objects as value to a dart map
-  static Map<String, List<AutocompleteGet200ResponseProximity>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AutocompleteGet200ResponseProximity>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AutocompleteGet200ResponseProximity>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AutocompleteGet200ResponseProximity.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AutocompleteGet200ResponseProximity.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -124,7 +139,6 @@ class AutocompleteGet200ResponseProximity {
   };
 }
 
-
 class AutocompleteGet200ResponseProximityIntentEnum {
   /// Instantiate a new enum with the provided [value].
   const AutocompleteGet200ResponseProximityIntentEnum._(this.value);
@@ -137,11 +151,15 @@ class AutocompleteGet200ResponseProximityIntentEnum {
 
   String toJson() => value;
 
-  static const restroom = AutocompleteGet200ResponseProximityIntentEnum._(r'restroom');
+  static const restroom =
+      AutocompleteGet200ResponseProximityIntentEnum._(r'restroom');
   static const food = AutocompleteGet200ResponseProximityIntentEnum._(r'food');
-  static const parking = AutocompleteGet200ResponseProximityIntentEnum._(r'parking');
-  static const busStop = AutocompleteGet200ResponseProximityIntentEnum._(r'bus_stop');
-  static const coffee = AutocompleteGet200ResponseProximityIntentEnum._(r'coffee');
+  static const parking =
+      AutocompleteGet200ResponseProximityIntentEnum._(r'parking');
+  static const busStop =
+      AutocompleteGet200ResponseProximityIntentEnum._(r'bus_stop');
+  static const coffee =
+      AutocompleteGet200ResponseProximityIntentEnum._(r'coffee');
 
   /// List of all possible values in this [enum][AutocompleteGet200ResponseProximityIntentEnum].
   static const values = <AutocompleteGet200ResponseProximityIntentEnum>[
@@ -152,13 +170,20 @@ class AutocompleteGet200ResponseProximityIntentEnum {
     coffee,
   ];
 
-  static AutocompleteGet200ResponseProximityIntentEnum? fromJson(dynamic value) => AutocompleteGet200ResponseProximityIntentEnumTypeTransformer().decode(value);
+  static AutocompleteGet200ResponseProximityIntentEnum? fromJson(
+          dynamic value) =>
+      AutocompleteGet200ResponseProximityIntentEnumTypeTransformer()
+          .decode(value);
 
-  static List<AutocompleteGet200ResponseProximityIntentEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AutocompleteGet200ResponseProximityIntentEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AutocompleteGet200ResponseProximityIntentEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = AutocompleteGet200ResponseProximityIntentEnum.fromJson(row);
+        final value =
+            AutocompleteGet200ResponseProximityIntentEnum.fromJson(row);
         if (value != null) {
           result.add(value);
         }
@@ -171,11 +196,15 @@ class AutocompleteGet200ResponseProximityIntentEnum {
 /// Transformation class that can [encode] an instance of [AutocompleteGet200ResponseProximityIntentEnum] to String,
 /// and [decode] dynamic data back to [AutocompleteGet200ResponseProximityIntentEnum].
 class AutocompleteGet200ResponseProximityIntentEnumTypeTransformer {
-  factory AutocompleteGet200ResponseProximityIntentEnumTypeTransformer() => _instance ??= const AutocompleteGet200ResponseProximityIntentEnumTypeTransformer._();
+  factory AutocompleteGet200ResponseProximityIntentEnumTypeTransformer() =>
+      _instance ??=
+          const AutocompleteGet200ResponseProximityIntentEnumTypeTransformer
+              ._();
 
   const AutocompleteGet200ResponseProximityIntentEnumTypeTransformer._();
 
-  String encode(AutocompleteGet200ResponseProximityIntentEnum data) => data.value;
+  String encode(AutocompleteGet200ResponseProximityIntentEnum data) =>
+      data.value;
 
   /// Decodes a [dynamic value][data] to a AutocompleteGet200ResponseProximityIntentEnum.
   ///
@@ -185,14 +214,20 @@ class AutocompleteGet200ResponseProximityIntentEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  AutocompleteGet200ResponseProximityIntentEnum? decode(dynamic data, {bool allowNull = true}) {
+  AutocompleteGet200ResponseProximityIntentEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'restroom': return AutocompleteGet200ResponseProximityIntentEnum.restroom;
-        case r'food': return AutocompleteGet200ResponseProximityIntentEnum.food;
-        case r'parking': return AutocompleteGet200ResponseProximityIntentEnum.parking;
-        case r'bus_stop': return AutocompleteGet200ResponseProximityIntentEnum.busStop;
-        case r'coffee': return AutocompleteGet200ResponseProximityIntentEnum.coffee;
+        case r'restroom':
+          return AutocompleteGet200ResponseProximityIntentEnum.restroom;
+        case r'food':
+          return AutocompleteGet200ResponseProximityIntentEnum.food;
+        case r'parking':
+          return AutocompleteGet200ResponseProximityIntentEnum.parking;
+        case r'bus_stop':
+          return AutocompleteGet200ResponseProximityIntentEnum.busStop;
+        case r'coffee':
+          return AutocompleteGet200ResponseProximityIntentEnum.coffee;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -203,10 +238,9 @@ class AutocompleteGet200ResponseProximityIntentEnumTypeTransformer {
   }
 
   /// Singleton [AutocompleteGet200ResponseProximityIntentEnumTypeTransformer] instance.
-  static AutocompleteGet200ResponseProximityIntentEnumTypeTransformer? _instance;
+  static AutocompleteGet200ResponseProximityIntentEnumTypeTransformer?
+      _instance;
 }
-
-
 
 class AutocompleteGet200ResponseProximityStatusEnum {
   /// Instantiate a new enum with the provided [value].
@@ -227,13 +261,20 @@ class AutocompleteGet200ResponseProximityStatusEnum {
     ok,
   ];
 
-  static AutocompleteGet200ResponseProximityStatusEnum? fromJson(dynamic value) => AutocompleteGet200ResponseProximityStatusEnumTypeTransformer().decode(value);
+  static AutocompleteGet200ResponseProximityStatusEnum? fromJson(
+          dynamic value) =>
+      AutocompleteGet200ResponseProximityStatusEnumTypeTransformer()
+          .decode(value);
 
-  static List<AutocompleteGet200ResponseProximityStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AutocompleteGet200ResponseProximityStatusEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AutocompleteGet200ResponseProximityStatusEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = AutocompleteGet200ResponseProximityStatusEnum.fromJson(row);
+        final value =
+            AutocompleteGet200ResponseProximityStatusEnum.fromJson(row);
         if (value != null) {
           result.add(value);
         }
@@ -246,11 +287,15 @@ class AutocompleteGet200ResponseProximityStatusEnum {
 /// Transformation class that can [encode] an instance of [AutocompleteGet200ResponseProximityStatusEnum] to String,
 /// and [decode] dynamic data back to [AutocompleteGet200ResponseProximityStatusEnum].
 class AutocompleteGet200ResponseProximityStatusEnumTypeTransformer {
-  factory AutocompleteGet200ResponseProximityStatusEnumTypeTransformer() => _instance ??= const AutocompleteGet200ResponseProximityStatusEnumTypeTransformer._();
+  factory AutocompleteGet200ResponseProximityStatusEnumTypeTransformer() =>
+      _instance ??=
+          const AutocompleteGet200ResponseProximityStatusEnumTypeTransformer
+              ._();
 
   const AutocompleteGet200ResponseProximityStatusEnumTypeTransformer._();
 
-  String encode(AutocompleteGet200ResponseProximityStatusEnum data) => data.value;
+  String encode(AutocompleteGet200ResponseProximityStatusEnum data) =>
+      data.value;
 
   /// Decodes a [dynamic value][data] to a AutocompleteGet200ResponseProximityStatusEnum.
   ///
@@ -260,10 +305,12 @@ class AutocompleteGet200ResponseProximityStatusEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  AutocompleteGet200ResponseProximityStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+  AutocompleteGet200ResponseProximityStatusEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'ok': return AutocompleteGet200ResponseProximityStatusEnum.ok;
+        case r'ok':
+          return AutocompleteGet200ResponseProximityStatusEnum.ok;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -274,7 +321,6 @@ class AutocompleteGet200ResponseProximityStatusEnumTypeTransformer {
   }
 
   /// Singleton [AutocompleteGet200ResponseProximityStatusEnumTypeTransformer] instance.
-  static AutocompleteGet200ResponseProximityStatusEnumTypeTransformer? _instance;
+  static AutocompleteGet200ResponseProximityStatusEnumTypeTransformer?
+      _instance;
 }
-
-

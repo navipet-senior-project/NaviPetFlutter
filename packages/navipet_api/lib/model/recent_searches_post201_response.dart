@@ -19,20 +19,23 @@ class RecentSearchesPost201Response {
   AutocompleteGet200ResponseResultsInner recentSearch;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is RecentSearchesPost201Response &&
-    other.recentSearch == recentSearch;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecentSearchesPost201Response &&
+          other.recentSearch == recentSearch;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (recentSearch.hashCode);
+      // ignore: unnecessary_parenthesis
+      (recentSearch.hashCode);
 
   @override
-  String toString() => 'RecentSearchesPost201Response[recentSearch=$recentSearch]';
+  String toString() =>
+      'RecentSearchesPost201Response[recentSearch=$recentSearch]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'recentSearch'] = this.recentSearch;
+    json[r'recentSearch'] = this.recentSearch;
     return json;
   }
 
@@ -48,20 +51,26 @@ class RecentSearchesPost201Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "RecentSearchesPost201Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "RecentSearchesPost201Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "RecentSearchesPost201Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "RecentSearchesPost201Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return RecentSearchesPost201Response(
-        recentSearch: AutocompleteGet200ResponseResultsInner.fromJson(json[r'recentSearch'])!,
+        recentSearch: AutocompleteGet200ResponseResultsInner.fromJson(
+            json[r'recentSearch'])!,
       );
     }
     return null;
   }
 
-  static List<RecentSearchesPost201Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<RecentSearchesPost201Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <RecentSearchesPost201Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +98,19 @@ class RecentSearchesPost201Response {
   }
 
   // maps a json object with a list of RecentSearchesPost201Response-objects as value to a dart map
-  static Map<String, List<RecentSearchesPost201Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<RecentSearchesPost201Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<RecentSearchesPost201Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = RecentSearchesPost201Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = RecentSearchesPost201Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +121,3 @@ class RecentSearchesPost201Response {
     'recentSearch',
   };
 }
-

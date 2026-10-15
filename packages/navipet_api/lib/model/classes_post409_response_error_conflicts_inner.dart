@@ -35,35 +35,38 @@ class ClassesPost409ResponseErrorConflictsInner {
   String location;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ClassesPost409ResponseErrorConflictsInner &&
-    other.existingClassId == existingClassId &&
-    other.existingCourse == existingCourse &&
-    other.day == day &&
-    other.newTime == newTime &&
-    other.existingTime == existingTime &&
-    other.location == location;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClassesPost409ResponseErrorConflictsInner &&
+          other.existingClassId == existingClassId &&
+          other.existingCourse == existingCourse &&
+          other.day == day &&
+          other.newTime == newTime &&
+          other.existingTime == existingTime &&
+          other.location == location;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (existingClassId.hashCode) +
-    (existingCourse.hashCode) +
-    (day.hashCode) +
-    (newTime.hashCode) +
-    (existingTime.hashCode) +
-    (location.hashCode);
+      // ignore: unnecessary_parenthesis
+      (existingClassId.hashCode) +
+      (existingCourse.hashCode) +
+      (day.hashCode) +
+      (newTime.hashCode) +
+      (existingTime.hashCode) +
+      (location.hashCode);
 
   @override
-  String toString() => 'ClassesPost409ResponseErrorConflictsInner[existingClassId=$existingClassId, existingCourse=$existingCourse, day=$day, newTime=$newTime, existingTime=$existingTime, location=$location]';
+  String toString() =>
+      'ClassesPost409ResponseErrorConflictsInner[existingClassId=$existingClassId, existingCourse=$existingCourse, day=$day, newTime=$newTime, existingTime=$existingTime, location=$location]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'existingClassId'] = this.existingClassId;
-      json[r'existingCourse'] = this.existingCourse;
-      json[r'day'] = this.day;
-      json[r'newTime'] = this.newTime;
-      json[r'existingTime'] = this.existingTime;
-      json[r'location'] = this.location;
+    json[r'existingClassId'] = this.existingClassId;
+    json[r'existingCourse'] = this.existingCourse;
+    json[r'day'] = this.day;
+    json[r'newTime'] = this.newTime;
+    json[r'existingTime'] = this.existingTime;
+    json[r'location'] = this.location;
     return json;
   }
 
@@ -79,8 +82,10 @@ class ClassesPost409ResponseErrorConflictsInner {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ClassesPost409ResponseErrorConflictsInner[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ClassesPost409ResponseErrorConflictsInner[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ClassesPost409ResponseErrorConflictsInner[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ClassesPost409ResponseErrorConflictsInner[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -97,7 +102,10 @@ class ClassesPost409ResponseErrorConflictsInner {
     return null;
   }
 
-  static List<ClassesPost409ResponseErrorConflictsInner> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ClassesPost409ResponseErrorConflictsInner> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ClassesPost409ResponseErrorConflictsInner>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -110,12 +118,14 @@ class ClassesPost409ResponseErrorConflictsInner {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ClassesPost409ResponseErrorConflictsInner> mapFromJson(dynamic json) {
+  static Map<String, ClassesPost409ResponseErrorConflictsInner> mapFromJson(
+      dynamic json) {
     final map = <String, ClassesPost409ResponseErrorConflictsInner>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = ClassesPost409ResponseErrorConflictsInner.fromJson(entry.value);
+        final value =
+            ClassesPost409ResponseErrorConflictsInner.fromJson(entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -125,13 +135,20 @@ class ClassesPost409ResponseErrorConflictsInner {
   }
 
   // maps a json object with a list of ClassesPost409ResponseErrorConflictsInner-objects as value to a dart map
-  static Map<String, List<ClassesPost409ResponseErrorConflictsInner>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ClassesPost409ResponseErrorConflictsInner>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ClassesPost409ResponseErrorConflictsInner>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ClassesPost409ResponseErrorConflictsInner.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ClassesPost409ResponseErrorConflictsInner.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -147,4 +164,3 @@ class ClassesPost409ResponseErrorConflictsInner {
     'location',
   };
 }
-

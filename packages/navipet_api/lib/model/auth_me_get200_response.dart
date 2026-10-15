@@ -19,20 +19,21 @@ class AuthMeGet200Response {
   AuthMeGet200ResponseUser user;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthMeGet200Response &&
-    other.user == user;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthMeGet200Response && other.user == user;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (user.hashCode);
+      // ignore: unnecessary_parenthesis
+      (user.hashCode);
 
   @override
   String toString() => 'AuthMeGet200Response[user=$user]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'user'] = this.user;
+    json[r'user'] = this.user;
     return json;
   }
 
@@ -48,8 +49,10 @@ class AuthMeGet200Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthMeGet200Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthMeGet200Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthMeGet200Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthMeGet200Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class AuthMeGet200Response {
     return null;
   }
 
-  static List<AuthMeGet200Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthMeGet200Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthMeGet200Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +95,19 @@ class AuthMeGet200Response {
   }
 
   // maps a json object with a list of AuthMeGet200Response-objects as value to a dart map
-  static Map<String, List<AuthMeGet200Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthMeGet200Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthMeGet200Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthMeGet200Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthMeGet200Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +118,3 @@ class AuthMeGet200Response {
     'user',
   };
 }
-

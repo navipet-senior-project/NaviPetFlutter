@@ -19,20 +19,23 @@ class ProfilesMeAvatarUploadIdDelete404Response {
   AuthLoginPost400ResponseError error;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMeAvatarUploadIdDelete404Response &&
-    other.error == error;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMeAvatarUploadIdDelete404Response &&
+          other.error == error;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (error.hashCode);
+      // ignore: unnecessary_parenthesis
+      (error.hashCode);
 
   @override
-  String toString() => 'ProfilesMeAvatarUploadIdDelete404Response[error=$error]';
+  String toString() =>
+      'ProfilesMeAvatarUploadIdDelete404Response[error=$error]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'error'] = this.error;
+    json[r'error'] = this.error;
     return json;
   }
 
@@ -48,8 +51,10 @@ class ProfilesMeAvatarUploadIdDelete404Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMeAvatarUploadIdDelete404Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMeAvatarUploadIdDelete404Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMeAvatarUploadIdDelete404Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMeAvatarUploadIdDelete404Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +66,10 @@ class ProfilesMeAvatarUploadIdDelete404Response {
     return null;
   }
 
-  static List<ProfilesMeAvatarUploadIdDelete404Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMeAvatarUploadIdDelete404Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMeAvatarUploadIdDelete404Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -74,12 +82,14 @@ class ProfilesMeAvatarUploadIdDelete404Response {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ProfilesMeAvatarUploadIdDelete404Response> mapFromJson(dynamic json) {
+  static Map<String, ProfilesMeAvatarUploadIdDelete404Response> mapFromJson(
+      dynamic json) {
     final map = <String, ProfilesMeAvatarUploadIdDelete404Response>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = ProfilesMeAvatarUploadIdDelete404Response.fromJson(entry.value);
+        final value =
+            ProfilesMeAvatarUploadIdDelete404Response.fromJson(entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -89,13 +99,20 @@ class ProfilesMeAvatarUploadIdDelete404Response {
   }
 
   // maps a json object with a list of ProfilesMeAvatarUploadIdDelete404Response-objects as value to a dart map
-  static Map<String, List<ProfilesMeAvatarUploadIdDelete404Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ProfilesMeAvatarUploadIdDelete404Response>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ProfilesMeAvatarUploadIdDelete404Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMeAvatarUploadIdDelete404Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ProfilesMeAvatarUploadIdDelete404Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +123,3 @@ class ProfilesMeAvatarUploadIdDelete404Response {
     'error',
   };
 }
-

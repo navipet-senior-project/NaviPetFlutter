@@ -10,9 +10,9 @@
 
 part of openapi.api;
 
-
 class ClassesApi {
-  ClassesApi([ApiClient? apiClient]) : apiClient = apiClient ?? defaultApiClient;
+  ClassesApi([ApiClient? apiClient])
+      : apiClient = apiClient ?? defaultApiClient;
 
   final ApiClient apiClient;
 
@@ -25,10 +25,11 @@ class ClassesApi {
   /// Parameters:
   ///
   /// * [String] classId (required):
-  Future<Response> classesClassIdDeleteWithHttpInfo(String classId,) async {
+  Future<Response> classesClassIdDeleteWithHttpInfo(
+    String classId,
+  ) async {
     // ignore: prefer_const_declarations
-    final path = r'/classes/{classId}'
-      .replaceAll('{classId}', classId);
+    final path = r'/classes/{classId}'.replaceAll('{classId}', classId);
 
     // ignore: prefer_final_locals
     Object? postBody;
@@ -38,7 +39,6 @@ class ClassesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -58,17 +58,24 @@ class ClassesApi {
   /// Parameters:
   ///
   /// * [String] classId (required):
-  Future<Object?> classesClassIdDelete(String classId,) async {
-    final response = await classesClassIdDeleteWithHttpInfo(classId,);
+  Future<Object?> classesClassIdDelete(
+    String classId,
+  ) async {
+    final response = await classesClassIdDeleteWithHttpInfo(
+      classId,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'Object',) as Object;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'Object',
+      ) as Object;
     }
     return null;
   }
@@ -84,10 +91,12 @@ class ClassesApi {
   /// * [String] classId (required):
   ///
   /// * [ClassesClassIdPatchRequest] classesClassIdPatchRequest (required):
-  Future<Response> classesClassIdPatchWithHttpInfo(String classId, ClassesClassIdPatchRequest classesClassIdPatchRequest,) async {
+  Future<Response> classesClassIdPatchWithHttpInfo(
+    String classId,
+    ClassesClassIdPatchRequest classesClassIdPatchRequest,
+  ) async {
     // ignore: prefer_const_declarations
-    final path = r'/classes/{classId}'
-      .replaceAll('{classId}', classId);
+    final path = r'/classes/{classId}'.replaceAll('{classId}', classId);
 
     // ignore: prefer_final_locals
     Object? postBody = classesClassIdPatchRequest;
@@ -97,7 +106,6 @@ class ClassesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>['application/json'];
-
 
     return apiClient.invokeAPI(
       path,
@@ -119,17 +127,26 @@ class ClassesApi {
   /// * [String] classId (required):
   ///
   /// * [ClassesClassIdPatchRequest] classesClassIdPatchRequest (required):
-  Future<ClassesClassIdPatch200Response?> classesClassIdPatch(String classId, ClassesClassIdPatchRequest classesClassIdPatchRequest,) async {
-    final response = await classesClassIdPatchWithHttpInfo(classId, classesClassIdPatchRequest,);
+  Future<ClassesClassIdPatch200Response?> classesClassIdPatch(
+    String classId,
+    ClassesClassIdPatchRequest classesClassIdPatchRequest,
+  ) async {
+    final response = await classesClassIdPatchWithHttpInfo(
+      classId,
+      classesClassIdPatchRequest,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ClassesClassIdPatch200Response',) as ClassesClassIdPatch200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'ClassesClassIdPatch200Response',
+      ) as ClassesClassIdPatch200Response;
     }
     return null;
   }
@@ -151,7 +168,6 @@ class ClassesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -175,9 +191,12 @@ class ClassesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ClassesGet200Response',) as ClassesGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'ClassesGet200Response',
+      ) as ClassesGet200Response;
     }
     return null;
   }
@@ -191,7 +210,9 @@ class ClassesApi {
   /// Parameters:
   ///
   /// * [ClassesPostRequest] classesPostRequest (required):
-  Future<Response> classesPostWithHttpInfo(ClassesPostRequest classesPostRequest,) async {
+  Future<Response> classesPostWithHttpInfo(
+    ClassesPostRequest classesPostRequest,
+  ) async {
     // ignore: prefer_const_declarations
     final path = r'/classes';
 
@@ -203,7 +224,6 @@ class ClassesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>['application/json'];
-
 
     return apiClient.invokeAPI(
       path,
@@ -223,17 +243,24 @@ class ClassesApi {
   /// Parameters:
   ///
   /// * [ClassesPostRequest] classesPostRequest (required):
-  Future<ClassesPost201Response?> classesPost(ClassesPostRequest classesPostRequest,) async {
-    final response = await classesPostWithHttpInfo(classesPostRequest,);
+  Future<ClassesPost201Response?> classesPost(
+    ClassesPostRequest classesPostRequest,
+  ) async {
+    final response = await classesPostWithHttpInfo(
+      classesPostRequest,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ClassesPost201Response',) as ClassesPost201Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'ClassesPost201Response',
+      ) as ClassesPost201Response;
     }
     return null;
   }

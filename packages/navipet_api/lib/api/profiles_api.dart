@@ -10,9 +10,9 @@
 
 part of openapi.api;
 
-
 class ProfilesApi {
-  ProfilesApi([ApiClient? apiClient]) : apiClient = apiClient ?? defaultApiClient;
+  ProfilesApi([ApiClient? apiClient])
+      : apiClient = apiClient ?? defaultApiClient;
 
   final ApiClient apiClient;
 
@@ -26,7 +26,9 @@ class ProfilesApi {
   ///
   /// * [MultipartFile] avatar (required):
   ///   Avatar image file.
-  Future<Response> profilesMeAvatarPostWithHttpInfo(MultipartFile avatar,) async {
+  Future<Response> profilesMeAvatarPostWithHttpInfo(
+    MultipartFile avatar,
+  ) async {
     // ignore: prefer_const_declarations
     final path = r'/profiles/me/avatar';
 
@@ -69,17 +71,24 @@ class ProfilesApi {
   ///
   /// * [MultipartFile] avatar (required):
   ///   Avatar image file.
-  Future<ProfilesMeAvatarPost200Response?> profilesMeAvatarPost(MultipartFile avatar,) async {
-    final response = await profilesMeAvatarPostWithHttpInfo(avatar,);
+  Future<ProfilesMeAvatarPost200Response?> profilesMeAvatarPost(
+    MultipartFile avatar,
+  ) async {
+    final response = await profilesMeAvatarPostWithHttpInfo(
+      avatar,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ProfilesMeAvatarPost200Response',) as ProfilesMeAvatarPost200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'ProfilesMeAvatarPost200Response',
+      ) as ProfilesMeAvatarPost200Response;
     }
     return null;
   }
@@ -93,10 +102,12 @@ class ProfilesApi {
   /// Parameters:
   ///
   /// * [String] uploadId (required):
-  Future<Response> profilesMeAvatarUploadIdDeleteWithHttpInfo(String uploadId,) async {
+  Future<Response> profilesMeAvatarUploadIdDeleteWithHttpInfo(
+    String uploadId,
+  ) async {
     // ignore: prefer_const_declarations
-    final path = r'/profiles/me/avatar/{uploadId}'
-      .replaceAll('{uploadId}', uploadId);
+    final path =
+        r'/profiles/me/avatar/{uploadId}'.replaceAll('{uploadId}', uploadId);
 
     // ignore: prefer_final_locals
     Object? postBody;
@@ -106,7 +117,6 @@ class ProfilesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -126,17 +136,24 @@ class ProfilesApi {
   /// Parameters:
   ///
   /// * [String] uploadId (required):
-  Future<Object?> profilesMeAvatarUploadIdDelete(String uploadId,) async {
-    final response = await profilesMeAvatarUploadIdDeleteWithHttpInfo(uploadId,);
+  Future<Object?> profilesMeAvatarUploadIdDelete(
+    String uploadId,
+  ) async {
+    final response = await profilesMeAvatarUploadIdDeleteWithHttpInfo(
+      uploadId,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'Object',) as Object;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'Object',
+      ) as Object;
     }
     return null;
   }
@@ -158,7 +175,6 @@ class ProfilesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -182,9 +198,12 @@ class ProfilesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ProfilesMeGet200Response',) as ProfilesMeGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'ProfilesMeGet200Response',
+      ) as ProfilesMeGet200Response;
     }
     return null;
   }
@@ -198,7 +217,9 @@ class ProfilesApi {
   /// Parameters:
   ///
   /// * [ProfilesMePatchRequest] profilesMePatchRequest (required):
-  Future<Response> profilesMePatchWithHttpInfo(ProfilesMePatchRequest profilesMePatchRequest,) async {
+  Future<Response> profilesMePatchWithHttpInfo(
+    ProfilesMePatchRequest profilesMePatchRequest,
+  ) async {
     // ignore: prefer_const_declarations
     final path = r'/profiles/me';
 
@@ -210,7 +231,6 @@ class ProfilesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>['application/json'];
-
 
     return apiClient.invokeAPI(
       path,
@@ -230,17 +250,24 @@ class ProfilesApi {
   /// Parameters:
   ///
   /// * [ProfilesMePatchRequest] profilesMePatchRequest (required):
-  Future<ProfilesMeGet200Response?> profilesMePatch(ProfilesMePatchRequest profilesMePatchRequest,) async {
-    final response = await profilesMePatchWithHttpInfo(profilesMePatchRequest,);
+  Future<ProfilesMeGet200Response?> profilesMePatch(
+    ProfilesMePatchRequest profilesMePatchRequest,
+  ) async {
+    final response = await profilesMePatchWithHttpInfo(
+      profilesMePatchRequest,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ProfilesMeGet200Response',) as ProfilesMeGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'ProfilesMeGet200Response',
+      ) as ProfilesMeGet200Response;
     }
     return null;
   }

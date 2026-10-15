@@ -25,26 +25,27 @@ class BuildingsBuildingCodeRoomsGet200Response {
   List<AutocompleteGet200ResponseResultsInner> results;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is BuildingsBuildingCodeRoomsGet200Response &&
-    other.building == building &&
-    other.query == query &&
-    _deepEquality.equals(other.results, results);
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BuildingsBuildingCodeRoomsGet200Response &&
+          other.building == building &&
+          other.query == query &&
+          _deepEquality.equals(other.results, results);
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (building.hashCode) +
-    (query.hashCode) +
-    (results.hashCode);
+      // ignore: unnecessary_parenthesis
+      (building.hashCode) + (query.hashCode) + (results.hashCode);
 
   @override
-  String toString() => 'BuildingsBuildingCodeRoomsGet200Response[building=$building, query=$query, results=$results]';
+  String toString() =>
+      'BuildingsBuildingCodeRoomsGet200Response[building=$building, query=$query, results=$results]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'building'] = this.building;
-      json[r'query'] = this.query;
-      json[r'results'] = this.results;
+    json[r'building'] = this.building;
+    json[r'query'] = this.query;
+    json[r'results'] = this.results;
     return json;
   }
 
@@ -60,22 +61,29 @@ class BuildingsBuildingCodeRoomsGet200Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "BuildingsBuildingCodeRoomsGet200Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "BuildingsBuildingCodeRoomsGet200Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "BuildingsBuildingCodeRoomsGet200Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "BuildingsBuildingCodeRoomsGet200Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return BuildingsBuildingCodeRoomsGet200Response(
-        building: BuildingsBuildingCodeRoomsGet200ResponseBuilding.fromJson(json[r'building'])!,
+        building: BuildingsBuildingCodeRoomsGet200ResponseBuilding.fromJson(
+            json[r'building'])!,
         query: mapValueOfType<String>(json, r'query')!,
-        results: AutocompleteGet200ResponseResultsInner.listFromJson(json[r'results']),
+        results: AutocompleteGet200ResponseResultsInner.listFromJson(
+            json[r'results']),
       );
     }
     return null;
   }
 
-  static List<BuildingsBuildingCodeRoomsGet200Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<BuildingsBuildingCodeRoomsGet200Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <BuildingsBuildingCodeRoomsGet200Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -88,12 +96,14 @@ class BuildingsBuildingCodeRoomsGet200Response {
     return result.toList(growable: growable);
   }
 
-  static Map<String, BuildingsBuildingCodeRoomsGet200Response> mapFromJson(dynamic json) {
+  static Map<String, BuildingsBuildingCodeRoomsGet200Response> mapFromJson(
+      dynamic json) {
     final map = <String, BuildingsBuildingCodeRoomsGet200Response>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = BuildingsBuildingCodeRoomsGet200Response.fromJson(entry.value);
+        final value =
+            BuildingsBuildingCodeRoomsGet200Response.fromJson(entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -103,13 +113,20 @@ class BuildingsBuildingCodeRoomsGet200Response {
   }
 
   // maps a json object with a list of BuildingsBuildingCodeRoomsGet200Response-objects as value to a dart map
-  static Map<String, List<BuildingsBuildingCodeRoomsGet200Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<BuildingsBuildingCodeRoomsGet200Response>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<BuildingsBuildingCodeRoomsGet200Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = BuildingsBuildingCodeRoomsGet200Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = BuildingsBuildingCodeRoomsGet200Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -122,4 +139,3 @@ class BuildingsBuildingCodeRoomsGet200Response {
     'results',
   };
 }
-

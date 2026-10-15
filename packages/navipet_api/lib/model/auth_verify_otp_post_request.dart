@@ -26,26 +26,27 @@ class AuthVerifyOtpPostRequest {
   AuthVerifyOtpPostRequestTypeEnum type;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthVerifyOtpPostRequest &&
-    other.email == email &&
-    other.code == code &&
-    other.type == type;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthVerifyOtpPostRequest &&
+          other.email == email &&
+          other.code == code &&
+          other.type == type;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (email.hashCode) +
-    (code.hashCode) +
-    (type.hashCode);
+      // ignore: unnecessary_parenthesis
+      (email.hashCode) + (code.hashCode) + (type.hashCode);
 
   @override
-  String toString() => 'AuthVerifyOtpPostRequest[email=$email, code=$code, type=$type]';
+  String toString() =>
+      'AuthVerifyOtpPostRequest[email=$email, code=$code, type=$type]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'email'] = this.email;
-      json[r'code'] = this.code;
-      json[r'type'] = this.type;
+    json[r'email'] = this.email;
+    json[r'code'] = this.code;
+    json[r'type'] = this.type;
     return json;
   }
 
@@ -61,8 +62,10 @@ class AuthVerifyOtpPostRequest {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthVerifyOtpPostRequest[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthVerifyOtpPostRequest[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthVerifyOtpPostRequest[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthVerifyOtpPostRequest[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -76,7 +79,10 @@ class AuthVerifyOtpPostRequest {
     return null;
   }
 
-  static List<AuthVerifyOtpPostRequest> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthVerifyOtpPostRequest> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthVerifyOtpPostRequest>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -104,13 +110,19 @@ class AuthVerifyOtpPostRequest {
   }
 
   // maps a json object with a list of AuthVerifyOtpPostRequest-objects as value to a dart map
-  static Map<String, List<AuthVerifyOtpPostRequest>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthVerifyOtpPostRequest>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthVerifyOtpPostRequest>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthVerifyOtpPostRequest.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthVerifyOtpPostRequest.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -139,7 +151,8 @@ class AuthVerifyOtpPostRequestTypeEnum {
 
   static const recovery = AuthVerifyOtpPostRequestTypeEnum._(r'recovery');
   static const register = AuthVerifyOtpPostRequestTypeEnum._(r'register');
-  static const emailChange = AuthVerifyOtpPostRequestTypeEnum._(r'email_change');
+  static const emailChange =
+      AuthVerifyOtpPostRequestTypeEnum._(r'email_change');
 
   /// List of all possible values in this [enum][AuthVerifyOtpPostRequestTypeEnum].
   static const values = <AuthVerifyOtpPostRequestTypeEnum>[
@@ -148,9 +161,13 @@ class AuthVerifyOtpPostRequestTypeEnum {
     emailChange,
   ];
 
-  static AuthVerifyOtpPostRequestTypeEnum? fromJson(dynamic value) => AuthVerifyOtpPostRequestTypeEnumTypeTransformer().decode(value);
+  static AuthVerifyOtpPostRequestTypeEnum? fromJson(dynamic value) =>
+      AuthVerifyOtpPostRequestTypeEnumTypeTransformer().decode(value);
 
-  static List<AuthVerifyOtpPostRequestTypeEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthVerifyOtpPostRequestTypeEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthVerifyOtpPostRequestTypeEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -167,7 +184,8 @@ class AuthVerifyOtpPostRequestTypeEnum {
 /// Transformation class that can [encode] an instance of [AuthVerifyOtpPostRequestTypeEnum] to String,
 /// and [decode] dynamic data back to [AuthVerifyOtpPostRequestTypeEnum].
 class AuthVerifyOtpPostRequestTypeEnumTypeTransformer {
-  factory AuthVerifyOtpPostRequestTypeEnumTypeTransformer() => _instance ??= const AuthVerifyOtpPostRequestTypeEnumTypeTransformer._();
+  factory AuthVerifyOtpPostRequestTypeEnumTypeTransformer() =>
+      _instance ??= const AuthVerifyOtpPostRequestTypeEnumTypeTransformer._();
 
   const AuthVerifyOtpPostRequestTypeEnumTypeTransformer._();
 
@@ -181,12 +199,16 @@ class AuthVerifyOtpPostRequestTypeEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  AuthVerifyOtpPostRequestTypeEnum? decode(dynamic data, {bool allowNull = true}) {
+  AuthVerifyOtpPostRequestTypeEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'recovery': return AuthVerifyOtpPostRequestTypeEnum.recovery;
-        case r'register': return AuthVerifyOtpPostRequestTypeEnum.register;
-        case r'email_change': return AuthVerifyOtpPostRequestTypeEnum.emailChange;
+        case r'recovery':
+          return AuthVerifyOtpPostRequestTypeEnum.recovery;
+        case r'register':
+          return AuthVerifyOtpPostRequestTypeEnum.register;
+        case r'email_change':
+          return AuthVerifyOtpPostRequestTypeEnum.emailChange;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -199,5 +221,3 @@ class AuthVerifyOtpPostRequestTypeEnumTypeTransformer {
   /// Singleton [AuthVerifyOtpPostRequestTypeEnumTypeTransformer] instance.
   static AuthVerifyOtpPostRequestTypeEnumTypeTransformer? _instance;
 }
-
-

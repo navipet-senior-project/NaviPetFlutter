@@ -32,25 +32,28 @@ class AuthVerifyOtpPost200Response {
   String? message;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthVerifyOtpPost200Response &&
-    other.accessToken == accessToken &&
-    other.refreshToken == refreshToken &&
-    other.message == message;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthVerifyOtpPost200Response &&
+          other.accessToken == accessToken &&
+          other.refreshToken == refreshToken &&
+          other.message == message;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (accessToken.hashCode) +
-    (refreshToken.hashCode) +
-    (message == null ? 0 : message!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (accessToken.hashCode) +
+      (refreshToken.hashCode) +
+      (message == null ? 0 : message!.hashCode);
 
   @override
-  String toString() => 'AuthVerifyOtpPost200Response[accessToken=$accessToken, refreshToken=$refreshToken, message=$message]';
+  String toString() =>
+      'AuthVerifyOtpPost200Response[accessToken=$accessToken, refreshToken=$refreshToken, message=$message]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'access_token'] = this.accessToken;
-      json[r'refresh_token'] = this.refreshToken;
+    json[r'access_token'] = this.accessToken;
+    json[r'refresh_token'] = this.refreshToken;
     if (this.message != null) {
       json[r'message'] = this.message;
     } else {
@@ -71,8 +74,10 @@ class AuthVerifyOtpPost200Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthVerifyOtpPost200Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthVerifyOtpPost200Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthVerifyOtpPost200Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthVerifyOtpPost200Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -86,7 +91,10 @@ class AuthVerifyOtpPost200Response {
     return null;
   }
 
-  static List<AuthVerifyOtpPost200Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthVerifyOtpPost200Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthVerifyOtpPost200Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -114,13 +122,19 @@ class AuthVerifyOtpPost200Response {
   }
 
   // maps a json object with a list of AuthVerifyOtpPost200Response-objects as value to a dart map
-  static Map<String, List<AuthVerifyOtpPost200Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthVerifyOtpPost200Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthVerifyOtpPost200Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthVerifyOtpPost200Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthVerifyOtpPost200Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -132,4 +146,3 @@ class AuthVerifyOtpPost200Response {
     'refresh_token',
   };
 }
-

@@ -98,48 +98,51 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
   String searchedAt;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is RecentSearchesGet200ResponseRecentSearchesInner &&
-    other.id == id &&
-    other.type == type &&
-    other.title == title &&
-    other.subtitle == subtitle &&
-    other.source_ == source_ &&
-    other.buildingCode == buildingCode &&
-    other.roomNumber == roomNumber &&
-    other.floorNumber == floorNumber &&
-    other.external_ == external_ &&
-    other.attribution == attribution &&
-    other.distanceMeters == distanceMeters &&
-    other.navigation == navigation &&
-    other.searchedAt == searchedAt;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecentSearchesGet200ResponseRecentSearchesInner &&
+          other.id == id &&
+          other.type == type &&
+          other.title == title &&
+          other.subtitle == subtitle &&
+          other.source_ == source_ &&
+          other.buildingCode == buildingCode &&
+          other.roomNumber == roomNumber &&
+          other.floorNumber == floorNumber &&
+          other.external_ == external_ &&
+          other.attribution == attribution &&
+          other.distanceMeters == distanceMeters &&
+          other.navigation == navigation &&
+          other.searchedAt == searchedAt;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (id.hashCode) +
-    (type.hashCode) +
-    (title.hashCode) +
-    (subtitle.hashCode) +
-    (source_.hashCode) +
-    (buildingCode == null ? 0 : buildingCode!.hashCode) +
-    (roomNumber == null ? 0 : roomNumber!.hashCode) +
-    (floorNumber == null ? 0 : floorNumber!.hashCode) +
-    (external_ == null ? 0 : external_!.hashCode) +
-    (attribution == null ? 0 : attribution!.hashCode) +
-    (distanceMeters == null ? 0 : distanceMeters!.hashCode) +
-    (navigation == null ? 0 : navigation!.hashCode) +
-    (searchedAt.hashCode);
+      // ignore: unnecessary_parenthesis
+      (id.hashCode) +
+      (type.hashCode) +
+      (title.hashCode) +
+      (subtitle.hashCode) +
+      (source_.hashCode) +
+      (buildingCode == null ? 0 : buildingCode!.hashCode) +
+      (roomNumber == null ? 0 : roomNumber!.hashCode) +
+      (floorNumber == null ? 0 : floorNumber!.hashCode) +
+      (external_ == null ? 0 : external_!.hashCode) +
+      (attribution == null ? 0 : attribution!.hashCode) +
+      (distanceMeters == null ? 0 : distanceMeters!.hashCode) +
+      (navigation == null ? 0 : navigation!.hashCode) +
+      (searchedAt.hashCode);
 
   @override
-  String toString() => 'RecentSearchesGet200ResponseRecentSearchesInner[id=$id, type=$type, title=$title, subtitle=$subtitle, source_=$source_, buildingCode=$buildingCode, roomNumber=$roomNumber, floorNumber=$floorNumber, external_=$external_, attribution=$attribution, distanceMeters=$distanceMeters, navigation=$navigation, searchedAt=$searchedAt]';
+  String toString() =>
+      'RecentSearchesGet200ResponseRecentSearchesInner[id=$id, type=$type, title=$title, subtitle=$subtitle, source_=$source_, buildingCode=$buildingCode, roomNumber=$roomNumber, floorNumber=$floorNumber, external_=$external_, attribution=$attribution, distanceMeters=$distanceMeters, navigation=$navigation, searchedAt=$searchedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'id'] = this.id;
-      json[r'type'] = this.type;
-      json[r'title'] = this.title;
-      json[r'subtitle'] = this.subtitle;
-      json[r'source'] = this.source_;
+    json[r'id'] = this.id;
+    json[r'type'] = this.type;
+    json[r'title'] = this.title;
+    json[r'subtitle'] = this.subtitle;
+    json[r'source'] = this.source_;
     if (this.buildingCode != null) {
       json[r'buildingCode'] = this.buildingCode;
     } else {
@@ -175,14 +178,15 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
     } else {
       json[r'navigation'] = null;
     }
-      json[r'searchedAt'] = this.searchedAt;
+    json[r'searchedAt'] = this.searchedAt;
     return json;
   }
 
   /// Returns a new [RecentSearchesGet200ResponseRecentSearchesInner] instance and imports its values from
   /// [value] if it's a [Map], null otherwise.
   // ignore: prefer_constructors_over_static_methods
-  static RecentSearchesGet200ResponseRecentSearchesInner? fromJson(dynamic value) {
+  static RecentSearchesGet200ResponseRecentSearchesInner? fromJson(
+      dynamic value) {
     if (value is Map) {
       final json = value.cast<String, dynamic>();
 
@@ -191,15 +195,18 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "RecentSearchesGet200ResponseRecentSearchesInner[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "RecentSearchesGet200ResponseRecentSearchesInner[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "RecentSearchesGet200ResponseRecentSearchesInner[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "RecentSearchesGet200ResponseRecentSearchesInner[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return RecentSearchesGet200ResponseRecentSearchesInner(
         id: mapValueOfType<String>(json, r'id')!,
-        type: RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.fromJson(json[r'type'])!,
+        type: RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.fromJson(
+            json[r'type'])!,
         title: mapValueOfType<String>(json, r'title')!,
         subtitle: mapValueOfType<String>(json, r'subtitle')!,
         source_: mapValueOfType<String>(json, r'source')!,
@@ -209,18 +216,23 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
         external_: mapValueOfType<bool>(json, r'external'),
         attribution: mapValueOfType<String>(json, r'attribution'),
         distanceMeters: mapValueOfType<int>(json, r'distanceMeters'),
-        navigation: AutocompleteGet200ResponseResultsInnerNavigation.fromJson(json[r'navigation']),
+        navigation: AutocompleteGet200ResponseResultsInnerNavigation.fromJson(
+            json[r'navigation']),
         searchedAt: mapValueOfType<String>(json, r'searchedAt')!,
       );
     }
     return null;
   }
 
-  static List<RecentSearchesGet200ResponseRecentSearchesInner> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<RecentSearchesGet200ResponseRecentSearchesInner> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <RecentSearchesGet200ResponseRecentSearchesInner>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = RecentSearchesGet200ResponseRecentSearchesInner.fromJson(row);
+        final value =
+            RecentSearchesGet200ResponseRecentSearchesInner.fromJson(row);
         if (value != null) {
           result.add(value);
         }
@@ -229,12 +241,14 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
     return result.toList(growable: growable);
   }
 
-  static Map<String, RecentSearchesGet200ResponseRecentSearchesInner> mapFromJson(dynamic json) {
+  static Map<String, RecentSearchesGet200ResponseRecentSearchesInner>
+      mapFromJson(dynamic json) {
     final map = <String, RecentSearchesGet200ResponseRecentSearchesInner>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = RecentSearchesGet200ResponseRecentSearchesInner.fromJson(entry.value);
+        final value = RecentSearchesGet200ResponseRecentSearchesInner.fromJson(
+            entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -244,13 +258,22 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
   }
 
   // maps a json object with a list of RecentSearchesGet200ResponseRecentSearchesInner-objects as value to a dart map
-  static Map<String, List<RecentSearchesGet200ResponseRecentSearchesInner>> mapListFromJson(dynamic json, {bool growable = false,}) {
-    final map = <String, List<RecentSearchesGet200ResponseRecentSearchesInner>>{};
+  static Map<String, List<RecentSearchesGet200ResponseRecentSearchesInner>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
+    final map =
+        <String, List<RecentSearchesGet200ResponseRecentSearchesInner>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = RecentSearchesGet200ResponseRecentSearchesInner.listFromJson(entry.value, growable: growable,);
+        map[entry.key] =
+            RecentSearchesGet200ResponseRecentSearchesInner.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -267,7 +290,6 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
   };
 }
 
-
 class RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum {
   /// Instantiate a new enum with the provided [value].
   const RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(this.value);
@@ -280,20 +302,32 @@ class RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum {
 
   String toJson() => value;
 
-  static const building = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'building');
-  static const room = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'room');
-  static const entrance = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'entrance');
-  static const parking = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'parking');
-  static const dining = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'dining');
-  static const service = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'service');
-  static const amenity = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'amenity');
-  static const transit = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'transit');
-  static const housing = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'housing');
-  static const landmark = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'landmark');
-  static const external_ = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'external');
+  static const building =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'building');
+  static const room =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'room');
+  static const entrance =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'entrance');
+  static const parking =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'parking');
+  static const dining =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'dining');
+  static const service =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'service');
+  static const amenity =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'amenity');
+  static const transit =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'transit');
+  static const housing =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'housing');
+  static const landmark =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'landmark');
+  static const external_ =
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum._(r'external');
 
   /// List of all possible values in this [enum][RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum].
-  static const values = <RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum>[
+  static const values =
+      <RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum>[
     building,
     room,
     entrance,
@@ -307,13 +341,22 @@ class RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum {
     external_,
   ];
 
-  static RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum? fromJson(dynamic value) => RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer().decode(value);
+  static RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum? fromJson(
+          dynamic value) =>
+      RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer()
+          .decode(value);
 
-  static List<RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum>
+      listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.fromJson(row);
+        final value =
+            RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.fromJson(
+                row);
         if (value != null) {
           result.add(value);
         }
@@ -326,11 +369,15 @@ class RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum {
 /// Transformation class that can [encode] an instance of [RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum] to String,
 /// and [decode] dynamic data back to [RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum].
 class RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer {
-  factory RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer() => _instance ??= const RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer._();
+  factory RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer() =>
+      _instance ??=
+          const RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer
+              ._();
 
   const RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer._();
 
-  String encode(RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum data) => data.value;
+  String encode(RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum data) =>
+      data.value;
 
   /// Decodes a [dynamic value][data] to a RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.
   ///
@@ -340,20 +387,41 @@ class RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum? decode(dynamic data, {bool allowNull = true}) {
+  RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'building': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.building;
-        case r'room': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.room;
-        case r'entrance': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.entrance;
-        case r'parking': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.parking;
-        case r'dining': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.dining;
-        case r'service': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.service;
-        case r'amenity': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.amenity;
-        case r'transit': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.transit;
-        case r'housing': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.housing;
-        case r'landmark': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.landmark;
-        case r'external': return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.external_;
+        case r'building':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .building;
+        case r'room':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.room;
+        case r'entrance':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .entrance;
+        case r'parking':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .parking;
+        case r'dining':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum.dining;
+        case r'service':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .service;
+        case r'amenity':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .amenity;
+        case r'transit':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .transit;
+        case r'housing':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .housing;
+        case r'landmark':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .landmark;
+        case r'external':
+          return RecentSearchesGet200ResponseRecentSearchesInnerTypeEnum
+              .external_;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -364,7 +432,6 @@ class RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer {
   }
 
   /// Singleton [RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer] instance.
-  static RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer? _instance;
+  static RecentSearchesGet200ResponseRecentSearchesInnerTypeEnumTypeTransformer?
+      _instance;
 }
-
-

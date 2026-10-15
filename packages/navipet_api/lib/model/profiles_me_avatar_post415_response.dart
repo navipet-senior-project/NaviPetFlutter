@@ -19,20 +19,21 @@ class ProfilesMeAvatarPost415Response {
   AuthLoginPost400ResponseError error;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMeAvatarPost415Response &&
-    other.error == error;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMeAvatarPost415Response && other.error == error;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (error.hashCode);
+      // ignore: unnecessary_parenthesis
+      (error.hashCode);
 
   @override
   String toString() => 'ProfilesMeAvatarPost415Response[error=$error]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'error'] = this.error;
+    json[r'error'] = this.error;
     return json;
   }
 
@@ -48,8 +49,10 @@ class ProfilesMeAvatarPost415Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMeAvatarPost415Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMeAvatarPost415Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMeAvatarPost415Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMeAvatarPost415Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class ProfilesMeAvatarPost415Response {
     return null;
   }
 
-  static List<ProfilesMeAvatarPost415Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMeAvatarPost415Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMeAvatarPost415Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -74,7 +80,8 @@ class ProfilesMeAvatarPost415Response {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ProfilesMeAvatarPost415Response> mapFromJson(dynamic json) {
+  static Map<String, ProfilesMeAvatarPost415Response> mapFromJson(
+      dynamic json) {
     final map = <String, ProfilesMeAvatarPost415Response>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
@@ -89,13 +96,19 @@ class ProfilesMeAvatarPost415Response {
   }
 
   // maps a json object with a list of ProfilesMeAvatarPost415Response-objects as value to a dart map
-  static Map<String, List<ProfilesMeAvatarPost415Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ProfilesMeAvatarPost415Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ProfilesMeAvatarPost415Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMeAvatarPost415Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ProfilesMeAvatarPost415Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +119,3 @@ class ProfilesMeAvatarPost415Response {
     'error',
   };
 }
-

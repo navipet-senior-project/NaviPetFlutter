@@ -10,7 +10,6 @@
 
 part of openapi.api;
 
-
 class CampusApi {
   CampusApi([ApiClient? apiClient]) : apiClient = apiClient ?? defaultApiClient;
 
@@ -31,7 +30,12 @@ class CampusApi {
   /// * [num] latitude:
   ///
   /// * [num] longitude:
-  Future<Response> autocompleteGetWithHttpInfo(String q, { int? limit, num? latitude, num? longitude, }) async {
+  Future<Response> autocompleteGetWithHttpInfo(
+    String q, {
+    int? limit,
+    num? latitude,
+    num? longitude,
+  }) async {
     // ignore: prefer_const_declarations
     final path = r'/autocomplete';
 
@@ -42,7 +46,7 @@ class CampusApi {
     final headerParams = <String, String>{};
     final formParams = <String, String>{};
 
-      queryParams.addAll(_queryParams('', 'q', q));
+    queryParams.addAll(_queryParams('', 'q', q));
     if (limit != null) {
       queryParams.addAll(_queryParams('', 'limit', limit));
     }
@@ -54,7 +58,6 @@ class CampusApi {
     }
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -80,17 +83,30 @@ class CampusApi {
   /// * [num] latitude:
   ///
   /// * [num] longitude:
-  Future<AutocompleteGet200Response?> autocompleteGet(String q, { int? limit, num? latitude, num? longitude, }) async {
-    final response = await autocompleteGetWithHttpInfo(q,  limit: limit, latitude: latitude, longitude: longitude, );
+  Future<AutocompleteGet200Response?> autocompleteGet(
+    String q, {
+    int? limit,
+    num? latitude,
+    num? longitude,
+  }) async {
+    final response = await autocompleteGetWithHttpInfo(
+      q,
+      limit: limit,
+      latitude: latitude,
+      longitude: longitude,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'AutocompleteGet200Response',) as AutocompleteGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'AutocompleteGet200Response',
+      ) as AutocompleteGet200Response;
     }
     return null;
   }
@@ -112,10 +128,16 @@ class CampusApi {
   /// * [num] latitude:
   ///
   /// * [num] longitude:
-  Future<Response> buildingsBuildingCodeRoomsGetWithHttpInfo(String q, String buildingCode, { int? limit, num? latitude, num? longitude, }) async {
+  Future<Response> buildingsBuildingCodeRoomsGetWithHttpInfo(
+    String q,
+    String buildingCode, {
+    int? limit,
+    num? latitude,
+    num? longitude,
+  }) async {
     // ignore: prefer_const_declarations
     final path = r'/buildings/{buildingCode}/rooms'
-      .replaceAll('{buildingCode}', buildingCode);
+        .replaceAll('{buildingCode}', buildingCode);
 
     // ignore: prefer_final_locals
     Object? postBody;
@@ -124,7 +146,7 @@ class CampusApi {
     final headerParams = <String, String>{};
     final formParams = <String, String>{};
 
-      queryParams.addAll(_queryParams('', 'q', q));
+    queryParams.addAll(_queryParams('', 'q', q));
     if (limit != null) {
       queryParams.addAll(_queryParams('', 'limit', limit));
     }
@@ -137,7 +159,6 @@ class CampusApi {
 
     const contentTypes = <String>[];
 
-
     return apiClient.invokeAPI(
       path,
       'GET',
@@ -164,17 +185,33 @@ class CampusApi {
   /// * [num] latitude:
   ///
   /// * [num] longitude:
-  Future<BuildingsBuildingCodeRoomsGet200Response?> buildingsBuildingCodeRoomsGet(String q, String buildingCode, { int? limit, num? latitude, num? longitude, }) async {
-    final response = await buildingsBuildingCodeRoomsGetWithHttpInfo(q, buildingCode,  limit: limit, latitude: latitude, longitude: longitude, );
+  Future<BuildingsBuildingCodeRoomsGet200Response?>
+      buildingsBuildingCodeRoomsGet(
+    String q,
+    String buildingCode, {
+    int? limit,
+    num? latitude,
+    num? longitude,
+  }) async {
+    final response = await buildingsBuildingCodeRoomsGetWithHttpInfo(
+      q,
+      buildingCode,
+      limit: limit,
+      latitude: latitude,
+      longitude: longitude,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'BuildingsBuildingCodeRoomsGet200Response',) as BuildingsBuildingCodeRoomsGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'BuildingsBuildingCodeRoomsGet200Response',
+      ) as BuildingsBuildingCodeRoomsGet200Response;
     }
     return null;
   }
@@ -188,10 +225,11 @@ class CampusApi {
   /// Parameters:
   ///
   /// * [String] placeId (required):
-  Future<Response> placesPlaceIdGetWithHttpInfo(String placeId,) async {
+  Future<Response> placesPlaceIdGetWithHttpInfo(
+    String placeId,
+  ) async {
     // ignore: prefer_const_declarations
-    final path = r'/places/{placeId}'
-      .replaceAll('{placeId}', placeId);
+    final path = r'/places/{placeId}'.replaceAll('{placeId}', placeId);
 
     // ignore: prefer_final_locals
     Object? postBody;
@@ -201,7 +239,6 @@ class CampusApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -221,17 +258,24 @@ class CampusApi {
   /// Parameters:
   ///
   /// * [String] placeId (required):
-  Future<PlacesPlaceIdGet200Response?> placesPlaceIdGet(String placeId,) async {
-    final response = await placesPlaceIdGetWithHttpInfo(placeId,);
+  Future<PlacesPlaceIdGet200Response?> placesPlaceIdGet(
+    String placeId,
+  ) async {
+    final response = await placesPlaceIdGetWithHttpInfo(
+      placeId,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'PlacesPlaceIdGet200Response',) as PlacesPlaceIdGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'PlacesPlaceIdGet200Response',
+      ) as PlacesPlaceIdGet200Response;
     }
     return null;
   }

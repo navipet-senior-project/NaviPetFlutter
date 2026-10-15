@@ -85,37 +85,40 @@ class ClassesPostRequest {
   String? time;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ClassesPostRequest &&
-    other.courseCode == courseCode &&
-    other.courseName == courseName &&
-    other.building == building &&
-    other.room == room &&
-    _deepEquality.equals(other.weekdays, weekdays) &&
-    other.isOnline == isOnline &&
-    other.startTime == startTime &&
-    other.endTime == endTime &&
-    other.time == time;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClassesPostRequest &&
+          other.courseCode == courseCode &&
+          other.courseName == courseName &&
+          other.building == building &&
+          other.room == room &&
+          _deepEquality.equals(other.weekdays, weekdays) &&
+          other.isOnline == isOnline &&
+          other.startTime == startTime &&
+          other.endTime == endTime &&
+          other.time == time;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (courseCode.hashCode) +
-    (courseName.hashCode) +
-    (building == null ? 0 : building!.hashCode) +
-    (room == null ? 0 : room!.hashCode) +
-    (weekdays.hashCode) +
-    (isOnline == null ? 0 : isOnline!.hashCode) +
-    (startTime == null ? 0 : startTime!.hashCode) +
-    (endTime == null ? 0 : endTime!.hashCode) +
-    (time == null ? 0 : time!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (courseCode.hashCode) +
+      (courseName.hashCode) +
+      (building == null ? 0 : building!.hashCode) +
+      (room == null ? 0 : room!.hashCode) +
+      (weekdays.hashCode) +
+      (isOnline == null ? 0 : isOnline!.hashCode) +
+      (startTime == null ? 0 : startTime!.hashCode) +
+      (endTime == null ? 0 : endTime!.hashCode) +
+      (time == null ? 0 : time!.hashCode);
 
   @override
-  String toString() => 'ClassesPostRequest[courseCode=$courseCode, courseName=$courseName, building=$building, room=$room, weekdays=$weekdays, isOnline=$isOnline, startTime=$startTime, endTime=$endTime, time=$time]';
+  String toString() =>
+      'ClassesPostRequest[courseCode=$courseCode, courseName=$courseName, building=$building, room=$room, weekdays=$weekdays, isOnline=$isOnline, startTime=$startTime, endTime=$endTime, time=$time]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'courseCode'] = this.courseCode;
-      json[r'courseName'] = this.courseName;
+    json[r'courseCode'] = this.courseCode;
+    json[r'courseName'] = this.courseName;
     if (this.building != null) {
       json[r'building'] = this.building;
     } else {
@@ -126,7 +129,7 @@ class ClassesPostRequest {
     } else {
       json[r'room'] = null;
     }
-      json[r'weekdays'] = this.weekdays;
+    json[r'weekdays'] = this.weekdays;
     if (this.isOnline != null) {
       json[r'isOnline'] = this.isOnline;
     } else {
@@ -162,8 +165,10 @@ class ClassesPostRequest {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ClassesPostRequest[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ClassesPostRequest[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ClassesPostRequest[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ClassesPostRequest[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -174,7 +179,9 @@ class ClassesPostRequest {
         building: mapValueOfType<String>(json, r'building'),
         room: mapValueOfType<String>(json, r'room'),
         weekdays: json[r'weekdays'] is Iterable
-            ? (json[r'weekdays'] as Iterable).cast<int>().toList(growable: false)
+            ? (json[r'weekdays'] as Iterable)
+                .cast<int>()
+                .toList(growable: false)
             : const [],
         isOnline: mapValueOfType<bool>(json, r'isOnline'),
         startTime: mapValueOfType<String>(json, r'startTime'),
@@ -185,7 +192,10 @@ class ClassesPostRequest {
     return null;
   }
 
-  static List<ClassesPostRequest> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ClassesPostRequest> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ClassesPostRequest>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -213,13 +223,19 @@ class ClassesPostRequest {
   }
 
   // maps a json object with a list of ClassesPostRequest-objects as value to a dart map
-  static Map<String, List<ClassesPostRequest>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ClassesPostRequest>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ClassesPostRequest>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ClassesPostRequest.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ClassesPostRequest.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -232,4 +248,3 @@ class ClassesPostRequest {
     'weekdays',
   };
 }
-

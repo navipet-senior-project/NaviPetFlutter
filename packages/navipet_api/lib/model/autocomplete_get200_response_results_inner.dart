@@ -95,46 +95,49 @@ class AutocompleteGet200ResponseResultsInner {
   AutocompleteGet200ResponseResultsInnerNavigation? navigation;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AutocompleteGet200ResponseResultsInner &&
-    other.id == id &&
-    other.type == type &&
-    other.title == title &&
-    other.subtitle == subtitle &&
-    other.source_ == source_ &&
-    other.buildingCode == buildingCode &&
-    other.roomNumber == roomNumber &&
-    other.floorNumber == floorNumber &&
-    other.external_ == external_ &&
-    other.attribution == attribution &&
-    other.distanceMeters == distanceMeters &&
-    other.navigation == navigation;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutocompleteGet200ResponseResultsInner &&
+          other.id == id &&
+          other.type == type &&
+          other.title == title &&
+          other.subtitle == subtitle &&
+          other.source_ == source_ &&
+          other.buildingCode == buildingCode &&
+          other.roomNumber == roomNumber &&
+          other.floorNumber == floorNumber &&
+          other.external_ == external_ &&
+          other.attribution == attribution &&
+          other.distanceMeters == distanceMeters &&
+          other.navigation == navigation;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (id.hashCode) +
-    (type.hashCode) +
-    (title.hashCode) +
-    (subtitle.hashCode) +
-    (source_.hashCode) +
-    (buildingCode == null ? 0 : buildingCode!.hashCode) +
-    (roomNumber == null ? 0 : roomNumber!.hashCode) +
-    (floorNumber == null ? 0 : floorNumber!.hashCode) +
-    (external_ == null ? 0 : external_!.hashCode) +
-    (attribution == null ? 0 : attribution!.hashCode) +
-    (distanceMeters == null ? 0 : distanceMeters!.hashCode) +
-    (navigation == null ? 0 : navigation!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (id.hashCode) +
+      (type.hashCode) +
+      (title.hashCode) +
+      (subtitle.hashCode) +
+      (source_.hashCode) +
+      (buildingCode == null ? 0 : buildingCode!.hashCode) +
+      (roomNumber == null ? 0 : roomNumber!.hashCode) +
+      (floorNumber == null ? 0 : floorNumber!.hashCode) +
+      (external_ == null ? 0 : external_!.hashCode) +
+      (attribution == null ? 0 : attribution!.hashCode) +
+      (distanceMeters == null ? 0 : distanceMeters!.hashCode) +
+      (navigation == null ? 0 : navigation!.hashCode);
 
   @override
-  String toString() => 'AutocompleteGet200ResponseResultsInner[id=$id, type=$type, title=$title, subtitle=$subtitle, source_=$source_, buildingCode=$buildingCode, roomNumber=$roomNumber, floorNumber=$floorNumber, external_=$external_, attribution=$attribution, distanceMeters=$distanceMeters, navigation=$navigation]';
+  String toString() =>
+      'AutocompleteGet200ResponseResultsInner[id=$id, type=$type, title=$title, subtitle=$subtitle, source_=$source_, buildingCode=$buildingCode, roomNumber=$roomNumber, floorNumber=$floorNumber, external_=$external_, attribution=$attribution, distanceMeters=$distanceMeters, navigation=$navigation]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'id'] = this.id;
-      json[r'type'] = this.type;
-      json[r'title'] = this.title;
-      json[r'subtitle'] = this.subtitle;
-      json[r'source'] = this.source_;
+    json[r'id'] = this.id;
+    json[r'type'] = this.type;
+    json[r'title'] = this.title;
+    json[r'subtitle'] = this.subtitle;
+    json[r'source'] = this.source_;
     if (this.buildingCode != null) {
       json[r'buildingCode'] = this.buildingCode;
     } else {
@@ -185,15 +188,18 @@ class AutocompleteGet200ResponseResultsInner {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AutocompleteGet200ResponseResultsInner[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AutocompleteGet200ResponseResultsInner[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AutocompleteGet200ResponseResultsInner[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AutocompleteGet200ResponseResultsInner[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return AutocompleteGet200ResponseResultsInner(
         id: mapValueOfType<String>(json, r'id')!,
-        type: AutocompleteGet200ResponseResultsInnerTypeEnum.fromJson(json[r'type'])!,
+        type: AutocompleteGet200ResponseResultsInnerTypeEnum.fromJson(
+            json[r'type'])!,
         title: mapValueOfType<String>(json, r'title')!,
         subtitle: mapValueOfType<String>(json, r'subtitle')!,
         source_: mapValueOfType<String>(json, r'source')!,
@@ -203,13 +209,17 @@ class AutocompleteGet200ResponseResultsInner {
         external_: mapValueOfType<bool>(json, r'external'),
         attribution: mapValueOfType<String>(json, r'attribution'),
         distanceMeters: mapValueOfType<int>(json, r'distanceMeters'),
-        navigation: AutocompleteGet200ResponseResultsInnerNavigation.fromJson(json[r'navigation']),
+        navigation: AutocompleteGet200ResponseResultsInnerNavigation.fromJson(
+            json[r'navigation']),
       );
     }
     return null;
   }
 
-  static List<AutocompleteGet200ResponseResultsInner> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AutocompleteGet200ResponseResultsInner> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AutocompleteGet200ResponseResultsInner>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -222,12 +232,14 @@ class AutocompleteGet200ResponseResultsInner {
     return result.toList(growable: growable);
   }
 
-  static Map<String, AutocompleteGet200ResponseResultsInner> mapFromJson(dynamic json) {
+  static Map<String, AutocompleteGet200ResponseResultsInner> mapFromJson(
+      dynamic json) {
     final map = <String, AutocompleteGet200ResponseResultsInner>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = AutocompleteGet200ResponseResultsInner.fromJson(entry.value);
+        final value =
+            AutocompleteGet200ResponseResultsInner.fromJson(entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -237,13 +249,20 @@ class AutocompleteGet200ResponseResultsInner {
   }
 
   // maps a json object with a list of AutocompleteGet200ResponseResultsInner-objects as value to a dart map
-  static Map<String, List<AutocompleteGet200ResponseResultsInner>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AutocompleteGet200ResponseResultsInner>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AutocompleteGet200ResponseResultsInner>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AutocompleteGet200ResponseResultsInner.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AutocompleteGet200ResponseResultsInner.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -259,7 +278,6 @@ class AutocompleteGet200ResponseResultsInner {
   };
 }
 
-
 class AutocompleteGet200ResponseResultsInnerTypeEnum {
   /// Instantiate a new enum with the provided [value].
   const AutocompleteGet200ResponseResultsInnerTypeEnum._(this.value);
@@ -272,17 +290,27 @@ class AutocompleteGet200ResponseResultsInnerTypeEnum {
 
   String toJson() => value;
 
-  static const building = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'building');
+  static const building =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'building');
   static const room = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'room');
-  static const entrance = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'entrance');
-  static const parking = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'parking');
-  static const dining = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'dining');
-  static const service = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'service');
-  static const amenity = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'amenity');
-  static const transit = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'transit');
-  static const housing = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'housing');
-  static const landmark = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'landmark');
-  static const external_ = AutocompleteGet200ResponseResultsInnerTypeEnum._(r'external');
+  static const entrance =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'entrance');
+  static const parking =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'parking');
+  static const dining =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'dining');
+  static const service =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'service');
+  static const amenity =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'amenity');
+  static const transit =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'transit');
+  static const housing =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'housing');
+  static const landmark =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'landmark');
+  static const external_ =
+      AutocompleteGet200ResponseResultsInnerTypeEnum._(r'external');
 
   /// List of all possible values in this [enum][AutocompleteGet200ResponseResultsInnerTypeEnum].
   static const values = <AutocompleteGet200ResponseResultsInnerTypeEnum>[
@@ -299,13 +327,20 @@ class AutocompleteGet200ResponseResultsInnerTypeEnum {
     external_,
   ];
 
-  static AutocompleteGet200ResponseResultsInnerTypeEnum? fromJson(dynamic value) => AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer().decode(value);
+  static AutocompleteGet200ResponseResultsInnerTypeEnum? fromJson(
+          dynamic value) =>
+      AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer()
+          .decode(value);
 
-  static List<AutocompleteGet200ResponseResultsInnerTypeEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AutocompleteGet200ResponseResultsInnerTypeEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AutocompleteGet200ResponseResultsInnerTypeEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = AutocompleteGet200ResponseResultsInnerTypeEnum.fromJson(row);
+        final value =
+            AutocompleteGet200ResponseResultsInnerTypeEnum.fromJson(row);
         if (value != null) {
           result.add(value);
         }
@@ -318,11 +353,15 @@ class AutocompleteGet200ResponseResultsInnerTypeEnum {
 /// Transformation class that can [encode] an instance of [AutocompleteGet200ResponseResultsInnerTypeEnum] to String,
 /// and [decode] dynamic data back to [AutocompleteGet200ResponseResultsInnerTypeEnum].
 class AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer {
-  factory AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer() => _instance ??= const AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer._();
+  factory AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer() =>
+      _instance ??=
+          const AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer
+              ._();
 
   const AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer._();
 
-  String encode(AutocompleteGet200ResponseResultsInnerTypeEnum data) => data.value;
+  String encode(AutocompleteGet200ResponseResultsInnerTypeEnum data) =>
+      data.value;
 
   /// Decodes a [dynamic value][data] to a AutocompleteGet200ResponseResultsInnerTypeEnum.
   ///
@@ -332,20 +371,32 @@ class AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  AutocompleteGet200ResponseResultsInnerTypeEnum? decode(dynamic data, {bool allowNull = true}) {
+  AutocompleteGet200ResponseResultsInnerTypeEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'building': return AutocompleteGet200ResponseResultsInnerTypeEnum.building;
-        case r'room': return AutocompleteGet200ResponseResultsInnerTypeEnum.room;
-        case r'entrance': return AutocompleteGet200ResponseResultsInnerTypeEnum.entrance;
-        case r'parking': return AutocompleteGet200ResponseResultsInnerTypeEnum.parking;
-        case r'dining': return AutocompleteGet200ResponseResultsInnerTypeEnum.dining;
-        case r'service': return AutocompleteGet200ResponseResultsInnerTypeEnum.service;
-        case r'amenity': return AutocompleteGet200ResponseResultsInnerTypeEnum.amenity;
-        case r'transit': return AutocompleteGet200ResponseResultsInnerTypeEnum.transit;
-        case r'housing': return AutocompleteGet200ResponseResultsInnerTypeEnum.housing;
-        case r'landmark': return AutocompleteGet200ResponseResultsInnerTypeEnum.landmark;
-        case r'external': return AutocompleteGet200ResponseResultsInnerTypeEnum.external_;
+        case r'building':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.building;
+        case r'room':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.room;
+        case r'entrance':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.entrance;
+        case r'parking':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.parking;
+        case r'dining':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.dining;
+        case r'service':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.service;
+        case r'amenity':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.amenity;
+        case r'transit':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.transit;
+        case r'housing':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.housing;
+        case r'landmark':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.landmark;
+        case r'external':
+          return AutocompleteGet200ResponseResultsInnerTypeEnum.external_;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -356,7 +407,6 @@ class AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer {
   }
 
   /// Singleton [AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer] instance.
-  static AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer? _instance;
+  static AutocompleteGet200ResponseResultsInnerTypeEnumTypeTransformer?
+      _instance;
 }
-
-

@@ -54,50 +54,53 @@ class ClassesPost201ResponseClass {
   String updatedAt;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ClassesPost201ResponseClass &&
-    other.id == id &&
-    other.courseCode == courseCode &&
-    other.courseName == courseName &&
-    other.building == building &&
-    other.room == room &&
-    _deepEquality.equals(other.weekdays, weekdays) &&
-    other.isOnline == isOnline &&
-    other.startTime == startTime &&
-    other.endTime == endTime &&
-    other.createdAt == createdAt &&
-    other.updatedAt == updatedAt;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClassesPost201ResponseClass &&
+          other.id == id &&
+          other.courseCode == courseCode &&
+          other.courseName == courseName &&
+          other.building == building &&
+          other.room == room &&
+          _deepEquality.equals(other.weekdays, weekdays) &&
+          other.isOnline == isOnline &&
+          other.startTime == startTime &&
+          other.endTime == endTime &&
+          other.createdAt == createdAt &&
+          other.updatedAt == updatedAt;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (id.hashCode) +
-    (courseCode.hashCode) +
-    (courseName.hashCode) +
-    (building.hashCode) +
-    (room.hashCode) +
-    (weekdays.hashCode) +
-    (isOnline.hashCode) +
-    (startTime.hashCode) +
-    (endTime.hashCode) +
-    (createdAt.hashCode) +
-    (updatedAt.hashCode);
+      // ignore: unnecessary_parenthesis
+      (id.hashCode) +
+      (courseCode.hashCode) +
+      (courseName.hashCode) +
+      (building.hashCode) +
+      (room.hashCode) +
+      (weekdays.hashCode) +
+      (isOnline.hashCode) +
+      (startTime.hashCode) +
+      (endTime.hashCode) +
+      (createdAt.hashCode) +
+      (updatedAt.hashCode);
 
   @override
-  String toString() => 'ClassesPost201ResponseClass[id=$id, courseCode=$courseCode, courseName=$courseName, building=$building, room=$room, weekdays=$weekdays, isOnline=$isOnline, startTime=$startTime, endTime=$endTime, createdAt=$createdAt, updatedAt=$updatedAt]';
+  String toString() =>
+      'ClassesPost201ResponseClass[id=$id, courseCode=$courseCode, courseName=$courseName, building=$building, room=$room, weekdays=$weekdays, isOnline=$isOnline, startTime=$startTime, endTime=$endTime, createdAt=$createdAt, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'id'] = this.id;
-      json[r'courseCode'] = this.courseCode;
-      json[r'courseName'] = this.courseName;
-      json[r'building'] = this.building;
-      json[r'room'] = this.room;
-      json[r'weekdays'] = this.weekdays;
-      json[r'isOnline'] = this.isOnline;
-      json[r'startTime'] = this.startTime;
-      json[r'endTime'] = this.endTime;
-      json[r'createdAt'] = this.createdAt;
-      json[r'updatedAt'] = this.updatedAt;
+    json[r'id'] = this.id;
+    json[r'courseCode'] = this.courseCode;
+    json[r'courseName'] = this.courseName;
+    json[r'building'] = this.building;
+    json[r'room'] = this.room;
+    json[r'weekdays'] = this.weekdays;
+    json[r'isOnline'] = this.isOnline;
+    json[r'startTime'] = this.startTime;
+    json[r'endTime'] = this.endTime;
+    json[r'createdAt'] = this.createdAt;
+    json[r'updatedAt'] = this.updatedAt;
     return json;
   }
 
@@ -113,8 +116,10 @@ class ClassesPost201ResponseClass {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ClassesPost201ResponseClass[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ClassesPost201ResponseClass[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ClassesPost201ResponseClass[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ClassesPost201ResponseClass[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -126,7 +131,9 @@ class ClassesPost201ResponseClass {
         building: mapValueOfType<String>(json, r'building')!,
         room: mapValueOfType<String>(json, r'room')!,
         weekdays: json[r'weekdays'] is Iterable
-            ? (json[r'weekdays'] as Iterable).cast<int>().toList(growable: false)
+            ? (json[r'weekdays'] as Iterable)
+                .cast<int>()
+                .toList(growable: false)
             : const [],
         isOnline: mapValueOfType<bool>(json, r'isOnline')!,
         startTime: mapValueOfType<String>(json, r'startTime')!,
@@ -138,7 +145,10 @@ class ClassesPost201ResponseClass {
     return null;
   }
 
-  static List<ClassesPost201ResponseClass> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ClassesPost201ResponseClass> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ClassesPost201ResponseClass>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -166,13 +176,19 @@ class ClassesPost201ResponseClass {
   }
 
   // maps a json object with a list of ClassesPost201ResponseClass-objects as value to a dart map
-  static Map<String, List<ClassesPost201ResponseClass>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ClassesPost201ResponseClass>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ClassesPost201ResponseClass>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ClassesPost201ResponseClass.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ClassesPost201ResponseClass.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -193,4 +209,3 @@ class ClassesPost201ResponseClass {
     'updatedAt',
   };
 }
-

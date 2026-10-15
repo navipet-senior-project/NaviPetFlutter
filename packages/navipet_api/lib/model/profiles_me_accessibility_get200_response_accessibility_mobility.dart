@@ -29,36 +29,40 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityMobility {
   bool avoidSteepSlopes;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMeAccessibilityGet200ResponseAccessibilityMobility &&
-    other.accessibleRoutes == accessibleRoutes &&
-    other.avoidStairs == avoidStairs &&
-    other.preferElevators == preferElevators &&
-    other.avoidSteepSlopes == avoidSteepSlopes;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMeAccessibilityGet200ResponseAccessibilityMobility &&
+          other.accessibleRoutes == accessibleRoutes &&
+          other.avoidStairs == avoidStairs &&
+          other.preferElevators == preferElevators &&
+          other.avoidSteepSlopes == avoidSteepSlopes;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (accessibleRoutes.hashCode) +
-    (avoidStairs.hashCode) +
-    (preferElevators.hashCode) +
-    (avoidSteepSlopes.hashCode);
+      // ignore: unnecessary_parenthesis
+      (accessibleRoutes.hashCode) +
+      (avoidStairs.hashCode) +
+      (preferElevators.hashCode) +
+      (avoidSteepSlopes.hashCode);
 
   @override
-  String toString() => 'ProfilesMeAccessibilityGet200ResponseAccessibilityMobility[accessibleRoutes=$accessibleRoutes, avoidStairs=$avoidStairs, preferElevators=$preferElevators, avoidSteepSlopes=$avoidSteepSlopes]';
+  String toString() =>
+      'ProfilesMeAccessibilityGet200ResponseAccessibilityMobility[accessibleRoutes=$accessibleRoutes, avoidStairs=$avoidStairs, preferElevators=$preferElevators, avoidSteepSlopes=$avoidSteepSlopes]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'accessibleRoutes'] = this.accessibleRoutes;
-      json[r'avoidStairs'] = this.avoidStairs;
-      json[r'preferElevators'] = this.preferElevators;
-      json[r'avoidSteepSlopes'] = this.avoidSteepSlopes;
+    json[r'accessibleRoutes'] = this.accessibleRoutes;
+    json[r'avoidStairs'] = this.avoidStairs;
+    json[r'preferElevators'] = this.preferElevators;
+    json[r'avoidSteepSlopes'] = this.avoidSteepSlopes;
     return json;
   }
 
   /// Returns a new [ProfilesMeAccessibilityGet200ResponseAccessibilityMobility] instance and imports its values from
   /// [value] if it's a [Map], null otherwise.
   // ignore: prefer_constructors_over_static_methods
-  static ProfilesMeAccessibilityGet200ResponseAccessibilityMobility? fromJson(dynamic value) {
+  static ProfilesMeAccessibilityGet200ResponseAccessibilityMobility? fromJson(
+      dynamic value) {
     if (value is Map) {
       final json = value.cast<String, dynamic>();
 
@@ -67,8 +71,10 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityMobility {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMeAccessibilityGet200ResponseAccessibilityMobility[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMeAccessibilityGet200ResponseAccessibilityMobility[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMeAccessibilityGet200ResponseAccessibilityMobility[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMeAccessibilityGet200ResponseAccessibilityMobility[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -83,11 +89,18 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityMobility {
     return null;
   }
 
-  static List<ProfilesMeAccessibilityGet200ResponseAccessibilityMobility> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>[];
+  static List<ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>
+      listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
+    final result =
+        <ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = ProfilesMeAccessibilityGet200ResponseAccessibilityMobility.fromJson(row);
+        final value =
+            ProfilesMeAccessibilityGet200ResponseAccessibilityMobility.fromJson(
+                row);
         if (value != null) {
           result.add(value);
         }
@@ -96,12 +109,16 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityMobility {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ProfilesMeAccessibilityGet200ResponseAccessibilityMobility> mapFromJson(dynamic json) {
-    final map = <String, ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>{};
+  static Map<String, ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>
+      mapFromJson(dynamic json) {
+    final map =
+        <String, ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = ProfilesMeAccessibilityGet200ResponseAccessibilityMobility.fromJson(entry.value);
+        final value =
+            ProfilesMeAccessibilityGet200ResponseAccessibilityMobility.fromJson(
+                entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -111,13 +128,24 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityMobility {
   }
 
   // maps a json object with a list of ProfilesMeAccessibilityGet200ResponseAccessibilityMobility-objects as value to a dart map
-  static Map<String, List<ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>> mapListFromJson(dynamic json, {bool growable = false,}) {
-    final map = <String, List<ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>>{};
+  static Map<String,
+          List<ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
+    final map = <String,
+        List<ProfilesMeAccessibilityGet200ResponseAccessibilityMobility>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMeAccessibilityGet200ResponseAccessibilityMobility.listFromJson(entry.value, growable: growable,);
+        map[entry.key] =
+            ProfilesMeAccessibilityGet200ResponseAccessibilityMobility
+                .listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -131,4 +159,3 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityMobility {
     'avoidSteepSlopes',
   };
 }
-

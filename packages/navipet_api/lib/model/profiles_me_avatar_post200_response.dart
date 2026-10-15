@@ -22,23 +22,25 @@ class ProfilesMeAvatarPost200Response {
   String avatarUrl;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMeAvatarPost200Response &&
-    other.uploadId == uploadId &&
-    other.avatarUrl == avatarUrl;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMeAvatarPost200Response &&
+          other.uploadId == uploadId &&
+          other.avatarUrl == avatarUrl;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (uploadId.hashCode) +
-    (avatarUrl.hashCode);
+      // ignore: unnecessary_parenthesis
+      (uploadId.hashCode) + (avatarUrl.hashCode);
 
   @override
-  String toString() => 'ProfilesMeAvatarPost200Response[uploadId=$uploadId, avatarUrl=$avatarUrl]';
+  String toString() =>
+      'ProfilesMeAvatarPost200Response[uploadId=$uploadId, avatarUrl=$avatarUrl]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'uploadId'] = this.uploadId;
-      json[r'avatarUrl'] = this.avatarUrl;
+    json[r'uploadId'] = this.uploadId;
+    json[r'avatarUrl'] = this.avatarUrl;
     return json;
   }
 
@@ -54,8 +56,10 @@ class ProfilesMeAvatarPost200Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMeAvatarPost200Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMeAvatarPost200Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMeAvatarPost200Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMeAvatarPost200Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -68,7 +72,10 @@ class ProfilesMeAvatarPost200Response {
     return null;
   }
 
-  static List<ProfilesMeAvatarPost200Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMeAvatarPost200Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMeAvatarPost200Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -81,7 +88,8 @@ class ProfilesMeAvatarPost200Response {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ProfilesMeAvatarPost200Response> mapFromJson(dynamic json) {
+  static Map<String, ProfilesMeAvatarPost200Response> mapFromJson(
+      dynamic json) {
     final map = <String, ProfilesMeAvatarPost200Response>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
@@ -96,13 +104,19 @@ class ProfilesMeAvatarPost200Response {
   }
 
   // maps a json object with a list of ProfilesMeAvatarPost200Response-objects as value to a dart map
-  static Map<String, List<ProfilesMeAvatarPost200Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ProfilesMeAvatarPost200Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ProfilesMeAvatarPost200Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMeAvatarPost200Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ProfilesMeAvatarPost200Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -114,4 +128,3 @@ class ProfilesMeAvatarPost200Response {
     'avatarUrl',
   };
 }
-

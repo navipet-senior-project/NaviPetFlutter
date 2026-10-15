@@ -19,20 +19,21 @@ class AuthRefreshPost422Response {
   AuthLoginPost400ResponseError error;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthRefreshPost422Response &&
-    other.error == error;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthRefreshPost422Response && other.error == error;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (error.hashCode);
+      // ignore: unnecessary_parenthesis
+      (error.hashCode);
 
   @override
   String toString() => 'AuthRefreshPost422Response[error=$error]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'error'] = this.error;
+    json[r'error'] = this.error;
     return json;
   }
 
@@ -48,8 +49,10 @@ class AuthRefreshPost422Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthRefreshPost422Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthRefreshPost422Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthRefreshPost422Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthRefreshPost422Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class AuthRefreshPost422Response {
     return null;
   }
 
-  static List<AuthRefreshPost422Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthRefreshPost422Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthRefreshPost422Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +95,19 @@ class AuthRefreshPost422Response {
   }
 
   // maps a json object with a list of AuthRefreshPost422Response-objects as value to a dart map
-  static Map<String, List<AuthRefreshPost422Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthRefreshPost422Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthRefreshPost422Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthRefreshPost422Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthRefreshPost422Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +118,3 @@ class AuthRefreshPost422Response {
     'error',
   };
 }
-

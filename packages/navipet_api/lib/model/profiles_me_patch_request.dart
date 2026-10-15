@@ -38,20 +38,23 @@ class ProfilesMePatchRequest {
   String? avatarUploadId;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMePatchRequest &&
-    other.displayName == displayName &&
-    other.role == role &&
-    other.avatarUploadId == avatarUploadId;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMePatchRequest &&
+          other.displayName == displayName &&
+          other.role == role &&
+          other.avatarUploadId == avatarUploadId;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (displayName == null ? 0 : displayName!.hashCode) +
-    (role == null ? 0 : role!.hashCode) +
-    (avatarUploadId == null ? 0 : avatarUploadId!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (displayName == null ? 0 : displayName!.hashCode) +
+      (role == null ? 0 : role!.hashCode) +
+      (avatarUploadId == null ? 0 : avatarUploadId!.hashCode);
 
   @override
-  String toString() => 'ProfilesMePatchRequest[displayName=$displayName, role=$role, avatarUploadId=$avatarUploadId]';
+  String toString() =>
+      'ProfilesMePatchRequest[displayName=$displayName, role=$role, avatarUploadId=$avatarUploadId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -85,8 +88,10 @@ class ProfilesMePatchRequest {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMePatchRequest[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMePatchRequest[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMePatchRequest[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMePatchRequest[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -100,7 +105,10 @@ class ProfilesMePatchRequest {
     return null;
   }
 
-  static List<ProfilesMePatchRequest> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMePatchRequest> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMePatchRequest>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -128,23 +136,27 @@ class ProfilesMePatchRequest {
   }
 
   // maps a json object with a list of ProfilesMePatchRequest-objects as value to a dart map
-  static Map<String, List<ProfilesMePatchRequest>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ProfilesMePatchRequest>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ProfilesMePatchRequest>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMePatchRequest.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ProfilesMePatchRequest.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
   }
 
   /// The list of required keys that must be present in a JSON.
-  static const requiredKeys = <String>{
-  };
+  static const requiredKeys = <String>{};
 }
-
 
 class ProfilesMePatchRequestRoleEnum {
   /// Instantiate a new enum with the provided [value].
@@ -167,9 +179,13 @@ class ProfilesMePatchRequestRoleEnum {
     professor,
   ];
 
-  static ProfilesMePatchRequestRoleEnum? fromJson(dynamic value) => ProfilesMePatchRequestRoleEnumTypeTransformer().decode(value);
+  static ProfilesMePatchRequestRoleEnum? fromJson(dynamic value) =>
+      ProfilesMePatchRequestRoleEnumTypeTransformer().decode(value);
 
-  static List<ProfilesMePatchRequestRoleEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMePatchRequestRoleEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMePatchRequestRoleEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -186,7 +202,8 @@ class ProfilesMePatchRequestRoleEnum {
 /// Transformation class that can [encode] an instance of [ProfilesMePatchRequestRoleEnum] to String,
 /// and [decode] dynamic data back to [ProfilesMePatchRequestRoleEnum].
 class ProfilesMePatchRequestRoleEnumTypeTransformer {
-  factory ProfilesMePatchRequestRoleEnumTypeTransformer() => _instance ??= const ProfilesMePatchRequestRoleEnumTypeTransformer._();
+  factory ProfilesMePatchRequestRoleEnumTypeTransformer() =>
+      _instance ??= const ProfilesMePatchRequestRoleEnumTypeTransformer._();
 
   const ProfilesMePatchRequestRoleEnumTypeTransformer._();
 
@@ -200,11 +217,14 @@ class ProfilesMePatchRequestRoleEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  ProfilesMePatchRequestRoleEnum? decode(dynamic data, {bool allowNull = true}) {
+  ProfilesMePatchRequestRoleEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'student': return ProfilesMePatchRequestRoleEnum.student;
-        case r'professor': return ProfilesMePatchRequestRoleEnum.professor;
+        case r'student':
+          return ProfilesMePatchRequestRoleEnum.student;
+        case r'professor':
+          return ProfilesMePatchRequestRoleEnum.professor;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -217,5 +237,3 @@ class ProfilesMePatchRequestRoleEnumTypeTransformer {
   /// Singleton [ProfilesMePatchRequestRoleEnumTypeTransformer] instance.
   static ProfilesMePatchRequestRoleEnumTypeTransformer? _instance;
 }
-
-

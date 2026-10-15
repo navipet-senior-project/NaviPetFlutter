@@ -19,20 +19,21 @@ class AuthRefreshPostRequest {
   String refreshToken;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthRefreshPostRequest &&
-    other.refreshToken == refreshToken;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthRefreshPostRequest && other.refreshToken == refreshToken;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (refreshToken.hashCode);
+      // ignore: unnecessary_parenthesis
+      (refreshToken.hashCode);
 
   @override
   String toString() => 'AuthRefreshPostRequest[refreshToken=$refreshToken]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'refreshToken'] = this.refreshToken;
+    json[r'refreshToken'] = this.refreshToken;
     return json;
   }
 
@@ -48,8 +49,10 @@ class AuthRefreshPostRequest {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthRefreshPostRequest[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthRefreshPostRequest[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthRefreshPostRequest[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthRefreshPostRequest[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class AuthRefreshPostRequest {
     return null;
   }
 
-  static List<AuthRefreshPostRequest> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthRefreshPostRequest> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthRefreshPostRequest>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +95,19 @@ class AuthRefreshPostRequest {
   }
 
   // maps a json object with a list of AuthRefreshPostRequest-objects as value to a dart map
-  static Map<String, List<AuthRefreshPostRequest>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthRefreshPostRequest>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthRefreshPostRequest>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthRefreshPostRequest.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthRefreshPostRequest.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +118,3 @@ class AuthRefreshPostRequest {
     'refreshToken',
   };
 }
-

@@ -28,29 +28,32 @@ class AuthMeGet200ResponseUser {
   String createdAt;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthMeGet200ResponseUser &&
-    other.id == id &&
-    other.email == email &&
-    other.status == status &&
-    other.createdAt == createdAt;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthMeGet200ResponseUser &&
+          other.id == id &&
+          other.email == email &&
+          other.status == status &&
+          other.createdAt == createdAt;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (id.hashCode) +
-    (email.hashCode) +
-    (status.hashCode) +
-    (createdAt.hashCode);
+      // ignore: unnecessary_parenthesis
+      (id.hashCode) +
+      (email.hashCode) +
+      (status.hashCode) +
+      (createdAt.hashCode);
 
   @override
-  String toString() => 'AuthMeGet200ResponseUser[id=$id, email=$email, status=$status, createdAt=$createdAt]';
+  String toString() =>
+      'AuthMeGet200ResponseUser[id=$id, email=$email, status=$status, createdAt=$createdAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'id'] = this.id;
-      json[r'email'] = this.email;
-      json[r'status'] = this.status;
-      json[r'createdAt'] = this.createdAt;
+    json[r'id'] = this.id;
+    json[r'email'] = this.email;
+    json[r'status'] = this.status;
+    json[r'createdAt'] = this.createdAt;
     return json;
   }
 
@@ -66,8 +69,10 @@ class AuthMeGet200ResponseUser {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthMeGet200ResponseUser[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthMeGet200ResponseUser[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthMeGet200ResponseUser[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthMeGet200ResponseUser[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -82,7 +87,10 @@ class AuthMeGet200ResponseUser {
     return null;
   }
 
-  static List<AuthMeGet200ResponseUser> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthMeGet200ResponseUser> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthMeGet200ResponseUser>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -110,13 +118,19 @@ class AuthMeGet200ResponseUser {
   }
 
   // maps a json object with a list of AuthMeGet200ResponseUser-objects as value to a dart map
-  static Map<String, List<AuthMeGet200ResponseUser>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthMeGet200ResponseUser>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthMeGet200ResponseUser>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthMeGet200ResponseUser.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthMeGet200ResponseUser.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -130,7 +144,6 @@ class AuthMeGet200ResponseUser {
     'createdAt',
   };
 }
-
 
 class AuthMeGet200ResponseUserStatusEnum {
   /// Instantiate a new enum with the provided [value].
@@ -153,9 +166,13 @@ class AuthMeGet200ResponseUserStatusEnum {
     DISABLED,
   ];
 
-  static AuthMeGet200ResponseUserStatusEnum? fromJson(dynamic value) => AuthMeGet200ResponseUserStatusEnumTypeTransformer().decode(value);
+  static AuthMeGet200ResponseUserStatusEnum? fromJson(dynamic value) =>
+      AuthMeGet200ResponseUserStatusEnumTypeTransformer().decode(value);
 
-  static List<AuthMeGet200ResponseUserStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthMeGet200ResponseUserStatusEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthMeGet200ResponseUserStatusEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -172,7 +189,8 @@ class AuthMeGet200ResponseUserStatusEnum {
 /// Transformation class that can [encode] an instance of [AuthMeGet200ResponseUserStatusEnum] to String,
 /// and [decode] dynamic data back to [AuthMeGet200ResponseUserStatusEnum].
 class AuthMeGet200ResponseUserStatusEnumTypeTransformer {
-  factory AuthMeGet200ResponseUserStatusEnumTypeTransformer() => _instance ??= const AuthMeGet200ResponseUserStatusEnumTypeTransformer._();
+  factory AuthMeGet200ResponseUserStatusEnumTypeTransformer() =>
+      _instance ??= const AuthMeGet200ResponseUserStatusEnumTypeTransformer._();
 
   const AuthMeGet200ResponseUserStatusEnumTypeTransformer._();
 
@@ -186,11 +204,14 @@ class AuthMeGet200ResponseUserStatusEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  AuthMeGet200ResponseUserStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+  AuthMeGet200ResponseUserStatusEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'ACTIVE': return AuthMeGet200ResponseUserStatusEnum.ACTIVE;
-        case r'DISABLED': return AuthMeGet200ResponseUserStatusEnum.DISABLED;
+        case r'ACTIVE':
+          return AuthMeGet200ResponseUserStatusEnum.ACTIVE;
+        case r'DISABLED':
+          return AuthMeGet200ResponseUserStatusEnum.DISABLED;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -203,5 +224,3 @@ class AuthMeGet200ResponseUserStatusEnumTypeTransformer {
   /// Singleton [AuthMeGet200ResponseUserStatusEnumTypeTransformer] instance.
   static AuthMeGet200ResponseUserStatusEnumTypeTransformer? _instance;
 }
-
-

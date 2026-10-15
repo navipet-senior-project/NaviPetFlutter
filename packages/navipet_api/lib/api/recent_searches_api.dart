@@ -10,9 +10,9 @@
 
 part of openapi.api;
 
-
 class RecentSearchesApi {
-  RecentSearchesApi([ApiClient? apiClient]) : apiClient = apiClient ?? defaultApiClient;
+  RecentSearchesApi([ApiClient? apiClient])
+      : apiClient = apiClient ?? defaultApiClient;
 
   final ApiClient apiClient;
 
@@ -33,7 +33,6 @@ class RecentSearchesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -57,9 +56,12 @@ class RecentSearchesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'Object',) as Object;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'Object',
+      ) as Object;
     }
     return null;
   }
@@ -81,7 +83,6 @@ class RecentSearchesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -105,9 +106,12 @@ class RecentSearchesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'Object',) as Object;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'Object',
+      ) as Object;
     }
     return null;
   }
@@ -121,7 +125,9 @@ class RecentSearchesApi {
   /// Parameters:
   ///
   /// * [int] limit:
-  Future<Response> recentSearchesGetWithHttpInfo({ int? limit, }) async {
+  Future<Response> recentSearchesGetWithHttpInfo({
+    int? limit,
+  }) async {
     // ignore: prefer_const_declarations
     final path = r'/recent-searches';
 
@@ -137,7 +143,6 @@ class RecentSearchesApi {
     }
 
     const contentTypes = <String>[];
-
 
     return apiClient.invokeAPI(
       path,
@@ -157,17 +162,24 @@ class RecentSearchesApi {
   /// Parameters:
   ///
   /// * [int] limit:
-  Future<RecentSearchesGet200Response?> recentSearchesGet({ int? limit, }) async {
-    final response = await recentSearchesGetWithHttpInfo( limit: limit, );
+  Future<RecentSearchesGet200Response?> recentSearchesGet({
+    int? limit,
+  }) async {
+    final response = await recentSearchesGetWithHttpInfo(
+      limit: limit,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'RecentSearchesGet200Response',) as RecentSearchesGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'RecentSearchesGet200Response',
+      ) as RecentSearchesGet200Response;
     }
     return null;
   }
@@ -181,7 +193,9 @@ class RecentSearchesApi {
   /// Parameters:
   ///
   /// * [RecentSearchesPostRequest] recentSearchesPostRequest (required):
-  Future<Response> recentSearchesPostWithHttpInfo(RecentSearchesPostRequest recentSearchesPostRequest,) async {
+  Future<Response> recentSearchesPostWithHttpInfo(
+    RecentSearchesPostRequest recentSearchesPostRequest,
+  ) async {
     // ignore: prefer_const_declarations
     final path = r'/recent-searches';
 
@@ -193,7 +207,6 @@ class RecentSearchesApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>['application/json'];
-
 
     return apiClient.invokeAPI(
       path,
@@ -213,17 +226,24 @@ class RecentSearchesApi {
   /// Parameters:
   ///
   /// * [RecentSearchesPostRequest] recentSearchesPostRequest (required):
-  Future<RecentSearchesPost201Response?> recentSearchesPost(RecentSearchesPostRequest recentSearchesPostRequest,) async {
-    final response = await recentSearchesPostWithHttpInfo(recentSearchesPostRequest,);
+  Future<RecentSearchesPost201Response?> recentSearchesPost(
+    RecentSearchesPostRequest recentSearchesPostRequest,
+  ) async {
+    final response = await recentSearchesPostWithHttpInfo(
+      recentSearchesPostRequest,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'RecentSearchesPost201Response',) as RecentSearchesPost201Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'RecentSearchesPost201Response',
+      ) as RecentSearchesPost201Response;
     }
     return null;
   }

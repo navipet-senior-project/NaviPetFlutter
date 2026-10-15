@@ -19,20 +19,21 @@ class HealthGet200Response {
   HealthGet200ResponseStatusEnum status;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is HealthGet200Response &&
-    other.status == status;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HealthGet200Response && other.status == status;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (status.hashCode);
+      // ignore: unnecessary_parenthesis
+      (status.hashCode);
 
   @override
   String toString() => 'HealthGet200Response[status=$status]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'status'] = this.status;
+    json[r'status'] = this.status;
     return json;
   }
 
@@ -48,8 +49,10 @@ class HealthGet200Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "HealthGet200Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "HealthGet200Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "HealthGet200Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "HealthGet200Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class HealthGet200Response {
     return null;
   }
 
-  static List<HealthGet200Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<HealthGet200Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <HealthGet200Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +95,19 @@ class HealthGet200Response {
   }
 
   // maps a json object with a list of HealthGet200Response-objects as value to a dart map
-  static Map<String, List<HealthGet200Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<HealthGet200Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<HealthGet200Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = HealthGet200Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = HealthGet200Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,7 +118,6 @@ class HealthGet200Response {
     'status',
   };
 }
-
 
 class HealthGet200ResponseStatusEnum {
   /// Instantiate a new enum with the provided [value].
@@ -127,9 +138,13 @@ class HealthGet200ResponseStatusEnum {
     ok,
   ];
 
-  static HealthGet200ResponseStatusEnum? fromJson(dynamic value) => HealthGet200ResponseStatusEnumTypeTransformer().decode(value);
+  static HealthGet200ResponseStatusEnum? fromJson(dynamic value) =>
+      HealthGet200ResponseStatusEnumTypeTransformer().decode(value);
 
-  static List<HealthGet200ResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<HealthGet200ResponseStatusEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <HealthGet200ResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -146,7 +161,8 @@ class HealthGet200ResponseStatusEnum {
 /// Transformation class that can [encode] an instance of [HealthGet200ResponseStatusEnum] to String,
 /// and [decode] dynamic data back to [HealthGet200ResponseStatusEnum].
 class HealthGet200ResponseStatusEnumTypeTransformer {
-  factory HealthGet200ResponseStatusEnumTypeTransformer() => _instance ??= const HealthGet200ResponseStatusEnumTypeTransformer._();
+  factory HealthGet200ResponseStatusEnumTypeTransformer() =>
+      _instance ??= const HealthGet200ResponseStatusEnumTypeTransformer._();
 
   const HealthGet200ResponseStatusEnumTypeTransformer._();
 
@@ -160,10 +176,12 @@ class HealthGet200ResponseStatusEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  HealthGet200ResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+  HealthGet200ResponseStatusEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'ok': return HealthGet200ResponseStatusEnum.ok;
+        case r'ok':
+          return HealthGet200ResponseStatusEnum.ok;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -176,5 +194,3 @@ class HealthGet200ResponseStatusEnumTypeTransformer {
   /// Singleton [HealthGet200ResponseStatusEnumTypeTransformer] instance.
   static HealthGet200ResponseStatusEnumTypeTransformer? _instance;
 }
-
-

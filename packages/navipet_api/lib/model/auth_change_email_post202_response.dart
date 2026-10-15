@@ -19,20 +19,21 @@ class AuthChangeEmailPost202Response {
   AuthChangeEmailPost202ResponseStatusEnum status;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthChangeEmailPost202Response &&
-    other.status == status;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthChangeEmailPost202Response && other.status == status;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (status.hashCode);
+      // ignore: unnecessary_parenthesis
+      (status.hashCode);
 
   @override
   String toString() => 'AuthChangeEmailPost202Response[status=$status]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'status'] = this.status;
+    json[r'status'] = this.status;
     return json;
   }
 
@@ -48,20 +49,26 @@ class AuthChangeEmailPost202Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthChangeEmailPost202Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthChangeEmailPost202Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthChangeEmailPost202Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthChangeEmailPost202Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return AuthChangeEmailPost202Response(
-        status: AuthChangeEmailPost202ResponseStatusEnum.fromJson(json[r'status'])!,
+        status:
+            AuthChangeEmailPost202ResponseStatusEnum.fromJson(json[r'status'])!,
       );
     }
     return null;
   }
 
-  static List<AuthChangeEmailPost202Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthChangeEmailPost202Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthChangeEmailPost202Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +96,19 @@ class AuthChangeEmailPost202Response {
   }
 
   // maps a json object with a list of AuthChangeEmailPost202Response-objects as value to a dart map
-  static Map<String, List<AuthChangeEmailPost202Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthChangeEmailPost202Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthChangeEmailPost202Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthChangeEmailPost202Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthChangeEmailPost202Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,7 +119,6 @@ class AuthChangeEmailPost202Response {
     'status',
   };
 }
-
 
 class AuthChangeEmailPost202ResponseStatusEnum {
   /// Instantiate a new enum with the provided [value].
@@ -120,16 +132,21 @@ class AuthChangeEmailPost202ResponseStatusEnum {
 
   String toJson() => value;
 
-  static const verificationRequired = AuthChangeEmailPost202ResponseStatusEnum._(r'verification_required');
+  static const verificationRequired =
+      AuthChangeEmailPost202ResponseStatusEnum._(r'verification_required');
 
   /// List of all possible values in this [enum][AuthChangeEmailPost202ResponseStatusEnum].
   static const values = <AuthChangeEmailPost202ResponseStatusEnum>[
     verificationRequired,
   ];
 
-  static AuthChangeEmailPost202ResponseStatusEnum? fromJson(dynamic value) => AuthChangeEmailPost202ResponseStatusEnumTypeTransformer().decode(value);
+  static AuthChangeEmailPost202ResponseStatusEnum? fromJson(dynamic value) =>
+      AuthChangeEmailPost202ResponseStatusEnumTypeTransformer().decode(value);
 
-  static List<AuthChangeEmailPost202ResponseStatusEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthChangeEmailPost202ResponseStatusEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthChangeEmailPost202ResponseStatusEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -146,7 +163,9 @@ class AuthChangeEmailPost202ResponseStatusEnum {
 /// Transformation class that can [encode] an instance of [AuthChangeEmailPost202ResponseStatusEnum] to String,
 /// and [decode] dynamic data back to [AuthChangeEmailPost202ResponseStatusEnum].
 class AuthChangeEmailPost202ResponseStatusEnumTypeTransformer {
-  factory AuthChangeEmailPost202ResponseStatusEnumTypeTransformer() => _instance ??= const AuthChangeEmailPost202ResponseStatusEnumTypeTransformer._();
+  factory AuthChangeEmailPost202ResponseStatusEnumTypeTransformer() =>
+      _instance ??=
+          const AuthChangeEmailPost202ResponseStatusEnumTypeTransformer._();
 
   const AuthChangeEmailPost202ResponseStatusEnumTypeTransformer._();
 
@@ -160,10 +179,12 @@ class AuthChangeEmailPost202ResponseStatusEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  AuthChangeEmailPost202ResponseStatusEnum? decode(dynamic data, {bool allowNull = true}) {
+  AuthChangeEmailPost202ResponseStatusEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'verification_required': return AuthChangeEmailPost202ResponseStatusEnum.verificationRequired;
+        case r'verification_required':
+          return AuthChangeEmailPost202ResponseStatusEnum.verificationRequired;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -176,5 +197,3 @@ class AuthChangeEmailPost202ResponseStatusEnumTypeTransformer {
   /// Singleton [AuthChangeEmailPost202ResponseStatusEnumTypeTransformer] instance.
   static AuthChangeEmailPost202ResponseStatusEnumTypeTransformer? _instance;
 }
-
-

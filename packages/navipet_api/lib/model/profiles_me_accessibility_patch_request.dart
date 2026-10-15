@@ -43,20 +43,23 @@ class ProfilesMeAccessibilityPatchRequest {
   ProfilesMeAccessibilityPatchRequestVisuals? visuals;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMeAccessibilityPatchRequest &&
-    other.mobility == mobility &&
-    other.guidance == guidance &&
-    other.visuals == visuals;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMeAccessibilityPatchRequest &&
+          other.mobility == mobility &&
+          other.guidance == guidance &&
+          other.visuals == visuals;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (mobility == null ? 0 : mobility!.hashCode) +
-    (guidance == null ? 0 : guidance!.hashCode) +
-    (visuals == null ? 0 : visuals!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (mobility == null ? 0 : mobility!.hashCode) +
+      (guidance == null ? 0 : guidance!.hashCode) +
+      (visuals == null ? 0 : visuals!.hashCode);
 
   @override
-  String toString() => 'ProfilesMeAccessibilityPatchRequest[mobility=$mobility, guidance=$guidance, visuals=$visuals]';
+  String toString() =>
+      'ProfilesMeAccessibilityPatchRequest[mobility=$mobility, guidance=$guidance, visuals=$visuals]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -90,22 +93,30 @@ class ProfilesMeAccessibilityPatchRequest {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMeAccessibilityPatchRequest[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMeAccessibilityPatchRequest[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMeAccessibilityPatchRequest[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMeAccessibilityPatchRequest[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return ProfilesMeAccessibilityPatchRequest(
-        mobility: ProfilesMeAccessibilityPatchRequestMobility.fromJson(json[r'mobility']),
-        guidance: ProfilesMeAccessibilityPatchRequestGuidance.fromJson(json[r'guidance']),
-        visuals: ProfilesMeAccessibilityPatchRequestVisuals.fromJson(json[r'visuals']),
+        mobility: ProfilesMeAccessibilityPatchRequestMobility.fromJson(
+            json[r'mobility']),
+        guidance: ProfilesMeAccessibilityPatchRequestGuidance.fromJson(
+            json[r'guidance']),
+        visuals: ProfilesMeAccessibilityPatchRequestVisuals.fromJson(
+            json[r'visuals']),
       );
     }
     return null;
   }
 
-  static List<ProfilesMeAccessibilityPatchRequest> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMeAccessibilityPatchRequest> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMeAccessibilityPatchRequest>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -118,7 +129,8 @@ class ProfilesMeAccessibilityPatchRequest {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ProfilesMeAccessibilityPatchRequest> mapFromJson(dynamic json) {
+  static Map<String, ProfilesMeAccessibilityPatchRequest> mapFromJson(
+      dynamic json) {
     final map = <String, ProfilesMeAccessibilityPatchRequest>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
@@ -133,20 +145,24 @@ class ProfilesMeAccessibilityPatchRequest {
   }
 
   // maps a json object with a list of ProfilesMeAccessibilityPatchRequest-objects as value to a dart map
-  static Map<String, List<ProfilesMeAccessibilityPatchRequest>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ProfilesMeAccessibilityPatchRequest>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ProfilesMeAccessibilityPatchRequest>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMeAccessibilityPatchRequest.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ProfilesMeAccessibilityPatchRequest.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
   }
 
   /// The list of required keys that must be present in a JSON.
-  static const requiredKeys = <String>{
-  };
+  static const requiredKeys = <String>{};
 }
-

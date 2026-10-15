@@ -97,32 +97,35 @@ class ClassesClassIdPatchRequest {
   String? time;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ClassesClassIdPatchRequest &&
-    other.courseCode == courseCode &&
-    other.courseName == courseName &&
-    other.building == building &&
-    other.room == room &&
-    _deepEquality.equals(other.weekdays, weekdays) &&
-    other.isOnline == isOnline &&
-    other.startTime == startTime &&
-    other.endTime == endTime &&
-    other.time == time;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClassesClassIdPatchRequest &&
+          other.courseCode == courseCode &&
+          other.courseName == courseName &&
+          other.building == building &&
+          other.room == room &&
+          _deepEquality.equals(other.weekdays, weekdays) &&
+          other.isOnline == isOnline &&
+          other.startTime == startTime &&
+          other.endTime == endTime &&
+          other.time == time;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (courseCode == null ? 0 : courseCode!.hashCode) +
-    (courseName == null ? 0 : courseName!.hashCode) +
-    (building == null ? 0 : building!.hashCode) +
-    (room == null ? 0 : room!.hashCode) +
-    (weekdays.hashCode) +
-    (isOnline == null ? 0 : isOnline!.hashCode) +
-    (startTime == null ? 0 : startTime!.hashCode) +
-    (endTime == null ? 0 : endTime!.hashCode) +
-    (time == null ? 0 : time!.hashCode);
+      // ignore: unnecessary_parenthesis
+      (courseCode == null ? 0 : courseCode!.hashCode) +
+      (courseName == null ? 0 : courseName!.hashCode) +
+      (building == null ? 0 : building!.hashCode) +
+      (room == null ? 0 : room!.hashCode) +
+      (weekdays.hashCode) +
+      (isOnline == null ? 0 : isOnline!.hashCode) +
+      (startTime == null ? 0 : startTime!.hashCode) +
+      (endTime == null ? 0 : endTime!.hashCode) +
+      (time == null ? 0 : time!.hashCode);
 
   @override
-  String toString() => 'ClassesClassIdPatchRequest[courseCode=$courseCode, courseName=$courseName, building=$building, room=$room, weekdays=$weekdays, isOnline=$isOnline, startTime=$startTime, endTime=$endTime, time=$time]';
+  String toString() =>
+      'ClassesClassIdPatchRequest[courseCode=$courseCode, courseName=$courseName, building=$building, room=$room, weekdays=$weekdays, isOnline=$isOnline, startTime=$startTime, endTime=$endTime, time=$time]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -146,7 +149,7 @@ class ClassesClassIdPatchRequest {
     } else {
       json[r'room'] = null;
     }
-      json[r'weekdays'] = this.weekdays;
+    json[r'weekdays'] = this.weekdays;
     if (this.isOnline != null) {
       json[r'isOnline'] = this.isOnline;
     } else {
@@ -182,8 +185,10 @@ class ClassesClassIdPatchRequest {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ClassesClassIdPatchRequest[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ClassesClassIdPatchRequest[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ClassesClassIdPatchRequest[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ClassesClassIdPatchRequest[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -194,7 +199,9 @@ class ClassesClassIdPatchRequest {
         building: mapValueOfType<String>(json, r'building'),
         room: mapValueOfType<String>(json, r'room'),
         weekdays: json[r'weekdays'] is Iterable
-            ? (json[r'weekdays'] as Iterable).cast<int>().toList(growable: false)
+            ? (json[r'weekdays'] as Iterable)
+                .cast<int>()
+                .toList(growable: false)
             : const [],
         isOnline: mapValueOfType<bool>(json, r'isOnline'),
         startTime: mapValueOfType<String>(json, r'startTime'),
@@ -205,7 +212,10 @@ class ClassesClassIdPatchRequest {
     return null;
   }
 
-  static List<ClassesClassIdPatchRequest> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ClassesClassIdPatchRequest> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ClassesClassIdPatchRequest>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -233,20 +243,24 @@ class ClassesClassIdPatchRequest {
   }
 
   // maps a json object with a list of ClassesClassIdPatchRequest-objects as value to a dart map
-  static Map<String, List<ClassesClassIdPatchRequest>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ClassesClassIdPatchRequest>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ClassesClassIdPatchRequest>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ClassesClassIdPatchRequest.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ClassesClassIdPatchRequest.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
   }
 
   /// The list of required keys that must be present in a JSON.
-  static const requiredKeys = <String>{
-  };
+  static const requiredKeys = <String>{};
 }
-

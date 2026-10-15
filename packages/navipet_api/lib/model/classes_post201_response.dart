@@ -19,20 +19,21 @@ class ClassesPost201Response {
   ClassesPost201ResponseClass class_;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ClassesPost201Response &&
-    other.class_ == class_;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClassesPost201Response && other.class_ == class_;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (class_.hashCode);
+      // ignore: unnecessary_parenthesis
+      (class_.hashCode);
 
   @override
   String toString() => 'ClassesPost201Response[class_=$class_]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'class'] = this.class_;
+    json[r'class'] = this.class_;
     return json;
   }
 
@@ -48,8 +49,10 @@ class ClassesPost201Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ClassesPost201Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ClassesPost201Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ClassesPost201Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ClassesPost201Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class ClassesPost201Response {
     return null;
   }
 
-  static List<ClassesPost201Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ClassesPost201Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ClassesPost201Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +95,19 @@ class ClassesPost201Response {
   }
 
   // maps a json object with a list of ClassesPost201Response-objects as value to a dart map
-  static Map<String, List<ClassesPost201Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ClassesPost201Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ClassesPost201Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ClassesPost201Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ClassesPost201Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +118,3 @@ class ClassesPost201Response {
     'class',
   };
 }
-

@@ -19,20 +19,21 @@ class ClassesClassIdDelete404Response {
   AuthLoginPost400ResponseError error;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ClassesClassIdDelete404Response &&
-    other.error == error;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClassesClassIdDelete404Response && other.error == error;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (error.hashCode);
+      // ignore: unnecessary_parenthesis
+      (error.hashCode);
 
   @override
   String toString() => 'ClassesClassIdDelete404Response[error=$error]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'error'] = this.error;
+    json[r'error'] = this.error;
     return json;
   }
 
@@ -48,8 +49,10 @@ class ClassesClassIdDelete404Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ClassesClassIdDelete404Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ClassesClassIdDelete404Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ClassesClassIdDelete404Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ClassesClassIdDelete404Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class ClassesClassIdDelete404Response {
     return null;
   }
 
-  static List<ClassesClassIdDelete404Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ClassesClassIdDelete404Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ClassesClassIdDelete404Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -74,7 +80,8 @@ class ClassesClassIdDelete404Response {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ClassesClassIdDelete404Response> mapFromJson(dynamic json) {
+  static Map<String, ClassesClassIdDelete404Response> mapFromJson(
+      dynamic json) {
     final map = <String, ClassesClassIdDelete404Response>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
@@ -89,13 +96,19 @@ class ClassesClassIdDelete404Response {
   }
 
   // maps a json object with a list of ClassesClassIdDelete404Response-objects as value to a dart map
-  static Map<String, List<ClassesClassIdDelete404Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ClassesClassIdDelete404Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ClassesClassIdDelete404Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ClassesClassIdDelete404Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ClassesClassIdDelete404Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +119,3 @@ class ClassesClassIdDelete404Response {
     'error',
   };
 }
-

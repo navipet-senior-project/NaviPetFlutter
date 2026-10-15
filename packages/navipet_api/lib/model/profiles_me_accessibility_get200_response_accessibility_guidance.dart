@@ -23,30 +23,33 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance {
   bool hapticTurnAlerts;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance &&
-    other.voiceGuidance == voiceGuidance &&
-    other.hapticTurnAlerts == hapticTurnAlerts;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance &&
+          other.voiceGuidance == voiceGuidance &&
+          other.hapticTurnAlerts == hapticTurnAlerts;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (voiceGuidance.hashCode) +
-    (hapticTurnAlerts.hashCode);
+      // ignore: unnecessary_parenthesis
+      (voiceGuidance.hashCode) + (hapticTurnAlerts.hashCode);
 
   @override
-  String toString() => 'ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance[voiceGuidance=$voiceGuidance, hapticTurnAlerts=$hapticTurnAlerts]';
+  String toString() =>
+      'ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance[voiceGuidance=$voiceGuidance, hapticTurnAlerts=$hapticTurnAlerts]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'voiceGuidance'] = this.voiceGuidance;
-      json[r'hapticTurnAlerts'] = this.hapticTurnAlerts;
+    json[r'voiceGuidance'] = this.voiceGuidance;
+    json[r'hapticTurnAlerts'] = this.hapticTurnAlerts;
     return json;
   }
 
   /// Returns a new [ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance] instance and imports its values from
   /// [value] if it's a [Map], null otherwise.
   // ignore: prefer_constructors_over_static_methods
-  static ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance? fromJson(dynamic value) {
+  static ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance? fromJson(
+      dynamic value) {
     if (value is Map) {
       final json = value.cast<String, dynamic>();
 
@@ -55,8 +58,10 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -69,11 +74,18 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance {
     return null;
   }
 
-  static List<ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>[];
+  static List<ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>
+      listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
+    final result =
+        <ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance.fromJson(row);
+        final value =
+            ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance.fromJson(
+                row);
         if (value != null) {
           result.add(value);
         }
@@ -82,12 +94,16 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance> mapFromJson(dynamic json) {
-    final map = <String, ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>{};
+  static Map<String, ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>
+      mapFromJson(dynamic json) {
+    final map =
+        <String, ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance.fromJson(entry.value);
+        final value =
+            ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance.fromJson(
+                entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -97,13 +113,24 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance {
   }
 
   // maps a json object with a list of ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance-objects as value to a dart map
-  static Map<String, List<ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>> mapListFromJson(dynamic json, {bool growable = false,}) {
-    final map = <String, List<ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>>{};
+  static Map<String,
+          List<ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
+    final map = <String,
+        List<ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance.listFromJson(entry.value, growable: growable,);
+        map[entry.key] =
+            ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance
+                .listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -115,4 +142,3 @@ class ProfilesMeAccessibilityGet200ResponseAccessibilityGuidance {
     'hapticTurnAlerts',
   };
 }
-

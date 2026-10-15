@@ -19,20 +19,21 @@ class RecentSearchesPostRequest {
   String placeId;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is RecentSearchesPostRequest &&
-    other.placeId == placeId;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecentSearchesPostRequest && other.placeId == placeId;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (placeId.hashCode);
+      // ignore: unnecessary_parenthesis
+      (placeId.hashCode);
 
   @override
   String toString() => 'RecentSearchesPostRequest[placeId=$placeId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'placeId'] = this.placeId;
+    json[r'placeId'] = this.placeId;
     return json;
   }
 
@@ -48,8 +49,10 @@ class RecentSearchesPostRequest {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "RecentSearchesPostRequest[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "RecentSearchesPostRequest[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "RecentSearchesPostRequest[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "RecentSearchesPostRequest[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class RecentSearchesPostRequest {
     return null;
   }
 
-  static List<RecentSearchesPostRequest> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<RecentSearchesPostRequest> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <RecentSearchesPostRequest>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -89,13 +95,19 @@ class RecentSearchesPostRequest {
   }
 
   // maps a json object with a list of RecentSearchesPostRequest-objects as value to a dart map
-  static Map<String, List<RecentSearchesPostRequest>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<RecentSearchesPostRequest>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<RecentSearchesPostRequest>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = RecentSearchesPostRequest.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = RecentSearchesPostRequest.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +118,3 @@ class RecentSearchesPostRequest {
     'placeId',
   };
 }
-

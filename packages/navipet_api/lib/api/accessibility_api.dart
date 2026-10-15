@@ -10,9 +10,9 @@
 
 part of openapi.api;
 
-
 class AccessibilityApi {
-  AccessibilityApi([ApiClient? apiClient]) : apiClient = apiClient ?? defaultApiClient;
+  AccessibilityApi([ApiClient? apiClient])
+      : apiClient = apiClient ?? defaultApiClient;
 
   final ApiClient apiClient;
 
@@ -34,7 +34,6 @@ class AccessibilityApi {
 
     const contentTypes = <String>[];
 
-
     return apiClient.invokeAPI(
       path,
       'GET',
@@ -49,7 +48,8 @@ class AccessibilityApi {
   /// Get the accessibility preferences
   ///
   /// Returns the ten accessibility preferences of the authenticated user, grouped as on the Accessibility screen.  Requires `Authorization: Bearer <access_token>`. Each user sees only their own preferences.  A user who has never changed a preference gets the defaults, not a 404: voice guidance and haptic turn alerts are on, everything else is off.
-  Future<ProfilesMeAccessibilityGet200Response?> profilesMeAccessibilityGet() async {
+  Future<ProfilesMeAccessibilityGet200Response?>
+      profilesMeAccessibilityGet() async {
     final response = await profilesMeAccessibilityGetWithHttpInfo();
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
@@ -57,9 +57,12 @@ class AccessibilityApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ProfilesMeAccessibilityGet200Response',) as ProfilesMeAccessibilityGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'ProfilesMeAccessibilityGet200Response',
+      ) as ProfilesMeAccessibilityGet200Response;
     }
     return null;
   }
@@ -73,7 +76,9 @@ class AccessibilityApi {
   /// Parameters:
   ///
   /// * [ProfilesMeAccessibilityPatchRequest] profilesMeAccessibilityPatchRequest (required):
-  Future<Response> profilesMeAccessibilityPatchWithHttpInfo(ProfilesMeAccessibilityPatchRequest profilesMeAccessibilityPatchRequest,) async {
+  Future<Response> profilesMeAccessibilityPatchWithHttpInfo(
+    ProfilesMeAccessibilityPatchRequest profilesMeAccessibilityPatchRequest,
+  ) async {
     // ignore: prefer_const_declarations
     final path = r'/profiles/me/accessibility';
 
@@ -85,7 +90,6 @@ class AccessibilityApi {
     final formParams = <String, String>{};
 
     const contentTypes = <String>['application/json'];
-
 
     return apiClient.invokeAPI(
       path,
@@ -105,17 +109,24 @@ class AccessibilityApi {
   /// Parameters:
   ///
   /// * [ProfilesMeAccessibilityPatchRequest] profilesMeAccessibilityPatchRequest (required):
-  Future<ProfilesMeAccessibilityGet200Response?> profilesMeAccessibilityPatch(ProfilesMeAccessibilityPatchRequest profilesMeAccessibilityPatchRequest,) async {
-    final response = await profilesMeAccessibilityPatchWithHttpInfo(profilesMeAccessibilityPatchRequest,);
+  Future<ProfilesMeAccessibilityGet200Response?> profilesMeAccessibilityPatch(
+    ProfilesMeAccessibilityPatchRequest profilesMeAccessibilityPatchRequest,
+  ) async {
+    final response = await profilesMeAccessibilityPatchWithHttpInfo(
+      profilesMeAccessibilityPatchRequest,
+    );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'ProfilesMeAccessibilityGet200Response',) as ProfilesMeAccessibilityGet200Response;
-    
+    if (response.body.isNotEmpty &&
+        response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(
+        await _decodeBodyBytes(response),
+        'ProfilesMeAccessibilityGet200Response',
+      ) as ProfilesMeAccessibilityGet200Response;
     }
     return null;
   }

@@ -19,20 +19,21 @@ class ProfilesMeAccessibilityPatch400Response {
   AuthLoginPost400ResponseError error;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is ProfilesMeAccessibilityPatch400Response &&
-    other.error == error;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProfilesMeAccessibilityPatch400Response && other.error == error;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (error.hashCode);
+      // ignore: unnecessary_parenthesis
+      (error.hashCode);
 
   @override
   String toString() => 'ProfilesMeAccessibilityPatch400Response[error=$error]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'error'] = this.error;
+    json[r'error'] = this.error;
     return json;
   }
 
@@ -48,8 +49,10 @@ class ProfilesMeAccessibilityPatch400Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "ProfilesMeAccessibilityPatch400Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "ProfilesMeAccessibilityPatch400Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "ProfilesMeAccessibilityPatch400Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "ProfilesMeAccessibilityPatch400Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -61,7 +64,10 @@ class ProfilesMeAccessibilityPatch400Response {
     return null;
   }
 
-  static List<ProfilesMeAccessibilityPatch400Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<ProfilesMeAccessibilityPatch400Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <ProfilesMeAccessibilityPatch400Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -74,12 +80,14 @@ class ProfilesMeAccessibilityPatch400Response {
     return result.toList(growable: growable);
   }
 
-  static Map<String, ProfilesMeAccessibilityPatch400Response> mapFromJson(dynamic json) {
+  static Map<String, ProfilesMeAccessibilityPatch400Response> mapFromJson(
+      dynamic json) {
     final map = <String, ProfilesMeAccessibilityPatch400Response>{};
     if (json is Map && json.isNotEmpty) {
       json = json.cast<String, dynamic>(); // ignore: parameter_assignments
       for (final entry in json.entries) {
-        final value = ProfilesMeAccessibilityPatch400Response.fromJson(entry.value);
+        final value =
+            ProfilesMeAccessibilityPatch400Response.fromJson(entry.value);
         if (value != null) {
           map[entry.key] = value;
         }
@@ -89,13 +97,20 @@ class ProfilesMeAccessibilityPatch400Response {
   }
 
   // maps a json object with a list of ProfilesMeAccessibilityPatch400Response-objects as value to a dart map
-  static Map<String, List<ProfilesMeAccessibilityPatch400Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<ProfilesMeAccessibilityPatch400Response>>
+      mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<ProfilesMeAccessibilityPatch400Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = ProfilesMeAccessibilityPatch400Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = ProfilesMeAccessibilityPatch400Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -106,4 +121,3 @@ class ProfilesMeAccessibilityPatch400Response {
     'error',
   };
 }
-

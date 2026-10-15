@@ -22,23 +22,25 @@ class AuthRegisterPost200Response {
   bool otpRequired;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthRegisterPost200Response &&
-    other.message == message &&
-    other.otpRequired == otpRequired;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthRegisterPost200Response &&
+          other.message == message &&
+          other.otpRequired == otpRequired;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (message.hashCode) +
-    (otpRequired.hashCode);
+      // ignore: unnecessary_parenthesis
+      (message.hashCode) + (otpRequired.hashCode);
 
   @override
-  String toString() => 'AuthRegisterPost200Response[message=$message, otpRequired=$otpRequired]';
+  String toString() =>
+      'AuthRegisterPost200Response[message=$message, otpRequired=$otpRequired]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'message'] = this.message;
-      json[r'otp_required'] = this.otpRequired;
+    json[r'message'] = this.message;
+    json[r'otp_required'] = this.otpRequired;
     return json;
   }
 
@@ -54,21 +56,27 @@ class AuthRegisterPost200Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthRegisterPost200Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthRegisterPost200Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthRegisterPost200Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthRegisterPost200Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
 
       return AuthRegisterPost200Response(
-        message: AuthRegisterPost200ResponseMessageEnum.fromJson(json[r'message'])!,
+        message:
+            AuthRegisterPost200ResponseMessageEnum.fromJson(json[r'message'])!,
         otpRequired: mapValueOfType<bool>(json, r'otp_required')!,
       );
     }
     return null;
   }
 
-  static List<AuthRegisterPost200Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthRegisterPost200Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthRegisterPost200Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -96,13 +104,19 @@ class AuthRegisterPost200Response {
   }
 
   // maps a json object with a list of AuthRegisterPost200Response-objects as value to a dart map
-  static Map<String, List<AuthRegisterPost200Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthRegisterPost200Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthRegisterPost200Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthRegisterPost200Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthRegisterPost200Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -114,7 +128,6 @@ class AuthRegisterPost200Response {
     'otp_required',
   };
 }
-
 
 class AuthRegisterPost200ResponseMessageEnum {
   /// Instantiate a new enum with the provided [value].
@@ -128,16 +141,22 @@ class AuthRegisterPost200ResponseMessageEnum {
 
   String toJson() => value;
 
-  static const verificationCodeSentPeriodCheckYourInboxPeriod = AuthRegisterPost200ResponseMessageEnum._(r'Verification code sent. Check your inbox.');
+  static const verificationCodeSentPeriodCheckYourInboxPeriod =
+      AuthRegisterPost200ResponseMessageEnum._(
+          r'Verification code sent. Check your inbox.');
 
   /// List of all possible values in this [enum][AuthRegisterPost200ResponseMessageEnum].
   static const values = <AuthRegisterPost200ResponseMessageEnum>[
     verificationCodeSentPeriodCheckYourInboxPeriod,
   ];
 
-  static AuthRegisterPost200ResponseMessageEnum? fromJson(dynamic value) => AuthRegisterPost200ResponseMessageEnumTypeTransformer().decode(value);
+  static AuthRegisterPost200ResponseMessageEnum? fromJson(dynamic value) =>
+      AuthRegisterPost200ResponseMessageEnumTypeTransformer().decode(value);
 
-  static List<AuthRegisterPost200ResponseMessageEnum> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthRegisterPost200ResponseMessageEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthRegisterPost200ResponseMessageEnum>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -154,7 +173,9 @@ class AuthRegisterPost200ResponseMessageEnum {
 /// Transformation class that can [encode] an instance of [AuthRegisterPost200ResponseMessageEnum] to String,
 /// and [decode] dynamic data back to [AuthRegisterPost200ResponseMessageEnum].
 class AuthRegisterPost200ResponseMessageEnumTypeTransformer {
-  factory AuthRegisterPost200ResponseMessageEnumTypeTransformer() => _instance ??= const AuthRegisterPost200ResponseMessageEnumTypeTransformer._();
+  factory AuthRegisterPost200ResponseMessageEnumTypeTransformer() =>
+      _instance ??=
+          const AuthRegisterPost200ResponseMessageEnumTypeTransformer._();
 
   const AuthRegisterPost200ResponseMessageEnumTypeTransformer._();
 
@@ -168,10 +189,13 @@ class AuthRegisterPost200ResponseMessageEnumTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  AuthRegisterPost200ResponseMessageEnum? decode(dynamic data, {bool allowNull = true}) {
+  AuthRegisterPost200ResponseMessageEnum? decode(dynamic data,
+      {bool allowNull = true}) {
     if (data != null) {
       switch (data) {
-        case r'Verification code sent. Check your inbox.': return AuthRegisterPost200ResponseMessageEnum.verificationCodeSentPeriodCheckYourInboxPeriod;
+        case r'Verification code sent. Check your inbox.':
+          return AuthRegisterPost200ResponseMessageEnum
+              .verificationCodeSentPeriodCheckYourInboxPeriod;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -184,5 +208,3 @@ class AuthRegisterPost200ResponseMessageEnumTypeTransformer {
   /// Singleton [AuthRegisterPost200ResponseMessageEnumTypeTransformer] instance.
   static AuthRegisterPost200ResponseMessageEnumTypeTransformer? _instance;
 }
-
-

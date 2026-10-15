@@ -37,4 +37,9 @@ if [[ -f "$OUT/pubspec.yaml" ]]; then
   rm -f "$OUT/pubspec.yaml.bak"
 fi
 
+# CI runs `dart format --set-exit-if-changed .` over the whole repo, and the
+# generator output is not formatted to dart_style. Format it so regenerating
+# leaves the tree clean.
+dart format "$OUT"
+
 (cd "$OUT" && dart pub get)

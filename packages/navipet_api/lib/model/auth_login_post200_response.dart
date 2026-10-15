@@ -22,23 +22,25 @@ class AuthLoginPost200Response {
   String refreshToken;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is AuthLoginPost200Response &&
-    other.accessToken == accessToken &&
-    other.refreshToken == refreshToken;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthLoginPost200Response &&
+          other.accessToken == accessToken &&
+          other.refreshToken == refreshToken;
 
   @override
   int get hashCode =>
-    // ignore: unnecessary_parenthesis
-    (accessToken.hashCode) +
-    (refreshToken.hashCode);
+      // ignore: unnecessary_parenthesis
+      (accessToken.hashCode) + (refreshToken.hashCode);
 
   @override
-  String toString() => 'AuthLoginPost200Response[accessToken=$accessToken, refreshToken=$refreshToken]';
+  String toString() =>
+      'AuthLoginPost200Response[accessToken=$accessToken, refreshToken=$refreshToken]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'access_token'] = this.accessToken;
-      json[r'refresh_token'] = this.refreshToken;
+    json[r'access_token'] = this.accessToken;
+    json[r'refresh_token'] = this.refreshToken;
     return json;
   }
 
@@ -54,8 +56,10 @@ class AuthLoginPost200Response {
       // Note 2: this code is stripped in release mode!
       assert(() {
         requiredKeys.forEach((key) {
-          assert(json.containsKey(key), 'Required key "AuthLoginPost200Response[$key]" is missing from JSON.');
-          assert(json[key] != null, 'Required key "AuthLoginPost200Response[$key]" has a null value in JSON.');
+          assert(json.containsKey(key),
+              'Required key "AuthLoginPost200Response[$key]" is missing from JSON.');
+          assert(json[key] != null,
+              'Required key "AuthLoginPost200Response[$key]" has a null value in JSON.');
         });
         return true;
       }());
@@ -68,7 +72,10 @@ class AuthLoginPost200Response {
     return null;
   }
 
-  static List<AuthLoginPost200Response> listFromJson(dynamic json, {bool growable = false,}) {
+  static List<AuthLoginPost200Response> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final result = <AuthLoginPost200Response>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
@@ -96,13 +103,19 @@ class AuthLoginPost200Response {
   }
 
   // maps a json object with a list of AuthLoginPost200Response-objects as value to a dart map
-  static Map<String, List<AuthLoginPost200Response>> mapListFromJson(dynamic json, {bool growable = false,}) {
+  static Map<String, List<AuthLoginPost200Response>> mapListFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
     final map = <String, List<AuthLoginPost200Response>>{};
     if (json is Map && json.isNotEmpty) {
       // ignore: parameter_assignments
       json = json.cast<String, dynamic>();
       for (final entry in json.entries) {
-        map[entry.key] = AuthLoginPost200Response.listFromJson(entry.value, growable: growable,);
+        map[entry.key] = AuthLoginPost200Response.listFromJson(
+          entry.value,
+          growable: growable,
+        );
       }
     }
     return map;
@@ -114,4 +127,3 @@ class AuthLoginPost200Response {
     'refresh_token',
   };
 }
-
