@@ -38,6 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   bool _agreedToTerms = false;
+  bool _submitAttempted = false;
   String? _role;
   String? _statusMessage;
   bool _statusIsError = false;
@@ -54,17 +55,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isValidEmail(String value) => _emailPattern.hasMatch(value);
 
+  String? _requiredError(TextEditingController controller, String message) =>
+      _submitAttempted && controller.text.trim().isEmpty ? message : null;
+
+  String? get _firstNameError =>
+      _requiredError(_firstNameController, 'Enter your first name.');
+
+  String? get _lastNameError =>
+      _requiredError(_lastNameController, 'Enter your last name.');
+
   String? get _emailError {
     final value = _emailController.text.trim();
-    if (value.isEmpty || _isValidEmail(value)) return null;
-    return 'Enter a valid email address.';
+    if (value.isEmpty) {
+      return _submitAttempted ? 'Enter your email address.' : null;
+    }
+    return _isValidEmail(value) ? null : 'Please enter a valid email address.';
   }
+
+  String? get _passwordError =>
+      _submitAttempted && _passwordController.text.isEmpty
+      ? 'Enter a password.'
+      : null;
 
   String? get _confirmPasswordError {
     final confirm = _confirmPasswordController.text;
-    if (confirm.isEmpty || confirm == _passwordController.text) return null;
-    return 'Passwords do not match.';
+    if (confirm.isEmpty) {
+      return _submitAttempted ? 'Confirm your password.' : null;
+    }
+    return confirm == _passwordController.text
+        ? null
+        : 'Passwords do not match.';
   }
+
+  String? get _roleError =>
+      _submitAttempted && _role == null ? 'Select a role.' : null;
+
+  String? get _termsError => _submitAttempted && !_agreedToTerms
+      ? 'Agree to the Terms to continue.'
+      : null;
 
   bool get _passwordMeetsRules =>
       PasswordRules.isValid(_passwordController.text);
@@ -93,6 +121,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     context.go(
       Uri(path: '/verify-email', queryParameters: {'email': email}).toString(),
     );
+  }
+
+  void _attemptSubmit() {
+    setState(() => _submitAttempted = true);
+    if (_isFormValid) _submit();
   }
 
   Future<void> _submit() async {
@@ -197,6 +230,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _firstNameController,
                     hint: 'e.g. Elbee',
                     textInputAction: TextInputAction.next,
+                    errorText: _firstNameError,
                   ),
                   const SizedBox(height: 16),
                   _field(
@@ -204,6 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _lastNameController,
                     hint: 'e.g. Shark',
                     textInputAction: TextInputAction.next,
+                    errorText: _lastNameError,
                   ),
                   const SizedBox(height: 16),
                   _label('Role'),
@@ -214,7 +249,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       'Select a role',
                       style: TextStyle(fontSize: 16, color: Color(0xFF747B8B)),
                     ),
-                    decoration: _inputDecoration(hasError: false),
+                    decoration: _inputDecoration(hasError: _roleError != null),
                     items: const [
                       DropdownMenuItem(
                         value: 'student',
@@ -227,6 +262,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ],
                     onChanged: (value) => setState(() => _role = value),
                   ),
+                  if (_roleError case final error?) _errorLine(error),
                   const SizedBox(height: 16),
                   _field(
                     label: 'Campus Email',
@@ -243,6 +279,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hint: '••••••••',
                     obscureText: !_showPassword,
                     textInputAction: TextInputAction.next,
+                    errorText: _passwordError,
                     trailing: IconButton(
                       padding: EdgeInsets.zero,
                       onPressed: () =>
@@ -256,7 +293,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  PasswordRequirements(password: _passwordController.text),
+                  PasswordRequirements(
+                    password: _passwordController.text,
+                    unmetColor: _submitAttempted ? _a04Error : null,
+                  ),
                   const SizedBox(height: 6),
                   _field(
                     label: 'Confirm Password',
@@ -265,7 +305,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     obscureText: !_showConfirmPassword,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) {
-                      if (_isFormValid && !appState.isBusy) _submit();
+                      if (!appState.isBusy) _attemptSubmit();
                     },
                     errorText: _confirmPasswordError,
                     trailing: IconButton(
@@ -283,6 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 22),
                   _termsRow(),
+                  if (_termsError case final error?) _errorLine(error),
                   const SizedBox(height: 20),
                   _submitButton(appState),
                   TextButton(
@@ -366,12 +407,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _submitButton(AppState appState) {
-    final enabled = _isFormValid && !appState.isBusy;
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: enabled ? _submit : null,
+        onPressed: appState.isBusy ? null : _attemptSubmit,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.navy,
           foregroundColor: Colors.white,
