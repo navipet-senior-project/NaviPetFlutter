@@ -6,6 +6,14 @@ import '../data/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/password_requirements.dart';
 
+// Figma A-04 (Sign Up, validation errors) tokens. AppColors.danger is a
+// different red (#D92D20), so these stay local until the auth screens share
+// A-04 tokens.
+const _a04Error = Color(0xFFBA1A1A);
+const _a04Fill = Color(0xFFF3F3F4);
+const _a04ErrorFill = Color(0x33FFDAD6);
+const _a04LabelInk = Color(0xFF1A1C1C);
+
 /// Dedicated sign-up screen backed by the NaviPet backend's email-code
 /// registration flow (`AppState.signUp` -> `RegistrationGateway`).
 ///
@@ -30,6 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   bool _agreedToTerms = false;
+  bool _submitAttempted = false;
   String? _role;
   String? _statusMessage;
   bool _statusIsError = false;
@@ -46,17 +55,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isValidEmail(String value) => _emailPattern.hasMatch(value);
 
+  String? _requiredError(TextEditingController controller, String message) =>
+      _submitAttempted && controller.text.trim().isEmpty ? message : null;
+
+  String? get _firstNameError =>
+      _requiredError(_firstNameController, 'Enter your first name.');
+
+  String? get _lastNameError =>
+      _requiredError(_lastNameController, 'Enter your last name.');
+
   String? get _emailError {
     final value = _emailController.text.trim();
-    if (value.isEmpty || _isValidEmail(value)) return null;
-    return 'Enter a valid email address.';
+    if (value.isEmpty) {
+      return _submitAttempted ? 'Enter your email address.' : null;
+    }
+    return _isValidEmail(value) ? null : 'Please enter a valid email address.';
   }
+
+  String? get _passwordError =>
+      _submitAttempted && _passwordController.text.isEmpty
+      ? 'Enter a password.'
+      : null;
 
   String? get _confirmPasswordError {
     final confirm = _confirmPasswordController.text;
-    if (confirm.isEmpty || confirm == _passwordController.text) return null;
-    return 'Passwords do not match.';
+    if (confirm.isEmpty) {
+      return _submitAttempted ? 'Confirm your password.' : null;
+    }
+    return confirm == _passwordController.text
+        ? null
+        : 'Passwords do not match.';
   }
+
+  String? get _roleError =>
+      _submitAttempted && _role == null ? 'Select a role.' : null;
+
+  String? get _termsError => _submitAttempted && !_agreedToTerms
+      ? 'Agree to the Terms to continue.'
+      : null;
 
   bool get _passwordMeetsRules =>
       PasswordRules.isValid(_passwordController.text);
@@ -85,6 +121,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     context.go(
       Uri(path: '/verify-email', queryParameters: {'email': email}).toString(),
     );
+  }
+
+  void _attemptSubmit() {
+    setState(() => _submitAttempted = true);
+    if (_isFormValid) _submit();
   }
 
   Future<void> _submit() async {
@@ -189,6 +230,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _firstNameController,
                     hint: 'e.g. Elbee',
                     textInputAction: TextInputAction.next,
+                    errorText: _firstNameError,
                   ),
                   const SizedBox(height: 16),
                   _field(
@@ -196,22 +238,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _lastNameController,
                     hint: 'e.g. Shark',
                     textInputAction: TextInputAction.next,
+                    errorText: _lastNameError,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Role *',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF18181B)),
-                  ),
-                  const SizedBox(height: 6),
+                  _label('Role'),
                   DropdownButtonFormField<String>(
                     key: const ValueKey('registration-role'),
                     initialValue: _role,
-                    hint: const Text('Select a role'),
-                    decoration: const InputDecoration(
-                      filled: true,
-                      fillColor: Color(0xFFF7F7F8),
-                      border: OutlineInputBorder(),
+                    hint: const Text(
+                      'Select a role',
+                      style: TextStyle(fontSize: 16, color: Color(0xFF747B8B)),
                     ),
+                    decoration: _inputDecoration(hasError: _roleError != null),
                     items: const [
                       DropdownMenuItem(
                         value: 'student',
@@ -224,6 +262,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ],
                     onChanged: (value) => setState(() => _role = value),
                   ),
+                  if (_roleError case final error?) _errorLine(error),
                   const SizedBox(height: 16),
                   _field(
                     label: 'Campus Email',
@@ -240,6 +279,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hint: '••••••••',
                     obscureText: !_showPassword,
                     textInputAction: TextInputAction.next,
+                    errorText: _passwordError,
                     trailing: IconButton(
                       padding: EdgeInsets.zero,
                       onPressed: () =>
@@ -253,7 +293,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  PasswordRequirements(password: _passwordController.text),
+                  PasswordRequirements(
+                    password: _passwordController.text,
+                    unmetColor: _submitAttempted ? _a04Error : null,
+                  ),
                   const SizedBox(height: 6),
                   _field(
                     label: 'Confirm Password',
@@ -262,7 +305,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     obscureText: !_showConfirmPassword,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) {
-                      if (_isFormValid && !appState.isBusy) _submit();
+                      if (!appState.isBusy) _attemptSubmit();
                     },
                     errorText: _confirmPasswordError,
                     trailing: IconButton(
@@ -280,6 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 22),
                   _termsRow(),
+                  if (_termsError case final error?) _errorLine(error),
                   const SizedBox(height: 20),
                   _submitButton(appState),
                   TextButton(
@@ -363,12 +407,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _submitButton(AppState appState) {
-    final enabled = _isFormValid && !appState.isBusy;
     return SizedBox(
       width: double.infinity,
-      height: 44,
+      height: 52,
       child: ElevatedButton(
-        onPressed: enabled ? _submit : null,
+        onPressed: appState.isBusy ? null : _attemptSubmit,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.navy,
           foregroundColor: Colors.white,
@@ -402,21 +445,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     TextInputAction? textInputAction,
     ValueChanged<String>? onSubmitted,
     String? errorText,
-    String? helperText,
-    bool helperIsError = false,
     Widget? trailing,
   }) {
-    final hasError = errorText != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 3, bottom: 6),
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF18181B)),
-          ),
-        ),
+        _label(label),
         TextField(
           controller: controller,
           obscureText: obscureText,
@@ -427,96 +461,70 @@ class _RegisterScreenState extends State<RegisterScreen> {
           autocorrect: false,
           enableSuggestions: !obscureText,
           style: const TextStyle(fontSize: 16),
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            hintText: hint,
-            hintStyle: const TextStyle(fontSize: 16, color: Color(0xFF747B8B)),
-            suffixIcon: trailing,
-            filled: true,
-            fillColor: hasError
-                ? const Color(0xFFFFF8F8)
-                : const Color(0xFFF7F7F8),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(9),
-              borderSide: BorderSide(
-                color: hasError ? AppColors.danger : Colors.transparent,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(9),
-              borderSide: BorderSide(
-                color: hasError ? AppColors.danger : Colors.transparent,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(9),
-              borderSide: BorderSide(
-                color: hasError ? AppColors.danger : AppColors.navy,
-              ),
-            ),
+          decoration: _inputDecoration(
+            hasError: errorText != null,
+            hint: hint,
+            suffix: trailing,
           ),
         ),
-        if (errorText != null) ...[
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 14,
-                color: AppColors.danger,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  errorText,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.danger,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        if (helperText != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F0F1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: helperIsError ? AppColors.danger : AppColors.labelInk,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    helperText,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: helperIsError
-                          ? AppColors.danger
-                          : AppColors.labelInk,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        if (errorText != null) _errorLine(errorText),
       ],
     );
   }
+
+  InputDecoration _inputDecoration({
+    required bool hasError,
+    String? hint,
+    Widget? suffix,
+  }) {
+    OutlineInputBorder outline(Color color) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: color),
+    );
+    final idleBorder = outline(hasError ? _a04Error : Colors.transparent);
+    return InputDecoration(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      hintText: hint,
+      hintStyle: const TextStyle(fontSize: 16, color: Color(0xFF747B8B)),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: hasError ? _a04ErrorFill : _a04Fill,
+      border: idleBorder,
+      enabledBorder: idleBorder,
+      focusedBorder: outline(hasError ? _a04Error : AppColors.navy),
+    );
+  }
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(left: 4, bottom: 6),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.48,
+        color: _a04LabelInk,
+      ),
+    ),
+  );
+
+  Widget _errorLine(String text) => Padding(
+    padding: const EdgeInsets.only(left: 4, top: 4),
+    child: Row(
+      children: [
+        const Icon(Icons.info_outline, size: 11.67, color: _a04Error),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: _a04Error,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

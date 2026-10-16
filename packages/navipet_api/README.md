@@ -73,7 +73,7 @@ Class | Method | HTTP request | Description
 *AuthenticationApi* | [**authLogoutPost**](doc//AuthenticationApi.md#authlogoutpost) | **POST** /auth/logout | Revoke the current session
 *AuthenticationApi* | [**authMeGet**](doc//AuthenticationApi.md#authmeget) | **GET** /auth/me | Get the authenticated user
 *AuthenticationApi* | [**authRefreshPost**](doc//AuthenticationApi.md#authrefreshpost) | **POST** /auth/refresh | Rotate a refresh token for a new access/refresh pair
-*AuthenticationApi* | [**authRegisterPost**](doc//AuthenticationApi.md#authregisterpost) | **POST** /auth/register | Register with first name, last name, email, and password
+*AuthenticationApi* | [**authRegisterPost**](doc//AuthenticationApi.md#authregisterpost) | **POST** /auth/register | Register with first name, last name, email, password, and role
 *AuthenticationApi* | [**authResetPasswordPost**](doc//AuthenticationApi.md#authresetpasswordpost) | **POST** /auth/reset-password | Set a new password using a verified recovery session
 *AuthenticationApi* | [**authVerifyOtpPost**](doc//AuthenticationApi.md#authverifyotppost) | **POST** /auth/verify-otp | Verify a one-time code for password reset, signup, or email change
 *CampusApi* | [**autocompleteGet**](doc//CampusApi.md#autocompleteget) | **GET** /autocomplete | Autocomplete campus destinations

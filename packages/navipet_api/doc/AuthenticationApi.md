@@ -16,7 +16,7 @@ Method | HTTP request | Description
 [**authLogoutPost**](AuthenticationApi.md#authlogoutpost) | **POST** /auth/logout | Revoke the current session
 [**authMeGet**](AuthenticationApi.md#authmeget) | **GET** /auth/me | Get the authenticated user
 [**authRefreshPost**](AuthenticationApi.md#authrefreshpost) | **POST** /auth/refresh | Rotate a refresh token for a new access/refresh pair
-[**authRegisterPost**](AuthenticationApi.md#authregisterpost) | **POST** /auth/register | Register with first name, last name, email, and password
+[**authRegisterPost**](AuthenticationApi.md#authregisterpost) | **POST** /auth/register | Register with first name, last name, email, password, and role
 [**authResetPasswordPost**](AuthenticationApi.md#authresetpasswordpost) | **POST** /auth/reset-password | Set a new password using a verified recovery session
 [**authVerifyOtpPost**](AuthenticationApi.md#authverifyotppost) | **POST** /auth/verify-otp | Verify a one-time code for password reset, signup, or email change
 
@@ -337,9 +337,9 @@ No authorization required
 # **authRegisterPost**
 > AuthRegisterPost200Response authRegisterPost(authRegisterPostRequest)
 
-Register with first name, last name, email, and password
+Register with first name, last name, email, password, and role
 
-Creates an unconfirmed account and emails it a 6-digit verification code.  Public — no bearer token is needed. This call never returns access or refresh tokens.  Names and email are trimmed, and the email is lowercased, before validation.  The password needs 8 to 128 characters with at least one digit and one special character.  ---  Next step: submit the emailed code to `POST /auth/verify-otp` with `type: \"register\"`. That call confirms the account and signs it in.
+Creates an unconfirmed account and emails it a 6-digit verification code.  Public — no bearer token is needed. This call never returns access or refresh tokens.  Names and email are trimmed, and the email is lowercased, before validation.  The password needs 8 to 128 characters with at least one digit and one special character.  `role` is required and must be `student` or `professor`. It is self-declared: it is stored on the profile, can be changed later with `PATCH /profiles/me`, and is not an authorization signal.  ---  Next step: submit the emailed code to `POST /auth/verify-otp` with `type: \"register\"`. That call confirms the account and signs it in.
 
 ### Example
 ```dart

@@ -20,9 +20,17 @@ class PasswordRules {
 }
 
 class PasswordRequirements extends StatelessWidget {
-  const PasswordRequirements({super.key, required this.password});
+  const PasswordRequirements({
+    super.key,
+    required this.password,
+    this.unmetColor,
+  });
 
   final String password;
+
+  /// Colour for unmet rules; defaults to grey. The sign-up screen passes its
+  /// error red after a rejected submit.
+  final Color? unmetColor;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +49,11 @@ class PasswordRequirements extends StatelessWidget {
         runSpacing: 4,
         children: [
           for (final requirement in requirements)
-            _Requirement(label: requirement.$1, satisfied: requirement.$2),
+            _Requirement(
+              label: requirement.$1,
+              satisfied: requirement.$2,
+              unmetColor: unmetColor,
+            ),
         ],
       ),
     );
@@ -49,14 +61,21 @@ class PasswordRequirements extends StatelessWidget {
 }
 
 class _Requirement extends StatelessWidget {
-  const _Requirement({required this.label, required this.satisfied});
+  const _Requirement({
+    required this.label,
+    required this.satisfied,
+    this.unmetColor,
+  });
 
   final String label;
   final bool satisfied;
+  final Color? unmetColor;
 
   @override
   Widget build(BuildContext context) {
-    final color = satisfied ? Colors.green.shade700 : Colors.grey.shade600;
+    final color = satisfied
+        ? Colors.green.shade700
+        : unmetColor ?? Colors.grey.shade600;
     return Semantics(
       label: '$label: ${satisfied ? 'satisfied' : 'not satisfied'}',
       child: Row(

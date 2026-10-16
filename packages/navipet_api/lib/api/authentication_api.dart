@@ -422,9 +422,9 @@ class AuthenticationApi {
     return null;
   }
 
-  /// Register with first name, last name, email, and password
+  /// Register with first name, last name, email, password, and role
   ///
-  /// Creates an unconfirmed account and emails it a 6-digit verification code.  Public — no bearer token is needed. This call never returns access or refresh tokens.  Names and email are trimmed, and the email is lowercased, before validation.  The password needs 8 to 128 characters with at least one digit and one special character.  ---  Next step: submit the emailed code to `POST /auth/verify-otp` with `type: \"register\"`. That call confirms the account and signs it in.
+  /// Creates an unconfirmed account and emails it a 6-digit verification code.  Public — no bearer token is needed. This call never returns access or refresh tokens.  Names and email are trimmed, and the email is lowercased, before validation.  The password needs 8 to 128 characters with at least one digit and one special character.  `role` is required and must be `student` or `professor`. It is self-declared: it is stored on the profile, can be changed later with `PATCH /profiles/me`, and is not an authorization signal.  ---  Next step: submit the emailed code to `POST /auth/verify-otp` with `type: \"register\"`. That call confirms the account and signs it in.
   ///
   /// Note: This method returns the HTTP [Response].
   ///
@@ -457,9 +457,9 @@ class AuthenticationApi {
     );
   }
 
-  /// Register with first name, last name, email, and password
+  /// Register with first name, last name, email, password, and role
   ///
-  /// Creates an unconfirmed account and emails it a 6-digit verification code.  Public — no bearer token is needed. This call never returns access or refresh tokens.  Names and email are trimmed, and the email is lowercased, before validation.  The password needs 8 to 128 characters with at least one digit and one special character.  ---  Next step: submit the emailed code to `POST /auth/verify-otp` with `type: \"register\"`. That call confirms the account and signs it in.
+  /// Creates an unconfirmed account and emails it a 6-digit verification code.  Public — no bearer token is needed. This call never returns access or refresh tokens.  Names and email are trimmed, and the email is lowercased, before validation.  The password needs 8 to 128 characters with at least one digit and one special character.  `role` is required and must be `student` or `professor`. It is self-declared: it is stored on the profile, can be changed later with `PATCH /profiles/me`, and is not an authorization signal.  ---  Next step: submit the emailed code to `POST /auth/verify-otp` with `type: \"register\"`. That call confirms the account and signs it in.
   ///
   /// Parameters:
   ///

@@ -17,6 +17,7 @@ class AuthRegisterPostRequest {
     required this.lastName,
     required this.email,
     required this.password,
+    required this.role,
   });
 
   String firstName;
@@ -27,6 +28,8 @@ class AuthRegisterPostRequest {
 
   String password;
 
+  AuthRegisterPostRequestRoleEnum role;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -34,7 +37,8 @@ class AuthRegisterPostRequest {
           other.firstName == firstName &&
           other.lastName == lastName &&
           other.email == email &&
-          other.password == password;
+          other.password == password &&
+          other.role == role;
 
   @override
   int get hashCode =>
@@ -42,11 +46,12 @@ class AuthRegisterPostRequest {
       (firstName.hashCode) +
       (lastName.hashCode) +
       (email.hashCode) +
-      (password.hashCode);
+      (password.hashCode) +
+      (role.hashCode);
 
   @override
   String toString() =>
-      'AuthRegisterPostRequest[firstName=$firstName, lastName=$lastName, email=$email, password=$password]';
+      'AuthRegisterPostRequest[firstName=$firstName, lastName=$lastName, email=$email, password=$password, role=$role]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -54,6 +59,7 @@ class AuthRegisterPostRequest {
     json[r'lastName'] = this.lastName;
     json[r'email'] = this.email;
     json[r'password'] = this.password;
+    json[r'role'] = this.role;
     return json;
   }
 
@@ -82,6 +88,7 @@ class AuthRegisterPostRequest {
         lastName: mapValueOfType<String>(json, r'lastName')!,
         email: mapValueOfType<String>(json, r'email')!,
         password: mapValueOfType<String>(json, r'password')!,
+        role: AuthRegisterPostRequestRoleEnum.fromJson(json[r'role'])!,
       );
     }
     return null;
@@ -142,5 +149,86 @@ class AuthRegisterPostRequest {
     'lastName',
     'email',
     'password',
+    'role',
   };
+}
+
+class AuthRegisterPostRequestRoleEnum {
+  /// Instantiate a new enum with the provided [value].
+  const AuthRegisterPostRequestRoleEnum._(this.value);
+
+  /// The underlying value of this enum member.
+  final String value;
+
+  @override
+  String toString() => value;
+
+  String toJson() => value;
+
+  static const student = AuthRegisterPostRequestRoleEnum._(r'student');
+  static const professor = AuthRegisterPostRequestRoleEnum._(r'professor');
+
+  /// List of all possible values in this [enum][AuthRegisterPostRequestRoleEnum].
+  static const values = <AuthRegisterPostRequestRoleEnum>[
+    student,
+    professor,
+  ];
+
+  static AuthRegisterPostRequestRoleEnum? fromJson(dynamic value) =>
+      AuthRegisterPostRequestRoleEnumTypeTransformer().decode(value);
+
+  static List<AuthRegisterPostRequestRoleEnum> listFromJson(
+    dynamic json, {
+    bool growable = false,
+  }) {
+    final result = <AuthRegisterPostRequestRoleEnum>[];
+    if (json is List && json.isNotEmpty) {
+      for (final row in json) {
+        final value = AuthRegisterPostRequestRoleEnum.fromJson(row);
+        if (value != null) {
+          result.add(value);
+        }
+      }
+    }
+    return result.toList(growable: growable);
+  }
+}
+
+/// Transformation class that can [encode] an instance of [AuthRegisterPostRequestRoleEnum] to String,
+/// and [decode] dynamic data back to [AuthRegisterPostRequestRoleEnum].
+class AuthRegisterPostRequestRoleEnumTypeTransformer {
+  factory AuthRegisterPostRequestRoleEnumTypeTransformer() =>
+      _instance ??= const AuthRegisterPostRequestRoleEnumTypeTransformer._();
+
+  const AuthRegisterPostRequestRoleEnumTypeTransformer._();
+
+  String encode(AuthRegisterPostRequestRoleEnum data) => data.value;
+
+  /// Decodes a [dynamic value][data] to a AuthRegisterPostRequestRoleEnum.
+  ///
+  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
+  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
+  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
+  ///
+  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
+  /// and users are still using an old app with the old code.
+  AuthRegisterPostRequestRoleEnum? decode(dynamic data,
+      {bool allowNull = true}) {
+    if (data != null) {
+      switch (data) {
+        case r'student':
+          return AuthRegisterPostRequestRoleEnum.student;
+        case r'professor':
+          return AuthRegisterPostRequestRoleEnum.professor;
+        default:
+          if (!allowNull) {
+            throw ArgumentError('Unknown enum value to decode: $data');
+          }
+      }
+    }
+    return null;
+  }
+
+  /// Singleton [AuthRegisterPostRequestRoleEnumTypeTransformer] instance.
+  static AuthRegisterPostRequestRoleEnumTypeTransformer? _instance;
 }
