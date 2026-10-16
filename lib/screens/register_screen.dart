@@ -6,6 +6,14 @@ import '../data/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/password_requirements.dart';
 
+// Figma A-04 (Sign Up, validation errors) tokens. AppColors.danger is a
+// different red (#D92D20), so these stay local until the auth screens share
+// A-04 tokens.
+const _a04Error = Color(0xFFBA1A1A);
+const _a04Fill = Color(0xFFF3F3F4);
+const _a04ErrorFill = Color(0x33FFDAD6);
+const _a04LabelInk = Color(0xFF1A1C1C);
+
 /// Dedicated sign-up screen backed by the NaviPet backend's email-code
 /// registration flow (`AppState.signUp` -> `RegistrationGateway`).
 ///
@@ -198,20 +206,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Role *',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF18181B)),
-                  ),
-                  const SizedBox(height: 6),
+                  _label('Role'),
                   DropdownButtonFormField<String>(
                     key: const ValueKey('registration-role'),
                     initialValue: _role,
-                    hint: const Text('Select a role'),
-                    decoration: const InputDecoration(
-                      filled: true,
-                      fillColor: Color(0xFFF7F7F8),
-                      border: OutlineInputBorder(),
+                    hint: const Text(
+                      'Select a role',
+                      style: TextStyle(fontSize: 16, color: Color(0xFF747B8B)),
                     ),
+                    decoration: _inputDecoration(hasError: false),
                     items: const [
                       DropdownMenuItem(
                         value: 'student',
@@ -366,7 +369,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final enabled = _isFormValid && !appState.isBusy;
     return SizedBox(
       width: double.infinity,
-      height: 44,
+      height: 52,
       child: ElevatedButton(
         onPressed: enabled ? _submit : null,
         style: ElevatedButton.styleFrom(
@@ -402,21 +405,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     TextInputAction? textInputAction,
     ValueChanged<String>? onSubmitted,
     String? errorText,
-    String? helperText,
-    bool helperIsError = false,
     Widget? trailing,
   }) {
-    final hasError = errorText != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 3, bottom: 6),
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF18181B)),
-          ),
-        ),
+        _label(label),
         TextField(
           controller: controller,
           obscureText: obscureText,
@@ -427,96 +421,70 @@ class _RegisterScreenState extends State<RegisterScreen> {
           autocorrect: false,
           enableSuggestions: !obscureText,
           style: const TextStyle(fontSize: 16),
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            hintText: hint,
-            hintStyle: const TextStyle(fontSize: 16, color: Color(0xFF747B8B)),
-            suffixIcon: trailing,
-            filled: true,
-            fillColor: hasError
-                ? const Color(0xFFFFF8F8)
-                : const Color(0xFFF7F7F8),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(9),
-              borderSide: BorderSide(
-                color: hasError ? AppColors.danger : Colors.transparent,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(9),
-              borderSide: BorderSide(
-                color: hasError ? AppColors.danger : Colors.transparent,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(9),
-              borderSide: BorderSide(
-                color: hasError ? AppColors.danger : AppColors.navy,
-              ),
-            ),
+          decoration: _inputDecoration(
+            hasError: errorText != null,
+            hint: hint,
+            suffix: trailing,
           ),
         ),
-        if (errorText != null) ...[
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 14,
-                color: AppColors.danger,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  errorText,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.danger,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        if (helperText != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F0F1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: helperIsError ? AppColors.danger : AppColors.labelInk,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    helperText,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: helperIsError
-                          ? AppColors.danger
-                          : AppColors.labelInk,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        if (errorText != null) _errorLine(errorText),
       ],
     );
   }
+
+  InputDecoration _inputDecoration({
+    required bool hasError,
+    String? hint,
+    Widget? suffix,
+  }) {
+    OutlineInputBorder outline(Color color) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: color),
+    );
+    final idleBorder = outline(hasError ? _a04Error : Colors.transparent);
+    return InputDecoration(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      hintText: hint,
+      hintStyle: const TextStyle(fontSize: 16, color: Color(0xFF747B8B)),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: hasError ? _a04ErrorFill : _a04Fill,
+      border: idleBorder,
+      enabledBorder: idleBorder,
+      focusedBorder: outline(hasError ? _a04Error : AppColors.navy),
+    );
+  }
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(left: 4, bottom: 6),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.48,
+        color: _a04LabelInk,
+      ),
+    ),
+  );
+
+  Widget _errorLine(String text) => Padding(
+    padding: const EdgeInsets.only(left: 4, top: 4),
+    child: Row(
+      children: [
+        const Icon(Icons.info_outline, size: 11.67, color: _a04Error),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: _a04Error,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

@@ -175,6 +175,50 @@ void main() {
       expect(_submitButton(tester).onPressed, isNull);
     });
 
+    testWidgets('styles fields with the A-04 tokens', (tester) async {
+      final appState = AppState(
+        registrationGateway: _FakeRegistrationGateway(),
+      );
+      addTearDown(appState.dispose);
+      await tester.pumpWidget(_harness(appState));
+
+      final idle = tester
+          .widget<TextField>(find.byType(TextField).at(0))
+          .decoration!;
+      expect(idle.fillColor, const Color(0xFFF3F3F4));
+
+      await tester.enterText(find.byType(TextField).at(2), 'not-an-email');
+      await tester.pump();
+
+      final errored = tester
+          .widget<TextField>(find.byType(TextField).at(2))
+          .decoration!;
+      expect(errored.fillColor, const Color(0x33FFDAD6));
+      expect(
+        (errored.enabledBorder! as OutlineInputBorder).borderSide.color,
+        const Color(0xFFBA1A1A),
+      );
+    });
+
+    testWidgets('labels the role field "Role" and uses a 52 px button', (
+      tester,
+    ) async {
+      final appState = AppState(
+        registrationGateway: _FakeRegistrationGateway(),
+      );
+      addTearDown(appState.dispose);
+      await tester.pumpWidget(_harness(appState));
+
+      expect(find.text('Role'), findsOneWidget);
+      expect(find.text('Role *'), findsNothing);
+      expect(
+        tester
+            .getSize(find.widgetWithText(ElevatedButton, 'Create account'))
+            .height,
+        52,
+      );
+    });
+
     testWidgets('shows an inline error for an invalid email format', (
       tester,
     ) async {
