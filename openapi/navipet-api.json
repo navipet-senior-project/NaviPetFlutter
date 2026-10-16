@@ -292,11 +292,11 @@
     },
     "/auth/register": {
       "post": {
-        "summary": "Register with first name, last name, email, and password",
+        "summary": "Register with first name, last name, email, password, and role",
         "tags": [
           "Authentication"
         ],
-        "description": "Creates an unconfirmed account and emails it a 6-digit verification code.\n\nPublic — no bearer token is needed. This call never returns access or refresh tokens.\n\nNames and email are trimmed, and the email is lowercased, before validation.\n\nThe password needs 8 to 128 characters with at least one digit and one special character.\n\n---\n\nNext step: submit the emailed code to `POST /auth/verify-otp` with `type: \"register\"`. That call confirms the account and signs it in.",
+        "description": "Creates an unconfirmed account and emails it a 6-digit verification code.\n\nPublic — no bearer token is needed. This call never returns access or refresh tokens.\n\nNames and email are trimmed, and the email is lowercased, before validation.\n\nThe password needs 8 to 128 characters with at least one digit and one special character.\n\n`role` is required and must be `student` or `professor`. It is self-declared: it is stored on the profile, can be changed later with `PATCH /profiles/me`, and is not an authorization signal.\n\n---\n\nNext step: submit the emailed code to `POST /auth/verify-otp` with `type: \"register\"`. That call confirms the account and signs it in.",
         "requestBody": {
           "required": true,
           "content": {
@@ -307,7 +307,8 @@
                   "firstName",
                   "lastName",
                   "email",
-                  "password"
+                  "password",
+                  "role"
                 ],
                 "properties": {
                   "firstName": {
@@ -334,6 +335,22 @@
                     "maxLength": 128,
                     "pattern": "^(?=.*[0-9])(?=.*[^A-Za-z0-9]).*$",
                     "example": "Password1!"
+                  },
+                  "role": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "student"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "professor"
+                        ]
+                      }
+                    ]
                   }
                 },
                 "additionalProperties": false
@@ -442,7 +459,7 @@
             }
           },
           "422": {
-            "description": "firstName/lastName/email/password failed validation, either schema validation (e.g. blank name, malformed email, password missing a digit or special character) or a Supabase-side check (e.g. weak_password).",
+            "description": "firstName/lastName/email/password/role failed validation, either schema validation (e.g. blank name, malformed email, password missing a digit or special character, missing or unknown role) or a Supabase-side check (e.g. weak_password).",
             "content": {
               "application/json": {
                 "schema": {
@@ -471,7 +488,7 @@
                       }
                     }
                   },
-                  "description": "firstName/lastName/email/password failed validation, either schema validation (e.g. blank name, malformed email, password missing a digit or special character) or a Supabase-side check (e.g. weak_password)."
+                  "description": "firstName/lastName/email/password/role failed validation, either schema validation (e.g. blank name, malformed email, password missing a digit or special character, missing or unknown role) or a Supabase-side check (e.g. weak_password)."
                 }
               }
             }
