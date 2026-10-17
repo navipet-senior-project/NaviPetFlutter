@@ -140,10 +140,9 @@ class AccountSettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 56),
           OutlinedButton(
-            onPressed: () => _prototypeNotice(
-              context,
-              'Sign out will be connected by the backend team.',
-            ),
+            onPressed: appState.isBusy
+                ? null
+                : () => context.read<AppState>().signOut(),
             style: _outlineStyle(foreground: Colors.red),
             child: const Text('Sign Out'),
           ),
@@ -484,10 +483,9 @@ class ManageAccountScreen extends StatelessWidget {
                 _ManageTile(
                   Icons.logout,
                   'Sign Out',
-                  () => _prototypeNotice(
-                    context,
-                    'Sign out will be connected by the backend team.',
-                  ),
+                  appState.isBusy
+                      ? null
+                      : () => context.read<AppState>().signOut(),
                 ),
               ],
             ),
@@ -1057,7 +1055,7 @@ class _ManageTile extends StatelessWidget {
   const _ManageTile(this.icon, this.label, this.onTap);
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => ListTile(
     contentPadding: EdgeInsets.zero,

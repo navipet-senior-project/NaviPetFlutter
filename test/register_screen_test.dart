@@ -21,6 +21,9 @@ class _FakeRegistrationGateway implements RegistrationGateway {
   String? capturedRole;
 
   @override
+  Future<void> logout({required String accessToken}) async {}
+
+  @override
   Future<RegistrationVerificationSuccess> signIn({
     required String email,
     required String password,
@@ -149,9 +152,71 @@ Future<void> _acceptTerms(WidgetTester tester) async {
   await tester.pump();
 }
 
+Future<void> _tapCreateAccount(WidgetTester tester) async {
+  final submit = find.widgetWithText(ElevatedButton, 'Create account');
+  await tester.ensureVisible(submit);
+  await tester.pumpAndSettle();
+  await tester.tap(submit);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('RegisterScreen validation', () {
-    testWidgets('requires a role and offers exactly Student and Professor', (
+    testWidgets(
+      'offers exactly Student and Professor and requires a role on submit',
+      (tester) async {
+        final gateway = _FakeRegistrationGateway();
+        final appState = AppState(registrationGateway: gateway);
+        addTearDown(appState.dispose);
+        await tester.pumpWidget(_harness(appState));
+
+        final dropdown = tester.widget<DropdownButton<String>>(
+          find.descendant(
+            of: find.byKey(const ValueKey('registration-role')),
+            matching: find.byType(DropdownButton<String>),
+          ),
+        );
+        expect(dropdown.items!.map((item) => item.value).toList(), [
+          'student',
+          'professor',
+        ]);
+        await _fillValidForm(tester, role: null);
+        await _acceptTerms(tester);
+        expect(find.text('Select a role.'), findsNothing);
+
+        await _tapCreateAccount(tester);
+
+        expect(find.text('Select a role.'), findsOneWidget);
+        expect(gateway.callCount, 0);
+      },
+    );
+
+    testWidgets('styles fields with the A-04 tokens', (tester) async {
+      final appState = AppState(
+        registrationGateway: _FakeRegistrationGateway(),
+      );
+      addTearDown(appState.dispose);
+      await tester.pumpWidget(_harness(appState));
+
+      final idle = tester
+          .widget<TextField>(find.byType(TextField).at(0))
+          .decoration!;
+      expect(idle.fillColor, const Color(0xFFF3F3F4));
+
+      await tester.enterText(find.byType(TextField).at(2), 'not-an-email');
+      await tester.pump();
+
+      final errored = tester
+          .widget<TextField>(find.byType(TextField).at(2))
+          .decoration!;
+      expect(errored.fillColor, const Color(0x33FFDAD6));
+      expect(
+        (errored.enabledBorder! as OutlineInputBorder).borderSide.color,
+        const Color(0xFFBA1A1A),
+      );
+    });
+
+    testWidgets('labels the role field "Role" and uses a 52 px button', (
       tester,
     ) async {
       final appState = AppState(
@@ -160,19 +225,14 @@ void main() {
       addTearDown(appState.dispose);
       await tester.pumpWidget(_harness(appState));
 
-      final dropdown = tester.widget<DropdownButton<String>>(
-        find.descendant(
-          of: find.byKey(const ValueKey('registration-role')),
-          matching: find.byType(DropdownButton<String>),
-        ),
+      expect(find.text('Role'), findsOneWidget);
+      expect(find.text('Role *'), findsNothing);
+      expect(
+        tester
+            .getSize(find.widgetWithText(ElevatedButton, 'Create account'))
+            .height,
+        52,
       );
-      expect(dropdown.items!.map((item) => item.value).toList(), [
-        'student',
-        'professor',
-      ]);
-      await _fillValidForm(tester, role: null);
-      await _acceptTerms(tester);
-      expect(_submitButton(tester).onPressed, isNull);
     });
 
     testWidgets('shows an inline error for an invalid email format', (
@@ -187,62 +247,43 @@ void main() {
       await tester.enterText(find.byType(TextField).at(2), 'not-an-email');
       await tester.pump();
 
-      expect(find.text('Enter a valid email address.'), findsOneWidget);
+      expect(find.text('Please enter a valid email address.'), findsOneWidget);
     });
 
     testWidgets(
-      'shows an inline error and disables submit when passwords do not match',
+      'shows an inline error and sends nothing when passwords do not match',
       (tester) async {
-        final appState = AppState(
-          registrationGateway: _FakeRegistrationGateway(),
-        );
-        addTearDown(appState.dispose);
-        await tester.pumpWidget(_harness(appState));
-
-        await tester.enterText(find.byType(TextField).at(0), 'Elbee');
-        await tester.enterText(find.byType(TextField).at(1), 'Shark');
-        await tester.enterText(
-          find.byType(TextField).at(2),
-          'person@example.com',
-        );
-        await tester.enterText(find.byType(TextField).at(3), 'Password1!');
-        await tester.enterText(find.byType(TextField).at(4), 'Password2!');
-        await _acceptTerms(tester);
-
-        expect(find.text('Passwords do not match.'), findsOneWidget);
-        expect(_submitButton(tester).onPressed, isNull);
-      },
-    );
-
-    testWidgets('disables submit when the terms checkbox is unchecked', (
-      tester,
-    ) async {
-      final appState = AppState(
-        registrationGateway: _FakeRegistrationGateway(),
-      );
-      addTearDown(appState.dispose);
-      await tester.pumpWidget(_harness(appState));
-
-      await _fillValidForm(tester);
-
-      expect(_submitButton(tester).onPressed, isNull);
-    });
-
-    testWidgets(
-      'enables submit once every field is valid and terms are accepted',
-      (tester) async {
-        final appState = AppState(
-          registrationGateway: _FakeRegistrationGateway(),
-        );
+        final gateway = _FakeRegistrationGateway();
+        final appState = AppState(registrationGateway: gateway);
         addTearDown(appState.dispose);
         await tester.pumpWidget(_harness(appState));
 
         await _fillValidForm(tester);
+        await tester.enterText(find.byType(TextField).at(4), 'Password2!');
         await _acceptTerms(tester);
 
-        expect(_submitButton(tester).onPressed, isNotNull);
+        expect(find.text('Passwords do not match.'), findsOneWidget);
+
+        await _tapCreateAccount(tester);
+
+        expect(gateway.callCount, 0);
       },
     );
+
+    testWidgets('requires accepting the terms on submit', (tester) async {
+      final gateway = _FakeRegistrationGateway();
+      final appState = AppState(registrationGateway: gateway);
+      addTearDown(appState.dispose);
+      await tester.pumpWidget(_harness(appState));
+
+      await _fillValidForm(tester);
+      expect(find.text('Agree to the Terms to continue.'), findsNothing);
+
+      await _tapCreateAccount(tester);
+
+      expect(find.text('Agree to the Terms to continue.'), findsOneWidget);
+      expect(gateway.callCount, 0);
+    });
 
     testWidgets('shows a green check for every satisfied password rule', (
       tester,
@@ -259,12 +300,11 @@ void main() {
       expect(find.byIcon(Icons.check_circle), findsNWidgets(5));
     });
 
-    testWidgets('keeps submit disabled when any password rule is unmet', (
+    testWidgets('highlights unmet password rules on submit and sends nothing', (
       tester,
     ) async {
-      final appState = AppState(
-        registrationGateway: _FakeRegistrationGateway(),
-      );
+      final gateway = _FakeRegistrationGateway();
+      final appState = AppState(registrationGateway: gateway);
       addTearDown(appState.dispose);
       await tester.pumpWidget(_harness(appState));
 
@@ -274,13 +314,66 @@ void main() {
       await _acceptTerms(tester);
       await tester.pumpAndSettle();
 
-      expect(_submitButton(tester).onPressed, isNull);
-      expect(
+      Icon unmetUppercase() => tester.widget<Icon>(
         find.byKey(
           const ValueKey('password-requirement-unmet-One uppercase letter'),
         ),
-        findsOneWidget,
       );
+      expect(unmetUppercase().color, isNot(const Color(0xFFBA1A1A)));
+
+      await _tapCreateAccount(tester);
+
+      expect(unmetUppercase().color, const Color(0xFFBA1A1A));
+      expect(gateway.callCount, 0);
+    });
+
+    testWidgets(
+      'keeps Create account tappable and shows every required error on an empty submit',
+      (tester) async {
+        final gateway = _FakeRegistrationGateway();
+        final appState = AppState(registrationGateway: gateway);
+        addTearDown(appState.dispose);
+        await tester.pumpWidget(_harness(appState));
+
+        const requiredErrors = [
+          'Enter your first name.',
+          'Enter your last name.',
+          'Enter your email address.',
+          'Enter a password.',
+          'Confirm your password.',
+          'Select a role.',
+          'Agree to the Terms to continue.',
+        ];
+        expect(_submitButton(tester).onPressed, isNotNull);
+        for (final message in requiredErrors) {
+          expect(find.text(message), findsNothing, reason: message);
+        }
+
+        await _tapCreateAccount(tester);
+
+        for (final message in requiredErrors) {
+          expect(find.text(message), findsOneWidget, reason: message);
+        }
+        expect(gateway.callCount, 0);
+      },
+    );
+
+    testWidgets('clears a required error once the field is filled', (
+      tester,
+    ) async {
+      final appState = AppState(
+        registrationGateway: _FakeRegistrationGateway(),
+      );
+      addTearDown(appState.dispose);
+      await tester.pumpWidget(_harness(appState));
+
+      await _tapCreateAccount(tester);
+      expect(find.text('Enter your first name.'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).at(0), 'Elbee');
+      await tester.pump();
+
+      expect(find.text('Enter your first name.'), findsNothing);
     });
 
     testWidgets('back arrow returns to the sign-in screen', (tester) async {

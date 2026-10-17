@@ -94,6 +94,10 @@ abstract interface class RegistrationGateway {
     required String confirmPassword,
   });
 
+  /// Revokes the current session only (`POST /auth/logout`). Completes on 204,
+  /// which is also returned for an already-revoked session.
+  Future<void> logout({required String accessToken});
+
   /// Asks the backend to email a six-digit code to [newEmail]. Completes on
   /// 202, which is also returned when the address belongs to another account.
   Future<void> requestEmailChange({
@@ -191,6 +195,16 @@ class HttpRegistrationGateway implements RegistrationGateway {
     await _post(
       path: '/auth/reset-password',
       body: {'newPassword': newPassword, 'confirmPassword': confirmPassword},
+      headers: {'Authorization': 'Bearer $accessToken'},
+      expectedStatus: 204,
+    );
+  }
+
+  @override
+  Future<void> logout({required String accessToken}) async {
+    await _post(
+      path: '/auth/logout',
+      body: const {},
       headers: {'Authorization': 'Bearer $accessToken'},
       expectedStatus: 204,
     );

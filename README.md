@@ -344,3 +344,10 @@ the pinned Flutter/Mapbox versions in this repository.
 - Khoi Do ([@Ben2104](https://github.com/Ben2104))
 - Jan Kirvey Montemayor ([@Kura-Yami](https://github.com/Kura-Yami))
 - Jake Namoto ([@GlazedKrispy])
+
+## Backend API client
+
+- The Dart client lives in `packages/navipet_api` and is generated from `openapi/navipet-api.json` (the backend's OpenAPI spec).
+- Regenerate with `tool/generate_api_client.sh --fetch` to re-download the spec and regenerate. Requires Java and Node.js (`npx`).
+- Before generating, `tool/normalize_openapi.jq` collapses TypeBox literal unions (`anyOf` of single-value enums, `anyOf` with `null`) into plain enums and `nullable` fields, which the `dart` generator cannot model otherwise. The committed spec stays unmodified.
+- Never hand-edit generated files. Change the spec or the script instead, then regenerate.

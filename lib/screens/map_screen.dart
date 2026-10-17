@@ -36,10 +36,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   static const _lastLatitudeKey = 'last_location_latitude';
   static const _lastLongitudeKey = 'last_location_longitude';
   String _mapStyle = mapboxStyle;
+  static bool _remembered3d = false;
+  static bool _rememberedRaisedBuildings = true;
 
   late final Future<void> _lastLocationReady;
 
   MapboxMap? _map;
+  CameraViewportState? _initialMapViewport;
+  MapboxNaviMapController? _naviMap;
+  bool _is3d = false;
+  bool _raisedBuildings = true;
+  bool _bicycling = false;
+  String? _styleBeforeBicycling;
   StreamSubscription<geo.Position>? _positionSubscription;
   geo.Position? _position;
   NavigationCoordinate? _lastKnownCoordinate;
@@ -51,6 +59,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _is3d = _remembered3d;
+    _raisedBuildings = _rememberedRaisedBuildings;
     WidgetsBinding.instance.addObserver(this);
     _lastLocationReady = _loadLastKnownLocation();
   }
@@ -130,14 +140,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     // every remount (the flow is app-scoped and outlives this MapScreen
     // instance; without the replay, a route sheet from before the remount
     // would claim a distance and duration over a blank map).
-    await _flow.attachMap(
-      MapboxNaviMapController(
-        map: mapboxMap,
-        routes: routes,
-        markers: markers,
-        arrowMarkers: arrowMarkers,
-      ),
+    _naviMap = MapboxNaviMapController(
+      map: mapboxMap,
+      routes: routes,
+      markers: markers,
+      arrowMarkers: arrowMarkers,
     );
+    if (_is3d) await _naviMap!.setPitch(65);
+    await _flow.attachMap(_naviMap!);
+    await _applyRaisedBuildings();
 
     await _lastLocationReady;
     if (_flow.state is FlowIdle) await _centerOnBestKnownLocation();
@@ -266,7 +277,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           coordinates: Position(position.longitude, position.latitude),
         ),
         zoom: following ? 17.5 : 16,
-        pitch: 0,
+        pitch: _is3d ? 65 : 0,
         bearing: following && position.heading >= 0 ? position.heading : 0,
       ),
       MapAnimationOptions(duration: 500),
@@ -288,6 +299,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           coordinates: Position(coordinate.longitude, coordinate.latitude),
         ),
         zoom: 16,
+        pitch: _is3d ? 65 : 0,
       ),
       MapAnimationOptions(duration: 500),
     );
@@ -408,21 +420,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Widget _mapWidget() {
-    final initialCoordinate =
-        _lastKnownCoordinate ??
-        const NavigationCoordinate(latitude: csulbLat, longitude: csulbLng);
+    // MapWidget treats each new ViewportState as a camera command. This must
+    // stay the same object after the map is created; rebuilding it on flow
+    // updates was snapping the camera back to campus top-down and undoing
+    // both route previews and the 3D pitch.
+    _initialMapViewport ??= CameraViewportState(
+      center: Point(coordinates: Position(csulbLng, csulbLat)),
+      zoom: csulbZoom,
+    );
     return MapWidget(
       key: const ValueKey('navipet-map'),
       styleUri: _mapStyle,
-      viewport: CameraViewportState(
-        center: Point(
-          coordinates: Position(
-            initialCoordinate.longitude,
-            initialCoordinate.latitude,
-          ),
-        ),
-        zoom: csulbZoom,
-      ),
+      viewport: _initialMapViewport,
       onMapCreated: _onMapCreated,
     );
   }
@@ -440,21 +449,31 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
         const SizedBox(height: AppSpacing.sm),
         _mapControlButton(
-          icon: Icons.threed_rotation,
-          label: '2D / 3D map view',
-          // Reserved for the Unity map integration.
-          onPressed: () {},
+          icon: _is3d ? Icons.map : Icons.threed_rotation,
+          label: _is3d ? 'Switch to 2D map view' : 'Switch to 3D map view',
+          selected: _is3d,
+          onPressed: _toggle3d,
         ),
       ],
     ),
   );
 
+  Future<void> _toggle3d() async {
+    final next = !_is3d;
+    setState(() {
+      _is3d = next;
+      _remembered3d = next;
+    });
+    await _naviMap?.setPitch(next ? 65 : 0);
+  }
+
   Widget _mapControlButton({
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
+    bool selected = false,
   }) => Material(
-    color: Colors.white,
+    color: selected ? AppColors.navy : Colors.white,
     elevation: 3,
     shape: const CircleBorder(),
     child: Semantics(
@@ -463,7 +482,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       child: IconButton(
         tooltip: label,
         onPressed: onPressed,
-        icon: Icon(icon, color: AppColors.navy),
+        icon: Icon(icon, color: selected ? Colors.white : AppColors.navy),
       ),
     ),
   );
@@ -472,27 +491,93 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final style = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              title: Text(
-                'Map type',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
+        child: StatefulBuilder(
+          builder: (context, setSheetState) => SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.78,
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                const ListTile(
+                  title: Text(
+                    'Map type',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _mapStyleOption('Standard', mapboxStyle),
+                _mapStyleOption('Satellite', mapboxSatelliteStyle),
+                _mapStyleOption('Terrain', mapboxTerrainStyle),
+                const Divider(height: AppSpacing.md),
+                const ListTile(
+                  title: Text(
+                    'Map details',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.apartment_outlined),
+                  title: const Text('Raised buildings'),
+                  subtitle: const Text('Show 3D buildings and landmarks'),
+                  value: _raisedBuildings,
+                  onChanged: (value) async {
+                    setState(() {
+                      _raisedBuildings = value;
+                      _rememberedRaisedBuildings = value;
+                    });
+                    setSheetState(() {});
+                    await _applyRaisedBuildings();
+                  },
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.directions_bike_outlined),
+                  title: const Text('Bicycling'),
+                  subtitle: const Text('Show bicycle-friendly map details'),
+                  value: _bicycling,
+                  onChanged: (value) async {
+                    setState(() => _bicycling = value);
+                    setSheetState(() {});
+                    if (value) {
+                      _styleBeforeBicycling = _mapStyle;
+                    } else if (_styleBeforeBicycling != null) {
+                      _mapStyle = _styleBeforeBicycling!;
+                      _styleBeforeBicycling = null;
+                    }
+                    final style = value ? mapboxTerrainStyle : _mapStyle;
+                    await _map?.loadStyleURI(style);
+                    await _applyRaisedBuildings();
+                    if (_naviMap != null) {
+                      await _flow.attachMap(_naviMap!);
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
             ),
-            _mapStyleOption('Standard', mapboxStyle),
-            _mapStyleOption('Satellite', mapboxSatelliteStyle),
-            _mapStyleOption('Terrain', mapboxTerrainStyle),
-            const SizedBox(height: AppSpacing.sm),
-          ],
+          ),
         ),
       ),
     );
-    if (!mounted || style == null || style == _mapStyle) return;
+    if (!mounted || style == null || (style == _mapStyle && !_bicycling)) {
+      return;
+    }
+    setState(() => _bicycling = false);
     setState(() => _mapStyle = style);
+    _styleBeforeBicycling = null;
     await _map?.loadStyleURI(style);
+    await _applyRaisedBuildings();
+    if (_naviMap != null) await _flow.attachMap(_naviMap!);
+  }
+
+  Future<void> _applyRaisedBuildings() async {
+    final map = _map;
+    if (map == null || _mapStyle != mapboxStyle || _bicycling) return;
+    if (!await map.style.isStyleLoaded()) return;
+    await map.style.setStyleImportConfigProperty(
+      'basemap',
+      'show3dObjects',
+      _raisedBuildings,
+    );
   }
 
   Widget _mapStyleOption(String title, String style) => ListTile(
