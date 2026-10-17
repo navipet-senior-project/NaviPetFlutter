@@ -14,6 +14,9 @@ class _FakeRegistrationGateway implements RegistrationGateway {
   String? capturedNewPassword;
 
   @override
+  Future<void> logout({required String accessToken}) async {}
+
+  @override
   Future<RegistrationVerificationSuccess> signIn({
     required String email,
     required String password,

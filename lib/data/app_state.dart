@@ -818,16 +818,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Revokes the backend session on a best-effort basis, then always clears
+  /// local state so a backend failure never leaves the user signed in.
   Future<void> signOut() async {
     _setBusy(true);
     try {
-      await _requireClient().auth.signOut();
-      _activeUser = null;
-      _pendingRecoverySession = null;
+      final gateway = _registrationGateway;
+      if (gateway != null) {
+        try {
+          final token = await _currentAccessToken();
+          if (token != null) await gateway.logout(accessToken: token);
+        } catch (_) {
+          // Best effort: the local session is discarded regardless.
+        }
+      }
+      await _discardSession();
       _errorMessage = null;
-    } on AuthException catch (error) {
-      _errorMessage = error.message;
-      rethrow;
     } finally {
       _setBusy(false);
     }
