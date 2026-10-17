@@ -69,7 +69,7 @@ void main() {
   test(
     'live movement advances instructions and redraws remaining route',
     () async {
-      final gateway = harness.FakeRouteGateway()..answer = route();
+      final gateway = harness.FakeRouteGateway()..result = route();
       final map = harness.RecordingMap();
       final controller = await startGuidance(gateway: gateway, map: map);
       await controller.onLiveLocation(start, accuracyMeters: 5);
@@ -96,7 +96,7 @@ void main() {
   );
 
   test('two off-route fixes reroute from the live position', () async {
-    final gateway = harness.FakeRouteGateway()..answer = route();
+    final gateway = harness.FakeRouteGateway()..result = route();
     final controller = await startGuidance(gateway: gateway);
     await controller.onLiveLocation(detour, accuracyMeters: 5);
     expect(gateway.calls, 1);
@@ -111,7 +111,7 @@ void main() {
   });
 
   test('failed reroute keeps guidance and waits before retrying', () async {
-    final gateway = harness.FakeRouteGateway()..answer = route();
+    final gateway = harness.FakeRouteGateway()..result = route();
     final controller = await startGuidance(gateway: gateway);
     gateway.error = StateError('offline');
     await controller.onLiveLocation(detour, accuracyMeters: 5);
@@ -126,7 +126,7 @@ void main() {
   });
 
   test('arrival needs two accurate fixes and shows trip summary', () async {
-    final gateway = harness.FakeRouteGateway()..answer = route();
+    final gateway = harness.FakeRouteGateway()..result = route();
     final map = harness.RecordingMap();
     final controller = await startGuidance(gateway: gateway, map: map);
     await controller.onLiveLocation(middle, accuracyMeters: 5);
@@ -144,7 +144,7 @@ void main() {
   });
 
   test('late reroute cannot restore a manually ended trip', () async {
-    final gateway = harness.FakeRouteGateway()..answer = route();
+    final gateway = harness.FakeRouteGateway()..result = route();
     final controller = await startGuidance(gateway: gateway);
     gateway.block();
     await controller.onLiveLocation(detour, accuracyMeters: 5);

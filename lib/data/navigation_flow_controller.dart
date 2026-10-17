@@ -700,11 +700,18 @@ class NavigationFlowController extends ChangeNotifier {
       return;
     }
 
-    final projected = projectOntoRoute(
-      current.plan.selected.coordinates,
-      coordinate,
-      minimumProgressMeters: _routeProgressMeters,
-    );
+    final points = current.plan.selected.coordinates;
+    final unfloored = projectOntoRoute(points, coordinate);
+    // Jitter from a reliable fix stays within 20 m; falling further behind
+    // the furthest progress means the user walked back, so the passed trail
+    // returns instead of staying trimmed.
+    final projected = unfloored.traveledMeters < _routeProgressMeters - 20
+        ? unfloored
+        : projectOntoRoute(
+            points,
+            coordinate,
+            minimumProgressMeters: _routeProgressMeters,
+          );
     final onRoute = reliable && projected.offRouteMeters <= 20;
     if (onRoute) {
       _routeProgressMeters = projected.traveledMeters;
@@ -721,7 +728,7 @@ class NavigationFlowController extends ChangeNotifier {
                 : current.remainingGeometry.first,
             minimumProgressMeters: _routeProgressMeters,
           );
-    final nextIndex = _nextStepIndex(
+    final nextIndex = nextStepIndex(
       current.plan.selected,
       _routeProgressMeters,
     );
@@ -758,16 +765,6 @@ class NavigationFlowController extends ChangeNotifier {
       stillCurrent: () =>
           generation == _generation && _state is FlowActiveNavigation,
     );
-  }
-
-  int _nextStepIndex(NavigationRoute route, double traveled) {
-    var result = 0;
-    for (var i = 0; i < route.steps.length; i++) {
-      if (route.steps[i].maneuverType == 'arrive') continue;
-      final step = projectOntoRoute(route.coordinates, route.steps[i].maneuver);
-      if (step.traveledMeters <= traveled + 5) result = i;
-    }
-    return result;
   }
 
   Future<void> _rerouteFrom(
@@ -1021,6 +1018,8 @@ class NavigationFlowController extends ChangeNotifier {
 
   @override
   void dispose() {
+    // A reroute still in flight must not write to a disposed controller.
+    _generation++;
     search.removeListener(notifyListeners);
     super.dispose();
   }

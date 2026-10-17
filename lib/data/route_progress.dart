@@ -110,3 +110,53 @@ RouteProgress projectOntoRoute(
     offRouteMeters: bestDistance,
   );
 }
+
+/// The step whose maneuver is next ahead of [traveledMeters], so guidance
+/// names the upcoming turn and walks back to an earlier one on backtracking.
+/// Maneuvers are matched in order, so a route that passes the same spot
+/// twice still resolves each maneuver to its own pass.
+int nextStepIndex(NavigationRoute route, double traveledMeters) {
+  final points = route.coordinates;
+  final steps = route.steps;
+  if (steps.isEmpty) return 0;
+  if (points.length < 2) return steps.length - 1;
+  const metersPerDegree = 111195.0;
+  final lonScale = math.cos(points.first.latitude * math.pi / 180);
+  double x(NavigationCoordinate p) =>
+      (p.longitude - points.first.longitude) * metersPerDegree * lonScale;
+  double y(NavigationCoordinate p) =>
+      (p.latitude - points.first.latitude) * metersPerDegree;
+
+  var fromSegment = 0;
+  for (var step = 1; step < steps.length; step++) {
+    final mx = x(steps[step].maneuver);
+    final my = y(steps[step].maneuver);
+    var best = double.infinity;
+    var along = 0.0;
+    var walked = 0.0;
+    var bestSegment = fromSegment;
+    for (var i = 0; i < points.length - 1; i++) {
+      final ax = x(points[i]);
+      final ay = y(points[i]);
+      final dx = x(points[i + 1]) - ax;
+      final dy = y(points[i + 1]) - ay;
+      final squared = dx * dx + dy * dy;
+      final length = math.sqrt(squared);
+      final fraction = squared == 0
+          ? 0.0
+          : (((mx - ax) * dx + (my - ay) * dy) / squared).clamp(0.0, 1.0);
+      final distance =
+          math.pow(mx - ax - dx * fraction, 2) +
+          math.pow(my - ay - dy * fraction, 2);
+      if (i >= fromSegment && distance < best) {
+        best = distance.toDouble();
+        along = walked + length * fraction;
+        bestSegment = i;
+      }
+      walked += length;
+    }
+    fromSegment = bestSegment;
+    if (along > traveledMeters + 8) return step;
+  }
+  return steps.length - 1;
+}
