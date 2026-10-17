@@ -170,6 +170,8 @@ class FakeRecents implements RecentSearchesGateway {
 class FakeRouteGateway implements OutdoorRouteGateway {
   Object? error;
   int calls = 0;
+  NavigationRoute? result;
+  NavigationCoordinate? lastOrigin;
 
   Completer<void>? _blocked;
 
@@ -190,24 +192,26 @@ class FakeRouteGateway implements OutdoorRouteGateway {
     String profile = 'walking',
   }) async {
     calls++;
+    lastOrigin = origin;
     final gate = _blocked;
     if (gate != null) await gate.future;
     final failure = error;
     if (failure != null) throw failure;
-    return const NavigationRoute(
-      coordinates: [hornCoordinate],
-      steps: [
-        NavigationStep(
-          instruction: 'Walk north',
-          distanceMeters: 120,
-          durationSeconds: 90,
-          maneuver: hornCoordinate,
-          maneuverType: 'depart',
-        ),
-      ],
-      distanceMeters: 210,
-      durationSeconds: 180,
-    );
+    return result ??
+        const NavigationRoute(
+          coordinates: [hornCoordinate],
+          steps: [
+            NavigationStep(
+              instruction: 'Walk north',
+              distanceMeters: 120,
+              durationSeconds: 90,
+              maneuver: hornCoordinate,
+              maneuverType: 'depart',
+            ),
+          ],
+          distanceMeters: 210,
+          durationSeconds: 180,
+        );
   }
 }
 

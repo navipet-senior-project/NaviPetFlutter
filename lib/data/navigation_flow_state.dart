@@ -179,12 +179,14 @@ class FlowActiveNavigation extends NavigationFlowState {
     required this.plan,
     this.stepIndex = 0,
     this.place,
+    this.remainingRoute,
   });
 
   final NaviDestination destination;
   final RouteOrigin origin;
   final RoutePlan plan;
   final int stepIndex;
+  final NavigationRoute? remainingRoute;
   final CampusPlace? place;
 }
 
