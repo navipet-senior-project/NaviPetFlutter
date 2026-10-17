@@ -512,4 +512,57 @@ void main() {
       );
     });
   });
+
+  group('HttpRegistrationGateway.logout', () {
+    test(
+      'posts to /auth/logout with the bearer token and accepts 204',
+      () async {
+        late http.Request capturedRequest;
+        final client = MockClient((request) async {
+          capturedRequest = request;
+          return http.Response('', 204);
+        });
+        final gateway = HttpRegistrationGateway(
+          baseUrl: 'https://navipetbackend.onrender.com/',
+          client: client,
+        );
+
+        await gateway.logout(accessToken: 'access-token');
+
+        expect(capturedRequest.method, 'POST');
+        expect(capturedRequest.url.path, '/auth/logout');
+        expect(capturedRequest.headers['authorization'], 'Bearer access-token');
+        expect(jsonDecode(capturedRequest.body), isEmpty);
+      },
+    );
+
+    test('throws a RegistrationException with the code on 401', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'error': {
+              'code': 'INVALID_ACCESS_TOKEN',
+              'message': 'Authentication required',
+              'requestId': 'req-1',
+            },
+          }),
+          401,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final gateway = HttpRegistrationGateway(
+        baseUrl: 'https://navipetbackend.onrender.com/',
+        client: client,
+      );
+
+      await expectLater(
+        gateway.logout(accessToken: 'stale'),
+        throwsA(
+          isA<RegistrationException>()
+              .having((e) => e.code, 'code', 'INVALID_ACCESS_TOKEN')
+              .having((e) => e.statusCode, 'statusCode', 401),
+        ),
+      );
+    });
+  });
 }
