@@ -29,6 +29,25 @@ Widget host(NavigationFlowController controller) => MultiProvider(
 );
 
 void main() {
+  testWidgets('arrival shows a trip summary and returns to the map', (
+    tester,
+  ) async {
+    final controller = harness.build()..openSearch();
+    await tester.pumpWidget(host(controller));
+    await controller.selectPlace(harness.horn);
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    await controller.startRoute();
+    await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+    await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+    await tester.pump();
+    expect(find.text('You’ve arrived!'), findsOneWidget);
+    expect(find.textContaining('Distance traveled:'), findsOneWidget);
+    await tester.tap(find.text('Return to map'));
+    await tester.pump();
+    expect(find.byType(SearchBarField), findsOneWidget);
+  });
+
   testWidgets('walks search to place preview to route preview', (tester) async {
     final controller = harness.build();
     await tester.pumpWidget(host(controller));

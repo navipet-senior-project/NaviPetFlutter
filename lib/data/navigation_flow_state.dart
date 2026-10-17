@@ -179,15 +179,32 @@ class FlowActiveNavigation extends NavigationFlowState {
     required this.plan,
     this.stepIndex = 0,
     this.place,
-    this.remainingRoute,
+    this.position,
+    this.remainingGeometry = const [],
+    this.remainingMeters,
+    this.distanceTraveledMeters = 0,
+    this.rerouting = false,
+    this.routeNotice,
   });
 
   final NaviDestination destination;
   final RouteOrigin origin;
   final RoutePlan plan;
   final int stepIndex;
-  final NavigationRoute? remainingRoute;
   final CampusPlace? place;
+  final NavigationCoordinate? position;
+  final List<NavigationCoordinate> remainingGeometry;
+  final double? remainingMeters;
+  final double distanceTraveledMeters;
+  final bool rerouting;
+  final String? routeNotice;
+}
+
+class FlowArrived extends NavigationFlowState {
+  const FlowArrived({required this.destination, required this.summary});
+
+  final NaviDestination destination;
+  final NavigationTripSummary summary;
 }
 
 /// Reserved for the Unity/Multiset handoff. Unreachable until an indoor

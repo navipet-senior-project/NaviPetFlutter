@@ -126,10 +126,16 @@ class NavigationTripSummary {
   const NavigationTripSummary({
     required this.elapsed,
     required this.walkingSteps,
+    this.distanceMeters = 0,
   });
 
   final Duration elapsed;
   final int? walkingSteps;
+  final double distanceMeters;
+
+  String get distanceLabel => distanceMeters < 160.9344
+      ? '${(distanceMeters * 3.28084).round()} ft'
+      : '${(distanceMeters / 1609.344).toStringAsFixed(1)} mi';
 
   String get walkingStepsLabel => walkingSteps?.toString() ?? 'Unavailable';
 

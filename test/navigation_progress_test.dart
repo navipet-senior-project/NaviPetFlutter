@@ -1,6 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
+import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/data/navigation_flow_state.dart';
 import 'package:navipet/data/route_progress.dart';
@@ -28,144 +27,130 @@ NavigationRoute route() => NavigationRoute(
   durationSeconds: 180,
 );
 
-class StreamingLocation extends harness.FakeLocationService {
-  final updates = StreamController<NavigationCoordinate>();
-  @override
-  Stream<NavigationCoordinate> watch() => updates.stream;
+Future<void> fix(
+  NavigationFlowController controller,
+  NavigationCoordinate coordinate,
+) => controller.onLiveLocation(coordinate, accuracyMeters: 5);
+
+Future<NavigationFlowController> startGuidance(
+  harness.FakeRouteGateway gateway,
+) async {
+  final controller = harness.build(routes: gateway)..openSearch();
+  await controller.selectPlace(harness.horn);
+  await controller.requestDirections();
+  await controller.calculateRoute();
+  await controller.startRoute();
+  return controller;
 }
 
 void main() {
   test(
-    'guidance subscribes to GPS and cancels when leaving for overview',
+    'only active guidance consumes GPS; overview keeps the chosen route',
     () async {
-      final location = StreamingLocation();
       final gateway = harness.FakeRouteGateway()..result = route();
-      final controller = harness.build(location: location, routes: gateway)
-        ..openSearch();
+      final controller = await startGuidance(gateway);
       addTearDown(controller.dispose);
-      addTearDown(location.updates.close);
-      await controller.selectPlace(harness.horn);
-      await controller.requestDirections();
-      await controller.calculateRoute();
-      expect(location.updates.hasListener, isFalse);
-      await controller.startRoute();
-      expect(location.updates.hasListener, isTrue);
-      location.updates.add(point(150));
-      await Future<void>.delayed(Duration.zero);
+      await fix(controller, point(150));
       expect(
-        (controller.state as FlowActiveNavigation)
-            .remainingRoute!
-            .distanceMeters,
+        (controller.state as FlowActiveNavigation).remainingMeters,
         closeTo(150, 1),
       );
       controller.back();
       expect(controller.state, isA<FlowRoutePreview>());
-      expect(location.updates.hasListener, isFalse);
+      await fix(controller, point(250));
+      expect(controller.state, isA<FlowRoutePreview>());
       expect(
         (controller.state as FlowRoutePreview).plan.selected.distanceMeters,
         300,
       );
     },
   );
+
   test('passed geometry shrinks and returns when the user backtracks', () {
     final original = route();
-    final forward = RouteProgress(original, point(150));
-    expect(forward.remaining.distanceMeters, closeTo(150, 1));
-    expect(forward.remaining.coordinates.length, 3);
-    expect(forward.stepIndex, 2);
-    final backward = RouteProgress(original, point(50));
-    expect(backward.remaining.distanceMeters, closeTo(250, 1));
-    expect(backward.remaining.coordinates.length, 4);
-    expect(backward.stepIndex, 1);
+    final forward = projectOntoRoute(original.coordinates, point(150));
+    expect(forward.remainingMeters, closeTo(150, 1));
+    expect(forward.remaining.length, 3);
+    expect(nextStepIndex(original, forward.traveledMeters), 2);
+    final backward = projectOntoRoute(original.coordinates, point(50));
+    expect(backward.remainingMeters, closeTo(250, 1));
+    expect(backward.remaining.length, 4);
+    expect(nextStepIndex(original, backward.traveledMeters), 1);
     expect(original.coordinates.length, 4);
     expect(
-      RouteProgress(original, point(50, 60)).distanceFromRoute,
+      projectOntoRoute(original.coordinates, point(50, 60)).offRouteMeters,
       closeTo(60, 1),
     );
   });
 
   test('arrival leaves zero distance and degenerate geometry is safe', () {
     expect(
-      RouteProgress(route(), point(300)).remaining.distanceMeters,
+      projectOntoRoute(route().coordinates, point(300)).remainingMeters,
       closeTo(0, .01),
     );
-    final empty = NavigationRoute(
+    const empty = NavigationRoute(
       coordinates: [],
       steps: [],
       distanceMeters: 0,
       durationSeconds: 0,
     );
-    expect(RouteProgress(empty, point(0)).remaining, same(empty));
+    expect(projectOntoRoute(empty.coordinates, point(0)).remaining, isEmpty);
+    expect(nextStepIndex(empty, 0), 0);
   });
 
-  test(
-    'GPS progress preserves guidance; sustained deviation reroutes',
-    () async {
-      final gateway = harness.FakeRouteGateway()..result = route();
-      final controller = harness.build(routes: gateway)..openSearch();
-      addTearDown(controller.dispose);
-      await controller.selectPlace(harness.horn);
-      await controller.requestDirections();
-      await controller.calculateRoute();
-      await controller.startRoute();
-      await controller.updateNavigationLocation(point(150));
-      expect(
-        (controller.state as FlowActiveNavigation)
-            .remainingRoute!
-            .distanceMeters,
-        closeTo(150, 1),
-      );
-      await controller.updateNavigationLocation(point(50));
-      expect(
-        (controller.state as FlowActiveNavigation)
-            .remainingRoute!
-            .distanceMeters,
-        closeTo(250, 1),
-      );
-      await controller.updateNavigationLocation(point(50, 60));
-      expect(
-        gateway.calls,
-        1,
-      ); // One stray fix does not trigger a network request.
-      await controller.updateNavigationLocation(point(50, 65));
-      expect(gateway.calls, 2);
-      expect(gateway.lastOrigin!.longitude, point(50, 65).longitude);
-      expect(controller.state, isA<FlowActiveNavigation>());
-      await controller.updateNavigationLocation(point(50, 70));
-      expect(gateway.calls, 2); // Retries are throttled.
-    },
-  );
+  test('GPS progress ignores jitter, restores the trail on a real backtrack, '
+      'and sustained deviation reroutes', () async {
+    final gateway = harness.FakeRouteGateway()..result = route();
+    final controller = await startGuidance(gateway);
+    addTearDown(controller.dispose);
+    FlowActiveNavigation active() => controller.state as FlowActiveNavigation;
+    await fix(controller, point(150));
+    expect(active().remainingMeters, closeTo(150, 1));
+    expect(active().stepIndex, 2);
+    await fix(controller, point(140));
+    expect(active().remainingMeters, closeTo(150, 1));
+    await fix(controller, point(50));
+    expect(active().remainingMeters, closeTo(250, 1));
+    expect(active().stepIndex, 1);
+    await fix(controller, point(50, 60));
+    await Future<void>.delayed(Duration.zero);
+    // One stray fix does not trigger a network request.
+    expect(gateway.calls, 1);
+    await fix(controller, point(50, 65));
+    await Future<void>.delayed(Duration.zero);
+    expect(gateway.calls, 2);
+    expect(gateway.lastOrigin!.longitude, point(50, 65).longitude);
+    expect(controller.state, isA<FlowActiveNavigation>());
+    await fix(controller, point(50, 70));
+    await fix(controller, point(50, 75));
+    await Future<void>.delayed(Duration.zero);
+    expect(gateway.calls, 2); // Retries are throttled.
+  });
 
   test('a reroute cannot reopen guidance after the user ends it', () async {
     final gateway = harness.FakeRouteGateway()..result = route();
-    final controller = harness.build(routes: gateway)..openSearch();
+    final controller = await startGuidance(gateway);
     addTearDown(controller.dispose);
-    await controller.selectPlace(harness.horn);
-    await controller.requestDirections();
-    await controller.calculateRoute();
-    await controller.startRoute();
-    await controller.updateNavigationLocation(point(50, 60));
+    await fix(controller, point(50, 60));
     gateway.block();
-    final pending = controller.updateNavigationLocation(point(50, 65));
-    await Future<void>.delayed(Duration.zero);
+    await fix(controller, point(50, 65));
+    expect(gateway.calls, 2);
     await controller.endRoute();
     gateway.unblock();
-    await pending;
+    await Future<void>.delayed(Duration.zero);
     expect(controller.state, isA<FlowIdle>());
   });
 
   test('reroute failure keeps guidance and the current route', () async {
     final gateway = harness.FakeRouteGateway()..result = route();
-    final controller = harness.build(routes: gateway)..openSearch();
+    final controller = await startGuidance(gateway);
     addTearDown(controller.dispose);
-    await controller.selectPlace(harness.horn);
-    await controller.requestDirections();
-    await controller.calculateRoute();
-    await controller.startRoute();
     gateway.error = Exception('offline');
-    await controller.updateNavigationLocation(point(50, 60));
-    await controller.updateNavigationLocation(point(50, 65));
-    expect(controller.state, isA<FlowActiveNavigation>());
-    expect(controller.locationNotice, contains('Could not reroute'));
+    await fix(controller, point(50, 60));
+    await fix(controller, point(50, 65));
+    await Future<void>.delayed(Duration.zero);
+    final active = controller.state as FlowActiveNavigation;
+    expect(active.plan.selected.distanceMeters, 300);
+    expect(active.routeNotice, contains('Could not update the route'));
   });
 }

@@ -75,7 +75,37 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_flow.handleAppResumed());
+      unawaited(_refreshLivePosition());
     }
+  }
+
+  Future<void> _refreshLivePosition() async {
+    if (_flow.state is! FlowActiveNavigation) return;
+    try {
+      final position = await geo.Geolocator.getCurrentPosition(
+        locationSettings: const geo.LocationSettings(
+          accuracy: geo.LocationAccuracy.bestForNavigation,
+        ),
+      );
+      if (!mounted) return;
+      _position = position;
+      await _passLivePosition(position);
+    } on Object {
+      // The existing stream and location banner handle a temporarily lost fix.
+    }
+  }
+
+  Future<void> _passLivePosition(geo.Position position) async {
+    if (_flow.state is! FlowActiveNavigation) return;
+    await _flow.onLiveLocation(
+      NavigationCoordinate(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      ),
+      accuracyMeters: position.accuracy,
+      bearing: position.heading,
+      timestamp: position.timestamp,
+    );
   }
 
   @override
@@ -96,6 +126,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
+    await markers.setTextAllowOverlap(true);
+    final arrowMarkers = await mapboxMap.annotations
+        .createPointAnnotationManager();
+    await arrowMarkers.setTextRotationAlignment(TextRotationAlignment.MAP);
+    await arrowMarkers.setTextAllowOverlap(true);
 
     // Hands the flow a live map and re-issues whatever the current state
     // should already be showing — necessary both on first launch (the flow
@@ -107,6 +142,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       map: mapboxMap,
       routes: routes,
       markers: markers,
+      arrowMarkers: arrowMarkers,
     );
     if (_is3d) await _naviMap!.setPitch(65);
     await _flow.attachMap(_naviMap!);
@@ -181,7 +217,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     await _map?.location.updateSettings(
       LocationComponentSettings(
-        enabled: true,
+        enabled: _flow.state is! FlowActiveNavigation,
         pulsingEnabled: true,
         pulsingColor: AppColors.amber.toARGB32(),
         showAccuracyRing: true,
@@ -199,6 +235,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         locationSettings: settings,
       );
       await _rememberPosition(_position!);
+      unawaited(_passLivePosition(_position!));
       if (mounted) {
         setState(() => _locationMessage = null);
         // A live GPS fix must not replace the route camera while a route is
@@ -219,6 +256,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           (position) {
             _position = position;
             unawaited(_rememberPosition(position));
+            unawaited(_passLivePosition(position));
             if (mounted) setState(() => _locationMessage = null);
           },
           onError: (Object error) {
@@ -273,7 +311,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       builder: (context, _) {
         final state = flow.state;
         final padding = MediaQuery.paddingOf(context);
-        final locationMessage = flow.locationNotice ?? _locationMessage;
+        final locationMessage =
+            state is FlowActiveNavigation && state.routeNotice != null
+            ? state.routeNotice
+            : flow.locationNotice ?? _locationMessage;
         return PopScope(
           canPop: state is FlowIdle,
           onPopInvokedWithResult: (didPop, _) {
@@ -281,7 +322,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           },
           child: Scaffold(
             backgroundColor: AppColors.map,
-            bottomNavigationBar: state is FlowActiveNavigation
+            bottomNavigationBar:
+                state is FlowActiveNavigation || state is FlowArrived
                 ? null
                 : const NaviBottomNav(active: NaviTab.location),
             body: Stack(
@@ -363,6 +405,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 if (state is FlowActiveNavigation)
                   _activeNavigation(state, flow, padding),
+                if (state is FlowArrived) _arrivalSummary(state, flow, padding),
                 if (state is FlowError) _error(state, flow),
               ],
             ),
@@ -729,7 +772,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     NavigationFlowController flow,
     EdgeInsets padding,
   ) {
-    final route = state.remainingRoute ?? state.plan.selected;
+    final route = state.plan.selected;
     return Stack(
       children: [
         Positioned(
@@ -773,7 +816,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                           ),
                         ),
                         Text(
-                          '${route.durationLabel} · ${route.distanceLabel}',
+                          '${_remainingDurationLabel(state)} · ${_remainingLabel(state)}',
                           style: const TextStyle(color: AppColors.muted),
                         ),
                       ],
@@ -800,12 +843,64 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
+  String _remainingLabel(FlowActiveNavigation state) {
+    final meters = state.remainingMeters ?? state.plan.selected.distanceMeters;
+    if (meters < 160.9344) return '${(meters * 3.28084).round()} ft remaining';
+    return '${(meters / 1609.344).toStringAsFixed(1)} mi remaining';
+  }
+
+  String _remainingDurationLabel(FlowActiveNavigation state) {
+    final route = state.plan.selected;
+    final fraction = route.distanceMeters <= 0
+        ? 1.0
+        : ((state.remainingMeters ?? route.distanceMeters) /
+                  route.distanceMeters)
+              .clamp(0.0, 1.0);
+    final minutes = (route.durationSeconds * fraction / 60).ceil();
+    return '$minutes min';
+  }
+
+  Widget _arrivalSummary(
+    FlowArrived state,
+    NavigationFlowController flow,
+    EdgeInsets padding,
+  ) => Positioned(
+    left: AppSpacing.lg,
+    right: AppSpacing.lg,
+    bottom: padding.bottom + AppSpacing.lg,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'You’ve arrived!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(state.destination.name),
+            const SizedBox(height: 16),
+            Text('Time: ${state.summary.elapsedLabel}'),
+            Text('Distance traveled: ${state.summary.distanceLabel}'),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: flow.dismissArrival,
+              child: const Text('Return to map'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   Future<void> _confirmEnd(NavigationFlowController flow) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('End this route?'),
-        content: const Text('Guidance stops and the route stays on the map.'),
+        content: const Text('Guidance stops and the route is cleared.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
