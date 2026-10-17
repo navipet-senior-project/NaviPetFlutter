@@ -35,7 +35,16 @@ abstract interface class NaviMapController {
   Future<void> clear();
 }
 
-class MapboxNaviMapController implements NaviMapController {
+/// Guidance redraws the line without fitting the camera to the whole route.
+abstract interface class GuidanceMapController {
+  Future<void> updateGuidance(
+    NavigationRoute route, {
+    required NaviDestination destination,
+  });
+}
+
+class MapboxNaviMapController
+    implements NaviMapController, GuidanceMapController {
   MapboxNaviMapController({
     required MapboxMap map,
     required PolylineAnnotationManager routes,
@@ -128,6 +137,19 @@ class MapboxNaviMapController implements NaviMapController {
       null,
     );
     await _map.easeTo(camera, MapAnimationOptions(duration: 700));
+  }
+
+  @override
+  Future<void> updateGuidance(
+    NavigationRoute route, {
+    required NaviDestination destination,
+  }) async {
+    await _markers.deleteAll();
+    await _markers.create(_marker(destination.coordinate, destination.name));
+    await _routes.deleteAll();
+    if (route.coordinates.length >= 2) {
+      await _routes.create(_line(route, selected: true));
+    }
   }
 
   @override

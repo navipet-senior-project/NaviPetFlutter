@@ -12,6 +12,7 @@ import 'navigation_flow_state.dart';
 import 'navigation_models.dart';
 import 'recent_searches_gateway.dart';
 import 'route_repository.dart';
+import 'route_progress.dart';
 import 'travel_mode.dart';
 
 /// Owns which part of the search-to-route flow the user is in.
@@ -53,6 +54,11 @@ class NavigationFlowController extends ChangeNotifier {
   int _recentRevision = 0;
   int _generation = 0;
   int _resumeGeneration = 0;
+  StreamSubscription<NavigationCoordinate>? _guidanceLocation;
+  NavigationCoordinate? _guidanceCoordinate;
+  Object? _rerouteRequest;
+  DateTime? _lastReroute;
+  int _offRouteFixes = 0;
 
   // Chained so map mutations always apply in the order they were issued
   // rather than the order their underlying async work happens to finish.
@@ -143,10 +149,8 @@ class NavigationFlowController extends ChangeNotifier {
           origin: origin,
           plan: plan,
         );
-      case FlowActiveNavigation(:final origin):
-        final coordinate = origin.coordinate;
-        if (coordinate == null) return;
-        await _queueMap(() => _map.followUser(coordinate));
+      case FlowActiveNavigation():
+        await _drawGuidance();
       case FlowIdle():
       case FlowSearching():
       case FlowConfiguringRoute():
@@ -608,11 +612,109 @@ class NavigationFlowController extends ChangeNotifier {
         place: place,
       ),
     );
-    final coordinate = origin.coordinate;
-    if (coordinate != null) {
-      await _queueMap(() => _map.followUser(coordinate));
+    _guidanceCoordinate = origin.coordinate;
+    _lastReroute = null;
+    _offRouteFixes = 0;
+    _guidanceLocation = location.watch().listen(
+      (coordinate) => unawaited(updateNavigationLocation(coordinate)),
+      onError: (Object error) {
+        if (_state is! FlowActiveNavigation) return;
+        _locationNotice = 'Reacquiring GPS...';
+        notifyListeners();
+      },
+    );
+    await _drawGuidance();
+  }
+
+  /// Only active guidance consumes GPS fixes; previews keep their chosen route.
+  Future<void> updateNavigationLocation(NavigationCoordinate coordinate) async {
+    final current = _state;
+    if (current is! FlowActiveNavigation) return;
+    _guidanceCoordinate = coordinate;
+    _locationNotice = null;
+    final progress = RouteProgress(current.plan.selected, coordinate);
+    if (progress.distanceFromRoute > 35) {
+      _offRouteFixes++;
+      await _queueMap(
+        () => _map.followUser(coordinate),
+        stillCurrent: () => _state is FlowActiveNavigation,
+      );
+      if (_offRouteFixes >= 2) await _reroute(coordinate);
+      return;
+    }
+    _offRouteFixes = 0;
+    // A fix back on the path invalidates any reroute still in flight.
+    _rerouteRequest = null;
+    _set(
+      FlowActiveNavigation(
+        destination: current.destination,
+        origin: current.origin,
+        plan: current.plan,
+        place: current.place,
+        stepIndex: progress.stepIndex,
+        remainingRoute: progress.remaining,
+      ),
+    );
+    await _drawGuidance();
+  }
+
+  Future<void> _reroute(NavigationCoordinate coordinate) async {
+    final current = _state;
+    if (current is! FlowActiveNavigation || _rerouteRequest != null) return;
+    final now = DateTime.now();
+    if (_lastReroute != null &&
+        now.difference(_lastReroute!) < const Duration(seconds: 10)) {
+      return;
+    }
+    _lastReroute = now;
+    final request = Object();
+    _rerouteRequest = request;
+    final generation = _generation;
+    try {
+      final plan = await routes.plan(
+        origin: coordinate,
+        destination: current.destination,
+        mode: current.plan.mode,
+      );
+      if (generation != _generation ||
+          _rerouteRequest != request ||
+          _state is! FlowActiveNavigation) {
+        return;
+      }
+      _set(
+        FlowActiveNavigation(
+          destination: current.destination,
+          origin: CurrentLocationOrigin(coordinate: coordinate),
+          plan: plan,
+          place: current.place,
+        ),
+      );
+      _locationNotice = null;
+      _offRouteFixes = 0;
+      await updateNavigationLocation(_guidanceCoordinate ?? coordinate);
+    } on RouteFailure {
+      if (generation != _generation || _rerouteRequest != request) return;
+      _locationNotice = 'Could not reroute. Retrying as you move.';
+      notifyListeners();
+    } finally {
+      if (_rerouteRequest == request) _rerouteRequest = null;
     }
   }
+
+  Future<void> _drawGuidance() => _queueMap(() async {
+    final current = _state;
+    if (current is! FlowActiveNavigation) return;
+    final coordinate = _guidanceCoordinate ?? current.origin.coordinate;
+    if (coordinate == null) return;
+    final map = _map;
+    if (map is GuidanceMapController) {
+      await (map as GuidanceMapController).updateGuidance(
+        current.remainingRoute ?? current.plan.selected,
+        destination: current.destination,
+      );
+    }
+    await map.followUser(coordinate);
+  });
 
   Future<void> endRoute() async {
     final current = _state;
@@ -721,6 +823,9 @@ class NavigationFlowController extends ChangeNotifier {
             place: place,
           ),
         );
+        unawaited(
+          _redrawRoute(destination: destination, origin: origin, plan: plan),
+        );
       case FlowIndoorHandoff():
         _generation++;
         _set(const FlowIdle());
@@ -731,6 +836,11 @@ class NavigationFlowController extends ChangeNotifier {
   }
 
   void _set(NavigationFlowState next) {
+    if (next is! FlowActiveNavigation) {
+      _guidanceLocation?.cancel();
+      _guidanceLocation = null;
+      _rerouteRequest = null;
+    }
     _state = next;
     notifyListeners();
   }
@@ -768,6 +878,9 @@ class NavigationFlowController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _generation++;
+    _guidanceLocation?.cancel();
+    _rerouteRequest = null;
     search.removeListener(notifyListeners);
     super.dispose();
   }

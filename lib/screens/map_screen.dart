@@ -2,12 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo;
-import 'package:go_router/go_router.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../data/app_state.dart';
 import '../data/mapbox_config.dart';
 import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
@@ -16,7 +14,7 @@ import '../data/navigation_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/place_preview_sheet.dart';
-import '../widgets/profile_avatar.dart';
+import '../widgets/account_button.dart';
 import '../widgets/route_preview_sheet.dart';
 import '../widgets/search_bar_field.dart';
 import '../widgets/search_overlay.dart';
@@ -290,8 +288,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               children: [
                 _mapWidget(),
                 if (state is FlowIdle) _searchBar(context, padding),
-                if (state is! FlowSearching && state is! FlowRouteSteps)
-                  _mapTypeControls(padding),
                 if (locationMessage != null && state is! FlowSearching)
                   _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
@@ -393,26 +389,22 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _mapTypeControls(EdgeInsets padding) => Positioned(
-    top: padding.top + 72,
-    right: AppSpacing.lg,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _mapControlButton(
-          icon: Icons.layers_outlined,
-          label: 'Map type',
-          onPressed: _showMapTypePicker,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _mapControlButton(
-          icon: _is3d ? Icons.map : Icons.threed_rotation,
-          label: _is3d ? 'Switch to 2D map view' : 'Switch to 3D map view',
-          selected: _is3d,
-          onPressed: _toggle3d,
-        ),
-      ],
-    ),
+  Widget _mapTypeControls() => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _mapControlButton(
+        icon: Icons.layers_outlined,
+        label: 'Map type',
+        onPressed: _showMapTypePicker,
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      _mapControlButton(
+        icon: _is3d ? Icons.map : Icons.threed_rotation,
+        label: _is3d ? 'Switch to 2D map view' : 'Switch to 3D map view',
+        selected: _is3d,
+        onPressed: _toggle3d,
+      ),
+    ],
   );
 
   Future<void> _toggle3d() async {
@@ -553,8 +545,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   );
 
   Widget _searchBar(BuildContext context, EdgeInsets padding) {
-    final appState = context.watch<AppState>();
-    final activeUser = appState.activeUser;
     return Positioned(
       top: padding.top + AppSpacing.sm,
       left: AppSpacing.lg,
@@ -562,32 +552,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       child: SearchBarField(
         placeholder: 'Where to?',
         onPressed: _flow.openSearch,
-        right: Semantics(
-          label: 'Account settings',
-          button: true,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => context.push('/account'),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Center(
-                child: ProfileAvatar(
-                  name: activeUser?.name ?? '?',
-                  color: activeUser?.avatarColor ?? AppColors.amber,
-                  imageUrl: activeUser?.avatarUrl,
-                  size: 30,
-                  initialStyle: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                  onImageError: appState.reportAvatarLoadFailed,
-                ),
-              ),
-            ),
-          ),
-        ),
+        right: const AccountButton(),
       ),
     );
   }
@@ -614,16 +579,23 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return Positioned(
       right: 16,
       bottom: bottom,
-      child: Semantics(
-        label: 'Center map on your location',
-        button: true,
-        child: FloatingActionButton.small(
-          heroTag: 'recenter',
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.navy,
-          onPressed: _centerOnBestKnownLocation,
-          child: const Icon(Icons.my_location),
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _mapTypeControls(),
+          const SizedBox(height: AppSpacing.sm),
+          Semantics(
+            label: 'Center map on your location',
+            button: true,
+            child: FloatingActionButton.small(
+              heroTag: 'recenter',
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.navy,
+              onPressed: _centerOnBestKnownLocation,
+              child: const Icon(Icons.my_location),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -757,7 +729,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     NavigationFlowController flow,
     EdgeInsets padding,
   ) {
-    final route = state.plan.selected;
+    final route = state.remainingRoute ?? state.plan.selected;
     return Stack(
       children: [
         Positioned(

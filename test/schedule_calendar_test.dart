@@ -46,6 +46,51 @@ Future<void> _pump(
 }
 
 void main() {
+  testWidgets('grid hands off scrolling at both edges', (tester) async {
+    final parent = ScrollController();
+    addTearDown(parent.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            controller: parent,
+            children: [
+              const SizedBox(height: 100),
+              ScheduleCalendar(
+                parentScrollController: parent,
+                classes: const [],
+                today: DateTime(2026, 9, 23),
+                selectedDate: DateTime(2026, 9, 23),
+                onSelectDate: (_) {},
+                onTapClass: (_) {},
+              ),
+              const SizedBox(height: 1000),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final inner = tester.widget<SingleChildScrollView>(
+      find.descendant(
+        of: find.byType(ScheduleCalendar),
+        matching: find.byType(SingleChildScrollView),
+      ),
+    );
+    inner.controller!.jumpTo(inner.controller!.position.maxScrollExtent);
+    await tester.pump();
+    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -90));
+    await tester.pumpAndSettle();
+    expect(parent.offset, greaterThan(0));
+    parent.jumpTo(100);
+    inner.controller!.jumpTo(0);
+    await tester.pump();
+    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, 80));
+    await tester.pumpAndSettle();
+    expect(parent.offset, lessThan(100));
+    expect(tester.takeException(), isNull);
+  });
+
   test('the visible hours always span the full day', () {
     expect(ScheduleCalendar.hourRange(const []), (startHour: 0, endHour: 24));
     expect(
