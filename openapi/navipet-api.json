@@ -2747,6 +2747,11 @@
                               },
                               "indoorDestinationId": {
                                 "type": "string"
+                              },
+                              "arrivalRadiusMeters": {
+                                "type": "integer",
+                                "minimum": 3,
+                                "maximum": 50
                               }
                             },
                             "additionalProperties": false
@@ -3128,6 +3133,11 @@
                             },
                             "indoorDestinationId": {
                               "type": "string"
+                            },
+                            "arrivalRadiusMeters": {
+                              "type": "integer",
+                              "minimum": 3,
+                              "maximum": 50
                             }
                           },
                           "additionalProperties": false
@@ -3556,6 +3566,11 @@
                               },
                               "indoorDestinationId": {
                                 "type": "string"
+                              },
+                              "arrivalRadiusMeters": {
+                                "type": "integer",
+                                "minimum": 3,
+                                "maximum": 50
                               }
                             },
                             "additionalProperties": false
@@ -3926,6 +3941,11 @@
                             },
                             "indoorDestinationId": {
                               "type": "string"
+                            },
+                            "arrivalRadiusMeters": {
+                              "type": "integer",
+                              "minimum": 3,
+                              "maximum": 50
                             }
                           },
                           "additionalProperties": false
@@ -4287,6 +4307,11 @@
                               },
                               "indoorDestinationId": {
                                 "type": "string"
+                              },
+                              "arrivalRadiusMeters": {
+                                "type": "integer",
+                                "minimum": 3,
+                                "maximum": 50
                               }
                             },
                             "additionalProperties": false

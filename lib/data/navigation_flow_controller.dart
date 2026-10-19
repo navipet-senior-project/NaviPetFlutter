@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -36,6 +37,13 @@ class NavigationFlowController extends ChangeNotifier {
   static const placeSheetInset = 280.0;
   static const routeSheetInset = 320.0;
 
+  /// Distance at which the "Arriving soon" state is emitted. App-wide, not
+  /// per destination; skipped when the arrival radius is at least this large.
+  static const approachRadius = 15.0;
+
+  /// Largest GPS accuracy ever required for an arrival fix.
+  static const _arrivalAccuracyCap = 20.0;
+
   final CampusSearchController search;
   final CampusSearchGateway searchGateway;
   final RecentSearchesGateway recentSearches;
@@ -60,6 +68,7 @@ class NavigationFlowController extends ChangeNotifier {
   double _routeProgressMeters = 0;
   int _offRouteFixes = 0;
   int _arrivalFixes = 0;
+  bool _approachAnnounced = false;
   DateTime? _lastRerouteAt;
   bool _rerouteInFlight = false;
 
@@ -630,6 +639,7 @@ class NavigationFlowController extends ChangeNotifier {
     _routeProgressMeters = 0;
     _offRouteFixes = 0;
     _arrivalFixes = 0;
+    _approachAnnounced = false;
     _lastRerouteAt = null;
     _rerouteInFlight = false;
     _set(
@@ -678,10 +688,19 @@ class NavigationFlowController extends ChangeNotifier {
       coordinate,
       current.destination.coordinate,
     );
-    _arrivalFixes =
-        accuracyMeters.isFinite && accuracyMeters <= 10 && destinationGap <= 10
+    final arrivalRadius = current.destination.arrivalRadius.toDouble();
+    final arrivalAccuracyLimit = math.min(arrivalRadius, _arrivalAccuracyCap);
+    final accurate =
+        accuracyMeters.isFinite && accuracyMeters <= arrivalAccuracyLimit;
+    _arrivalFixes = accurate && destinationGap <= arrivalRadius
         ? _arrivalFixes + 1
         : 0;
+    if (accurate &&
+        !_approachAnnounced &&
+        arrivalRadius < approachRadius &&
+        destinationGap <= approachRadius) {
+      _approachAnnounced = true;
+    }
     if (_arrivalFixes >= 2) {
       _generation++;
       _set(
@@ -733,7 +752,7 @@ class NavigationFlowController extends ChangeNotifier {
       _routeProgressMeters,
     );
     _set(
-      FlowActiveNavigation(
+      _active(
         destination: current.destination,
         origin: current.origin,
         plan: current.plan,
@@ -767,6 +786,48 @@ class NavigationFlowController extends ChangeNotifier {
     );
   }
 
+  /// Builds the next active-guidance state, keeping the approach state once
+  /// it has been announced so later fixes and reroutes do not drop it.
+  FlowActiveNavigation _active({
+    required NaviDestination destination,
+    required RouteOrigin origin,
+    required RoutePlan plan,
+    int stepIndex = 0,
+    CampusPlace? place,
+    NavigationCoordinate? position,
+    List<NavigationCoordinate> remainingGeometry = const [],
+    double? remainingMeters,
+    double distanceTraveledMeters = 0,
+    bool rerouting = false,
+    String? routeNotice,
+  }) => _approachAnnounced
+      ? FlowApproaching(
+          destination: destination,
+          origin: origin,
+          plan: plan,
+          stepIndex: stepIndex,
+          place: place,
+          position: position,
+          remainingGeometry: remainingGeometry,
+          remainingMeters: remainingMeters,
+          distanceTraveledMeters: distanceTraveledMeters,
+          rerouting: rerouting,
+          routeNotice: routeNotice,
+        )
+      : FlowActiveNavigation(
+          destination: destination,
+          origin: origin,
+          plan: plan,
+          stepIndex: stepIndex,
+          place: place,
+          position: position,
+          remainingGeometry: remainingGeometry,
+          remainingMeters: remainingMeters,
+          distanceTraveledMeters: distanceTraveledMeters,
+          rerouting: rerouting,
+          routeNotice: routeNotice,
+        );
+
   Future<void> _rerouteFrom(
     NavigationCoordinate coordinate,
     int generation,
@@ -775,7 +836,7 @@ class NavigationFlowController extends ChangeNotifier {
     if (current is! FlowActiveNavigation) return;
     _rerouteInFlight = true;
     _set(
-      FlowActiveNavigation(
+      _active(
         destination: current.destination,
         origin: current.origin,
         plan: current.plan,
@@ -802,7 +863,7 @@ class NavigationFlowController extends ChangeNotifier {
       _routeProgressMeters = progress.traveledMeters;
       _offRouteFixes = 0;
       _set(
-        FlowActiveNavigation(
+        _active(
           destination: active.destination,
           origin: active.origin,
           plan: plan,
@@ -826,7 +887,7 @@ class NavigationFlowController extends ChangeNotifier {
       if (generation != _generation || _state is! FlowActiveNavigation) return;
       final active = _state as FlowActiveNavigation;
       _set(
-        FlowActiveNavigation(
+        _active(
           destination: active.destination,
           origin: active.origin,
           plan: active.plan,
