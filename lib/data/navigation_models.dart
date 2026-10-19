@@ -33,6 +33,16 @@ class PlaceSuggestion {
   final String description;
 }
 
+/// Arrival radius used when the server supplies none, or an unusable value.
+const defaultArrivalRadiusMeters = 10;
+
+/// Returns [value] when it is an integer inside the server's 3–50 m range,
+/// otherwise null so callers fall back to [defaultArrivalRadiusMeters].
+int? validArrivalRadiusMeters(Object? value) {
+  if (value is! int || value < 3 || value > 50) return null;
+  return value;
+}
+
 class NaviDestination {
   const NaviDestination({
     required this.name,
@@ -47,6 +57,7 @@ class NaviDestination {
     this.external = false,
     this.attribution,
     this.isBuildingAlternative = false,
+    this.arrivalRadiusMeters,
   });
 
   final String name;
@@ -61,6 +72,15 @@ class NaviDestination {
   final bool external;
   final String? attribution;
   final bool isBuildingAlternative;
+
+  /// Server-configured arrival radius, or null when none was supplied.
+  final int? arrivalRadiusMeters;
+
+  /// Distance at which arrival is detected: the server value when it is in
+  /// range, otherwise [defaultArrivalRadiusMeters].
+  int get arrivalRadius =>
+      validArrivalRadiusMeters(arrivalRadiusMeters) ??
+      defaultArrivalRadiusMeters;
 
   bool get hasIndoorNavigation =>
       indoorDestinationId?.trim().isNotEmpty == true;
