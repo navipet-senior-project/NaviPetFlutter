@@ -200,6 +200,25 @@ class FlowActiveNavigation extends NavigationFlowState {
   final String? routeNotice;
 }
 
+/// Active guidance that has come within the approach radius of the
+/// destination. A subtype so every active-navigation screen keeps working;
+/// the controller emits it once per trip and keeps it until arrival or end.
+class FlowApproaching extends FlowActiveNavigation {
+  const FlowApproaching({
+    required super.destination,
+    required super.origin,
+    required super.plan,
+    super.stepIndex,
+    super.place,
+    super.position,
+    super.remainingGeometry,
+    super.remainingMeters,
+    super.distanceTraveledMeters,
+    super.rerouting,
+    super.routeNotice,
+  });
+}
+
 class FlowArrived extends NavigationFlowState {
   const FlowArrived({required this.destination, required this.summary});
 

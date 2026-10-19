@@ -815,6 +815,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
+                        if (state is FlowApproaching)
+                          const Text(
+                            'Arriving soon',
+                            style: TextStyle(
+                              color: AppColors.amberInk,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         Text(
                           '${_remainingDurationLabel(state)} · ${_remainingLabel(state)}',
                           style: const TextStyle(color: AppColors.muted),
