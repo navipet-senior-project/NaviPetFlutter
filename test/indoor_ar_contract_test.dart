@@ -27,6 +27,38 @@ void main() {
       expect(() => vec119Request(headingDeg: double.nan), throwsArgumentError);
     });
 
+    test('rejects an empty floor or map code', () {
+      IndoorArRequest build({String floor = '1', String mapCode = 'M'}) =>
+          IndoorArRequest(
+            room: '119',
+            doorKey: 'VEC119',
+            floor: floor,
+            position: const IndoorArVector3(0, 0, 0),
+            headingDeg: 0,
+            mapCode: mapCode,
+            frame: 'multiset-mapset',
+          );
+      expect(() => build(floor: ''), throwsArgumentError);
+      expect(() => build(mapCode: ''), throwsArgumentError);
+    });
+
+    test('rejects a non-finite position', () {
+      for (final bad in [double.nan, double.infinity]) {
+        expect(
+          () => IndoorArRequest(
+            room: '119',
+            doorKey: 'VEC119',
+            floor: '1',
+            position: IndoorArVector3(0, bad, 0),
+            headingDeg: 0,
+            mapCode: 'M',
+            frame: 'multiset-mapset',
+          ),
+          throwsArgumentError,
+        );
+      }
+    });
+
     test('rejects an empty door key', () {
       expect(
         () => IndoorArRequest(
@@ -107,6 +139,23 @@ void main() {
       expect(result.checkDistanceM, isNull);
     });
 
+    test('keeps confidence and map code on non-arrived statuses', () {
+      final result = IndoorArResult.decode(
+        '{"status":"localizationFailed","confidence":0.1,'
+        '"localizedMapCode":"MAP_X","localizationQueries":3,"durationMs":5}',
+      );
+      expect(result.confidence, 0.1);
+      expect(result.localizedMapCode, 'MAP_X');
+    });
+
+    test('drops an error code on statuses other than error', () {
+      final result = IndoorArResult.decode(
+        '{"status":"cancelled","errorCode":"NETWORK","localizationQueries":0,'
+        '"durationMs":5}',
+      );
+      expect(result.errorCode, isNull);
+    });
+
     test('maps contract violations to error BAD_RESULT', () {
       expectBadResult('not json');
       expectBadResult('[]');
@@ -133,6 +182,26 @@ void main() {
       expectBadResult(
         '{"status":"cancelled","confidence":"high",'
         '"localizationQueries":0,"durationMs":5}',
+      );
+      expectBadResult(
+        '{"status":"error","errorCode":"","localizationQueries":0,'
+        '"durationMs":5}',
+      );
+      expectBadResult(
+        '{"status":"error","errorCode":7,"localizationQueries":0,'
+        '"durationMs":5}',
+      );
+      expectBadResult(
+        '{"status":"cancelled","localizedMapCode":7,"localizationQueries":0,'
+        '"durationMs":5}',
+      );
+      expectBadResult('{"status":5,"localizationQueries":0,"durationMs":5}');
+      expectBadResult(
+        '{"status":"cancelled","localizationQueries":1.5,"durationMs":5}',
+      );
+      expectBadResult(
+        '{"status":"arrived","checkDistanceM":1e999,"localizationQueries":0,'
+        '"durationMs":5}',
       );
     });
   });

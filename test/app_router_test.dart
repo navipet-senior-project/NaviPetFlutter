@@ -112,6 +112,32 @@ void main() {
 
     expect(find.byType(IndoorArSpikeScreen), findsOneWidget);
   });
+
+  testWidgets('redirects a guest from the indoor AR spike route to sign in', (
+    tester,
+  ) async {
+    final appState = _RouterAppState(
+      authenticated: false,
+      passwordRecovery: false,
+    );
+    final router = createAppRouter(
+      appState,
+      initialLocation: '/dev/indoor-ar-spike',
+    );
+    addTearDown(router.dispose);
+    addTearDown(appState.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>.value(
+        value: appState,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IndoorArSpikeScreen), findsNothing);
+    expect(find.byType(SignInScreen), findsOneWidget);
+  });
   group('email change routes', () {
     Future<void> open(
       WidgetTester tester,

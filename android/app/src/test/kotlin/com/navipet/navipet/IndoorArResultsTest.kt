@@ -33,4 +33,12 @@ class IndoorArResultsTest {
             IndoorArResults.unavailable(),
         )
     }
+
+    @Test
+    fun badRequestMatchesTheDartContract() {
+        assertEquals(
+            """{"status":"error","errorCode":"BAD_REQUEST","localizationQueries":0,"durationMs":0}""",
+            IndoorArResults.error(IndoorArResults.BAD_REQUEST, 0),
+        )
+    }
 }

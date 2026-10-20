@@ -29,6 +29,9 @@ class IndoorArRequest {
     if (doorKey.isEmpty || floor.isEmpty || mapCode.isEmpty) {
       throw ArgumentError('doorKey, floor and mapCode must not be empty');
     }
+    if (!(position.x.isFinite && position.y.isFinite && position.z.isFinite)) {
+      throw ArgumentError.value(position, 'position', 'must be finite');
+    }
     // Written as a negated range check so NaN is rejected too.
     if (!(headingDeg >= 0 && headingDeg < 360)) {
       throw ArgumentError.value(
@@ -156,7 +159,7 @@ class IndoorArResult {
 
   static double? _optionalDouble(Object? value) => switch (value) {
     null => null,
-    final num number => number.toDouble(),
+    final num number when number.isFinite => number.toDouble(),
     _ => throw const FormatException('expected a number'),
   };
 

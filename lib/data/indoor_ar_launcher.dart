@@ -29,9 +29,9 @@ class AndroidIndoorArLauncher implements IndoorArLauncher {
   @override
   Future<IndoorArResult> launch(IndoorArRequest request) async {
     if (!_isAndroid) return const IndoorArResult.unavailable();
-    final String? raw;
+    final Object? raw;
     try {
-      raw = await _channel.invokeMethod<String>(
+      raw = await _channel.invokeMethod<Object?>(
         'launch',
         jsonEncode(request.toJson()),
       );
@@ -41,9 +41,9 @@ class AndroidIndoorArLauncher implements IndoorArLauncher {
       // The host never raises on purpose; treat it like a bad reply.
       return const IndoorArResult.badResult();
     }
-    return raw == null
-        ? const IndoorArResult.badResult()
-        : IndoorArResult.decode(raw);
+    return raw is String
+        ? IndoorArResult.decode(raw)
+        : const IndoorArResult.badResult();
   }
 }
 

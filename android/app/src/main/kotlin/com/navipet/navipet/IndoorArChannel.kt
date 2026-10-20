@@ -36,13 +36,17 @@ class IndoorArChannel(
         val intent = Intent()
             .setClassName(activity, UNITY_HOST_CLASS)
             .putExtra(IndoorArResults.REQUEST_EXTRA, request)
+        pending = result
+        startedAt = SystemClock.elapsedRealtime()
         try {
-            pending = result
-            startedAt = SystemClock.elapsedRealtime()
             activity.startActivityForResult(intent, REQUEST_CODE)
         } catch (e: ActivityNotFoundException) {
             pending = null
             result.success(IndoorArResults.unavailable())
+        } catch (e: RuntimeException) {
+            // SecurityException, IllegalStateException: never leave a call pending.
+            pending = null
+            result.success(IndoorArResults.error(IndoorArResults.UNITY_EXITED, 0))
         }
     }
 

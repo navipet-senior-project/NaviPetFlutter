@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -55,6 +56,57 @@ void main() {
 
     expect(result.status, IndoorArStatus.error);
     expect(result.errorCode, 'BAD_RESULT');
+  });
+
+  test('maps a null reply to error BAD_RESULT', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async => null);
+
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
+    ).launch(vec119Request());
+
+    expect(result.errorCode, 'BAD_RESULT');
+  });
+
+  test('maps a non-string reply to error BAD_RESULT', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async => 42);
+
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
+    ).launch(vec119Request());
+
+    expect(result.errorCode, 'BAD_RESULT');
+  });
+
+  test('maps an unparseable reply to error BAD_RESULT', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async => 'garbage');
+
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
+    ).launch(vec119Request());
+
+    expect(result.errorCode, 'BAD_RESULT');
+  });
+
+  test('defaults to the current platform', () async {
+    messenger.setMockMethodCallHandler(
+      channel,
+      (call) async =>
+          '{"status":"cancelled","localizationQueries":0,"durationMs":1}',
+    );
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    expect(
+      (await AndroidIndoorArLauncher().launch(vec119Request())).status,
+      IndoorArStatus.unavailable,
+    );
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    expect(
+      (await AndroidIndoorArLauncher().launch(vec119Request())).status,
+      IndoorArStatus.cancelled,
+    );
   });
 
   test('returns unavailable off Android without calling the host', () async {

@@ -32,18 +32,22 @@ class _IndoorArSpikeScreenState extends State<IndoorArSpikeScreen> {
 
   Future<void> _launch() async {
     setState(() => _running = true);
-    final result = await widget.launcher.launch(IndoorArSpikeScreen.vec119);
-    if (!mounted) return;
-    debugPrint(
-      '[IndoorAr] ${result.status.name} distance=${result.checkDistanceM} '
-      'queries=${result.localizationQueries} durationMs=${result.durationMs} '
-      'error=${result.errorCode}',
-    );
-    setState(() {
-      _running = false;
-      _launches++;
-      _last = result;
-    });
+    try {
+      final result = await widget.launcher.launch(IndoorArSpikeScreen.vec119);
+      if (!mounted) return;
+      debugPrint(
+        '[IndoorAr] ${result.status.name} distance=${result.checkDistanceM} '
+        'queries=${result.localizationQueries} durationMs=${result.durationMs} '
+        'error=${result.errorCode}',
+      );
+      setState(() {
+        _launches++;
+        _last = result;
+      });
+    } finally {
+      // A throwing launcher must not leave the button disabled.
+      if (mounted) setState(() => _running = false);
+    }
   }
 
   @override
