@@ -4,6 +4,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Unity AR is optional. NaviPetUnity's tools/build-indoor-ar-aar.sh fills the
+// gitignored android/unity-ar/; CI and most machines build without it.
+val unityArDir = rootProject.file("unity-ar")
+val unityArEnabled = unityArDir.resolve("unityLibrary-release.aar").isFile
+
 android {
     namespace = "com.navipet.navipet"
     compileSdk = flutter.compileSdkVersion
@@ -12,6 +17,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     defaultConfig {
@@ -23,6 +32,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        buildConfigField("boolean", "UNITY_AR_ENABLED", unityArEnabled.toString())
     }
 
     buildTypes {
@@ -42,4 +52,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
 }
