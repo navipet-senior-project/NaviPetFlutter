@@ -6,6 +6,7 @@ import 'package:navipet/data/app_state.dart';
 import 'package:navipet/router/app_router.dart';
 import 'package:navipet/screens/account_settings_screen.dart';
 import 'package:navipet/screens/change_email_screen.dart';
+import 'package:navipet/screens/indoor_ar_spike_screen.dart';
 import 'package:navipet/screens/verify_email_screen.dart';
 
 import 'email_change_test_support.dart';
@@ -86,6 +87,31 @@ void main() {
       expect(find.byType(ResetPasswordScreen), findsOneWidget);
     },
   );
+
+  testWidgets('opens the debug indoor AR spike route when signed in', (
+    tester,
+  ) async {
+    final appState = _RouterAppState(
+      authenticated: true,
+      passwordRecovery: false,
+    );
+    final router = createAppRouter(
+      appState,
+      initialLocation: '/dev/indoor-ar-spike',
+    );
+    addTearDown(router.dispose);
+    addTearDown(appState.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>.value(
+        value: appState,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IndoorArSpikeScreen), findsOneWidget);
+  });
   group('email change routes', () {
     Future<void> open(
       WidgetTester tester,

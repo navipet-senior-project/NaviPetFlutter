@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -89,12 +90,21 @@ class NaviPetApp extends StatefulWidget {
   State<NaviPetApp> createState() => _NaviPetAppState();
 }
 
+/// Debug builds only: `--dart-define=NAVIPET_DEV_ROUTE=/dev/indoor-ar-spike`
+/// opens that route on start. The auth redirect still applies.
+const _devStartRoute = String.fromEnvironment('NAVIPET_DEV_ROUTE');
+
 class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
   /// Signed avatar URLs last about an hour; a resume after a long background
   /// stint reloads the URL before the old one expires on screen.
   static const _avatarUrlMaxAge = Duration(minutes: 10);
 
-  late final _router = createAppRouter(widget.appState);
+  late final _router = createAppRouter(
+    widget.appState,
+    initialLocation: kDebugMode && _devStartRoute.isNotEmpty
+        ? _devStartRoute
+        : null,
+  );
   late final NavigationFlowController _flow = _buildFlow();
 
   /// The signed-in identity the flow currently reflects, so a later change
