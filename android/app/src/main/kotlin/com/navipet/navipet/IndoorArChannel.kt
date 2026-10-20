@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.SystemClock
+import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
@@ -46,6 +47,7 @@ class IndoorArChannel(
         } catch (e: RuntimeException) {
             // SecurityException, IllegalStateException: never leave a call pending.
             pending = null
+            Log.w(TAG, "startActivityForResult failed", e)
             result.success(IndoorArResults.error(IndoorArResults.UNITY_EXITED, 0))
         }
     }
@@ -65,6 +67,7 @@ class IndoorArChannel(
     }
 
     companion object {
+        private const val TAG = "IndoorArChannel"
         const val CHANNEL = "navipet/indoor_ar"
         const val REQUEST_CODE = 4101
 
