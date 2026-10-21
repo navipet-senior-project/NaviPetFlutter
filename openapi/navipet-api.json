@@ -2745,6 +2745,11 @@
                                 },
                                 "additionalProperties": false
                               },
+                              "arrivalRadiusMeters": {
+                                "type": "number",
+                                "minimum": 1,
+                                "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
+                              },
                               "indoorDestinationId": {
                                 "type": "string"
                               }
@@ -3125,6 +3130,11 @@
                                 }
                               },
                               "additionalProperties": false
+                            },
+                            "arrivalRadiusMeters": {
+                              "type": "number",
+                              "minimum": 1,
+                              "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
                             },
                             "indoorDestinationId": {
                               "type": "string"
@@ -3554,6 +3564,11 @@
                                 },
                                 "additionalProperties": false
                               },
+                              "arrivalRadiusMeters": {
+                                "type": "number",
+                                "minimum": 1,
+                                "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
+                              },
                               "indoorDestinationId": {
                                 "type": "string"
                               }
@@ -3924,6 +3939,11 @@
                               },
                               "additionalProperties": false
                             },
+                            "arrivalRadiusMeters": {
+                              "type": "number",
+                              "minimum": 1,
+                              "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
+                            },
                             "indoorDestinationId": {
                               "type": "string"
                             }
@@ -4284,6 +4304,11 @@
                                   }
                                 },
                                 "additionalProperties": false
+                              },
+                              "arrivalRadiusMeters": {
+                                "type": "number",
+                                "minimum": 1,
+                                "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
                               },
                               "indoorDestinationId": {
                                 "type": "string"

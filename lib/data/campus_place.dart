@@ -29,6 +29,7 @@ class CampusPlace {
     required this.subtitle,
     required this.source,
     this.buildingCode,
+    this.arrivalRadiusMeters = 10,
     this.roomNumber,
     this.floorNumber,
     this.outdoorDestination,
@@ -55,6 +56,7 @@ class CampusPlace {
       subtitle: _requiredString(json, 'subtitle'),
       source: _requiredString(json, 'source'),
       buildingCode: _optionalString(json['buildingCode']),
+      arrivalRadiusMeters: _arrivalRadius(navigationJson['arrivalRadiusMeters']),
       roomNumber: _optionalString(json['roomNumber']),
       floorNumber: _optionalString(json['floorNumber']),
       outdoorDestination: latitude is num && longitude is num
@@ -78,6 +80,7 @@ class CampusPlace {
   final String subtitle;
   final String source;
   final String? buildingCode;
+  final double arrivalRadiusMeters;
   final String? roomNumber;
   final String? floorNumber;
   final NavigationCoordinate? outdoorDestination;
@@ -116,6 +119,7 @@ class CampusPlace {
       address: subtitle,
       coordinate: outdoor,
       buildingCode: buildingCode,
+      arrivalRadiusMeters: arrivalRadiusMeters,
       roomNumber: roomNumber,
       floorNumber: floorNumber,
       indoorDestinationId: hasIndoorNavigation
@@ -141,6 +145,12 @@ class CampusPlace {
   static String? _optionalString(Object? value) {
     if (value is! String || value.trim().isEmpty) return null;
     return value.trim();
+  }
+
+  static double _arrivalRadius(Object? value) {
+    if (value is! num) return 10;
+    final radius = value.toDouble();
+    return radius.isFinite && radius > 0 ? radius : 10;
   }
 
   static CampusDestinationType _parseType(String value) {

@@ -143,6 +143,34 @@ void main() {
     expect(controller.state, isA<FlowIdle>());
   });
 
+  test(
+    'the default 10 meter radius ends navigation after two accurate fixes',
+    () async {
+      final gateway = harness.FakeRouteGateway()..result = route();
+      final controller = await startGuidance(gateway: gateway);
+      final outsideRadius = NavigationCoordinate(
+        latitude: end.latitude + 0.00011,
+        longitude: end.longitude,
+      );
+      final insideRadius = NavigationCoordinate(
+        latitude: end.latitude + 0.00008,
+        longitude: end.longitude,
+      );
+
+      expect(distanceMeters(end, outsideRadius), greaterThan(10));
+      expect(distanceMeters(end, insideRadius), lessThan(10));
+
+      await controller.onLiveLocation(outsideRadius, accuracyMeters: 5);
+      await controller.onLiveLocation(outsideRadius, accuracyMeters: 5);
+      expect(controller.state, isA<FlowActiveNavigation>());
+
+      await controller.onLiveLocation(insideRadius, accuracyMeters: 5);
+      expect(controller.state, isA<FlowActiveNavigation>());
+      await controller.onLiveLocation(insideRadius, accuracyMeters: 5);
+      expect(controller.state, isA<FlowArrived>());
+    },
+  );
+
   test('late reroute cannot restore a manually ended trip', () async {
     final gateway = harness.FakeRouteGateway()..result = route();
     final controller = await startGuidance(gateway: gateway);

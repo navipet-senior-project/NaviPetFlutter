@@ -35,6 +35,7 @@ class NavigationFlowController extends ChangeNotifier {
   /// Height reserved for the bottom sheet when framing the map.
   static const placeSheetInset = 280.0;
   static const routeSheetInset = 320.0;
+  static const _minimumArrivalRadiusMeters = 350 * 0.3048;
 
   final CampusSearchController search;
   final CampusSearchGateway searchGateway;
@@ -678,8 +679,17 @@ class NavigationFlowController extends ChangeNotifier {
       coordinate,
       current.destination.coordinate,
     );
+    // GPS accuracy is commonly worse than 10 m while walking outdoors.
+    // Keep the arrival fix tied to the same 20 m quality used for route
+    // progress, while allowing a practical building-sized arrival radius.
+    final arrivalRadiusMeters =
+        current.destination.arrivalRadiusMeters < _minimumArrivalRadiusMeters
+        ? _minimumArrivalRadiusMeters
+        : current.destination.arrivalRadiusMeters;
     _arrivalFixes =
-        accuracyMeters.isFinite && accuracyMeters <= 10 && destinationGap <= 10
+        accuracyMeters.isFinite &&
+            accuracyMeters <= 20 &&
+            destinationGap <= arrivalRadiusMeters
         ? _arrivalFixes + 1
         : 0;
     if (_arrivalFixes >= 2) {
@@ -1010,6 +1020,7 @@ class NavigationFlowController extends ChangeNotifier {
     subtitle: destination.address,
     source: 'cache',
     buildingCode: destination.buildingCode,
+    arrivalRadiusMeters: destination.arrivalRadiusMeters,
     roomNumber: destination.roomNumber,
     floorNumber: destination.floorNumber,
     outdoorDestination: destination.coordinate,
