@@ -35,6 +35,9 @@ class SearchHistoryStore {
         external: json['external'] == true,
         attribution: json['attribution'] as String?,
         isBuildingAlternative: json['isBuildingAlternative'] == true,
+        arrivalRadiusMeters: validArrivalRadiusMeters(
+          json['arrivalRadiusMeters'],
+        ),
       );
     }).toList();
   }
@@ -65,6 +68,8 @@ class SearchHistoryStore {
               if (item.external) 'external': true,
               if (item.attribution != null) 'attribution': item.attribution,
               if (item.isBuildingAlternative) 'isBuildingAlternative': true,
+              if (item.arrivalRadiusMeters != null)
+                'arrivalRadiusMeters': item.arrivalRadiusMeters,
             }),
           )
           .toList(),

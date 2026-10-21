@@ -77,4 +77,44 @@ void main() {
       ),
     );
   });
+
+  group('arrival radius', () {
+    Map<String, dynamic> json(Object? radius, {bool include = true}) => {
+      'id': '00000000-0000-4000-8000-000000000004',
+      'type': 'building',
+      'title': 'Horn Center',
+      'subtitle': 'HC',
+      'source': 'csulb',
+      'navigation': {
+        'outdoorDestination': {'latitude': 33.7831, 'longitude': -118.1146},
+        if (include) 'arrivalRadiusMeters': radius,
+      },
+    };
+
+    test('reads the server radius into the destination', () {
+      final place = CampusPlace.fromJson(json(25));
+      expect(place.arrivalRadiusMeters, 25);
+      expect(place.toDestination().arrivalRadiusMeters, 25);
+      expect(place.toDestination().arrivalRadius, 25);
+    });
+
+    test('accepts the 3 and 50 boundaries', () {
+      expect(CampusPlace.fromJson(json(3)).arrivalRadiusMeters, 3);
+      expect(CampusPlace.fromJson(json(50)).arrivalRadiusMeters, 50);
+    });
+
+    test('missing field falls back to the 10 m default', () {
+      final place = CampusPlace.fromJson(json(null, include: false));
+      expect(place.arrivalRadiusMeters, isNull);
+      expect(place.toDestination().arrivalRadius, 10);
+    });
+
+    test('out-of-range or malformed values fall back to 10 m', () {
+      for (final bad in [2, 51, 0, -1, 25.5, '25', true, null]) {
+        final place = CampusPlace.fromJson(json(bad));
+        expect(place.arrivalRadiusMeters, isNull, reason: '$bad');
+        expect(place.toDestination().arrivalRadius, 10, reason: '$bad');
+      }
+    });
+  });
 }

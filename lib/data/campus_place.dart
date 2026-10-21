@@ -33,6 +33,7 @@ class CampusPlace {
     this.roomNumber,
     this.floorNumber,
     this.outdoorDestination,
+    this.arrivalRadiusMeters,
     this.indoorDestinationId,
     this.external = false,
     this.attribution,
@@ -65,6 +66,9 @@ class CampusPlace {
               longitude: longitude.toDouble(),
             )
           : null,
+      arrivalRadiusMeters: validArrivalRadiusMeters(
+        navigationJson['arrivalRadiusMeters'],
+      ),
       indoorDestinationId: _optionalString(
         navigationJson['indoorDestinationId'],
       ),
@@ -84,6 +88,10 @@ class CampusPlace {
   final String? roomNumber;
   final String? floorNumber;
   final NavigationCoordinate? outdoorDestination;
+
+  /// Per-destination arrival radius from the server; null when absent or
+  /// outside 3–50 m, which means the app default applies.
+  final int? arrivalRadiusMeters;
   final String? indoorDestinationId;
   final bool external;
   final String? attribution;
@@ -128,6 +136,7 @@ class CampusPlace {
       external: external,
       attribution: attribution,
       isBuildingAlternative: isBuildingAlternative,
+      arrivalRadiusMeters: arrivalRadiusMeters,
     );
   }
 
