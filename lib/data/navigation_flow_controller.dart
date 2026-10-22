@@ -36,7 +36,7 @@ class NavigationFlowController extends ChangeNotifier {
   /// Height reserved for the bottom sheet when framing the map.
   static const placeSheetInset = 280.0;
   static const routeSheetInset = 320.0;
-  static const _minimumArrivalRadiusMeters = 350 * 0.3048;
+  static const _minimumArrivalRadiusMeters = 250 * 0.3048;
 
   /// Distance at which the "Arriving soon" state is emitted. App-wide, not
   /// per destination; skipped when the arrival radius is at least this large.
