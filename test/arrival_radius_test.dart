@@ -8,7 +8,7 @@ import 'package:navipet/data/route_progress.dart';
 import 'support/flow_fakes.dart' as harness;
 
 const _metersPerDegreeLatitude = 111195.0;
-const _arrivalRadiusMeters = 350 * 0.3048;
+const _arrivalRadiusMeters = 200 * 0.3048;
 
 /// A point [meters] due north of the destination.
 NavigationCoordinate _north(double meters) => NavigationCoordinate(
@@ -67,32 +67,32 @@ Future<void> _fix(
 void main() {
   group('arrival radius', () {
     test(
-      'the default 350 ft radius ends guidance on one accurate fix',
+      'the default 200 ft radius ends guidance on one accurate fix',
       () async {
         final controller = await _guide();
 
-        expect(_arrivalRadiusMeters, closeTo(106.68, 0.01));
-        await _fix(controller, 108);
+        expect(_arrivalRadiusMeters, closeTo(60.96, 0.01));
+        await _fix(controller, 62);
         expect(controller.state, isA<FlowActiveNavigation>());
 
-        await _fix(controller, 106);
+        await _fix(controller, 60);
         expect(controller.state, isA<FlowArrived>());
       },
     );
 
-    test('a smaller server radius cannot shrink the 350 ft minimum', () async {
+    test('a smaller server radius cannot shrink the 200 ft minimum', () async {
       final controller = await _guide(radius: 25);
-      await _fix(controller, 108);
+      await _fix(controller, 62);
       expect(controller.state, isA<FlowActiveNavigation>());
-      await _fix(controller, 106);
+      await _fix(controller, 60);
       expect(controller.state, isA<FlowArrived>());
     });
 
     test('GPS accuracy must be 20 m or better', () async {
       final controller = await _guide(radius: 50);
-      await _fix(controller, 80, accuracy: 21);
+      await _fix(controller, 50, accuracy: 21);
       expect(controller.state, isA<FlowActiveNavigation>());
-      await _fix(controller, 80, accuracy: 20);
+      await _fix(controller, 50, accuracy: 20);
       expect(controller.state, isA<FlowArrived>());
     });
 

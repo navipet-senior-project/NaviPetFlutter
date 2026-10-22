@@ -158,7 +158,7 @@ void main() {
     final controller = await startGuidance(gateway: gateway, map: map);
     await controller.onLiveLocation(farMiddle, accuracyMeters: 5);
     final nearDestination = NavigationCoordinate(
-      latitude: end.latitude + 0.0009,
+      latitude: end.latitude + 0.0005,
       longitude: end.longitude,
     );
     await controller.onLiveLocation(nearDestination, accuracyMeters: 5);
@@ -175,7 +175,7 @@ void main() {
     final controller = await startGuidance(gateway: gateway);
     await controller.onLiveLocation(farMiddle, accuracyMeters: 5);
     final nearDestination = NavigationCoordinate(
-      latitude: end.latitude + 0.0009,
+      latitude: end.latitude + 0.0005,
       longitude: end.longitude,
     );
     await controller.onLiveLocation(nearDestination, accuracyMeters: 40);
@@ -184,7 +184,7 @@ void main() {
     expect(controller.state, isA<FlowArrived>());
   });
 
-  test('navigation ends within 350 ft after one accurate fix', () async {
+  test('navigation ends within 200 ft after one accurate fix', () async {
     final gateway = harness.FakeRouteGateway()..result = route();
     final controller = await startGuidance(gateway: gateway);
     final outsideRadius = NavigationCoordinate(
@@ -192,12 +192,12 @@ void main() {
       longitude: end.longitude,
     );
     final insideRadius = NavigationCoordinate(
-      latitude: end.latitude + 0.0009,
+      latitude: end.latitude + 0.0005,
       longitude: end.longitude,
     );
 
-    expect(distanceMeters(end, outsideRadius), greaterThan(350 * 0.3048));
-    expect(distanceMeters(end, insideRadius), lessThan(350 * 0.3048));
+    expect(distanceMeters(end, outsideRadius), greaterThan(200 * 0.3048));
+    expect(distanceMeters(end, insideRadius), lessThan(200 * 0.3048));
 
     await controller.onLiveLocation(outsideRadius, accuracyMeters: 5);
     expect(controller.state, isA<FlowActiveNavigation>());
