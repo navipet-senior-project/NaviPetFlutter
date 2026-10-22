@@ -51,7 +51,6 @@ class NaviDestination {
     this.id,
     this.type,
     this.buildingCode,
-    this.arrivalRadiusMeters = 10,
     this.roomNumber,
     this.floorNumber,
     this.indoorDestinationId,
@@ -67,9 +66,6 @@ class NaviDestination {
   final String? id;
   final CampusDestinationType? type;
   final String? buildingCode;
-  /// Distance from the destination at which guidance considers the user
-  /// arrived. Campus buildings may provide an override through the API.
-  final double arrivalRadiusMeters;
   final String? roomNumber;
   final String? floorNumber;
   final String? indoorDestinationId;

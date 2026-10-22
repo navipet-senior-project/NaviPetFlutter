@@ -3,25 +3,44 @@ import 'package:navipet/data/campus_place.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/data/navigation_flow_state.dart';
 import 'package:navipet/data/navigation_models.dart';
+<<<<<<< Updated upstream
+=======
+import 'package:navipet/data/route_progress.dart';
+>>>>>>> Stashed changes
 
 import 'support/flow_fakes.dart' as harness;
 
 const _metersPerDegreeLatitude = 111195.0;
+<<<<<<< Updated upstream
 
 /// A point [meters] due north of the destination, so it lies on the route.
+=======
+const _arrivalRadiusMeters = 350 * 0.3048;
+
+/// A point [meters] due north of the destination.
+>>>>>>> Stashed changes
 NavigationCoordinate _north(double meters) => NavigationCoordinate(
   latitude: harness.hornCoordinate.latitude + meters / _metersPerDegreeLatitude,
   longitude: harness.hornCoordinate.longitude,
 );
 
+<<<<<<< Updated upstream
 NavigationRoute _route() => NavigationRoute(
   coordinates: [_north(80), harness.hornCoordinate],
+=======
+NavigationRoute _route({double endpointMeters = 0}) => NavigationRoute(
+  coordinates: [_north(endpointMeters + 80), _north(endpointMeters)],
+>>>>>>> Stashed changes
   steps: [
     NavigationStep(
       instruction: 'Walk south',
       distanceMeters: 80,
       durationSeconds: 60,
+<<<<<<< Updated upstream
       maneuver: _north(80),
+=======
+      maneuver: _north(endpointMeters + 80),
+>>>>>>> Stashed changes
       maneuverType: 'depart',
     ),
   ],
@@ -40,12 +59,25 @@ CampusPlace _horn({int? radius}) => CampusPlace(
   arrivalRadiusMeters: radius,
 );
 
+<<<<<<< Updated upstream
 Future<NavigationFlowController> _guide({int? radius}) async {
   final gateway = harness.FakeRouteGateway()..result = _route();
   final search = harness.FakeSearchGateway()..results = [_horn(radius: radius)];
   final controller = harness.build(search: search, routes: gateway)
     ..openSearch();
   await controller.selectPlace(_horn(radius: radius));
+=======
+Future<NavigationFlowController> _guide({
+  int? radius,
+  NavigationRoute? route,
+}) async {
+  final gateway = harness.FakeRouteGateway()..result = route ?? _route();
+  final place = _horn(radius: radius);
+  final search = harness.FakeSearchGateway()..results = [place];
+  final controller = harness.build(search: search, routes: gateway)
+    ..openSearch();
+  await controller.selectPlace(place);
+>>>>>>> Stashed changes
   await controller.requestDirections();
   await controller.calculateRoute();
   await controller.startRoute();
@@ -60,6 +92,7 @@ Future<void> _fix(
 
 void main() {
   group('arrival radius', () {
+<<<<<<< Updated upstream
     test('no server value arrives within the 10 m default', () async {
       final controller = await _guide();
       await _fix(controller, 11);
@@ -211,5 +244,65 @@ void main() {
       await _fix(controller, 14);
       expect(controller.state, isA<FlowApproaching>());
     });
+=======
+    test(
+      'the default 350 ft radius ends guidance on one accurate fix',
+      () async {
+        final controller = await _guide();
+
+        expect(_arrivalRadiusMeters, closeTo(106.68, 0.01));
+        await _fix(controller, 108);
+        expect(controller.state, isA<FlowActiveNavigation>());
+
+        await _fix(controller, 106);
+        expect(controller.state, isA<FlowArrived>());
+      },
+    );
+
+    test('a smaller server radius cannot shrink the 350 ft minimum', () async {
+      final controller = await _guide(radius: 25);
+      await _fix(controller, 108);
+      expect(controller.state, isA<FlowActiveNavigation>());
+      await _fix(controller, 106);
+      expect(controller.state, isA<FlowArrived>());
+    });
+
+    test('GPS accuracy must be 20 m or better', () async {
+      final controller = await _guide(radius: 50);
+      await _fix(controller, 80, accuracy: 21);
+      expect(controller.state, isA<FlowActiveNavigation>());
+      await _fix(controller, 80, accuracy: 20);
+      expect(controller.state, isA<FlowArrived>());
+    });
+
+    test(
+      'route remaining distance handles a destination-point offset',
+      () async {
+        final controller = await _guide(route: _route(endpointMeters: 110));
+        expect(
+          distanceMeters(harness.hornCoordinate, _north(110)),
+          greaterThan(_arrivalRadiusMeters),
+        );
+
+        await _fix(controller, 110);
+        expect(controller.state, isA<FlowArrived>());
+      },
+    );
+
+    test(
+      'off-route projection cannot trigger arrival past the radius',
+      () async {
+        final controller = await _guide();
+        await controller.onLiveLocation(
+          NavigationCoordinate(
+            latitude: harness.hornCoordinate.latitude,
+            longitude: harness.hornCoordinate.longitude + 0.002,
+          ),
+          accuracyMeters: 5,
+        );
+        expect(controller.state, isA<FlowActiveNavigation>());
+      },
+    );
+>>>>>>> Stashed changes
   });
 }
