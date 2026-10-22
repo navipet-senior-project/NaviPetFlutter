@@ -689,22 +689,6 @@ class NavigationFlowController extends ChangeNotifier {
       coordinate,
       current.destination.coordinate,
     );
-<<<<<<< Updated upstream
-    final arrivalRadius = current.destination.arrivalRadius.toDouble();
-    final arrivalAccuracyLimit = math.min(arrivalRadius, _arrivalAccuracyCap);
-    final accurate =
-        accuracyMeters.isFinite && accuracyMeters <= arrivalAccuracyLimit;
-    _arrivalFixes = accurate && destinationGap <= arrivalRadius
-        ? _arrivalFixes + 1
-        : 0;
-    if (accurate &&
-        !_approachAnnounced &&
-        arrivalRadius < approachRadius &&
-        destinationGap <= approachRadius) {
-      _approachAnnounced = true;
-    }
-    if (_arrivalFixes >= 2) {
-=======
     final routeProjection = projectOntoRoute(
       current.plan.selected.coordinates,
       coordinate,
@@ -731,7 +715,6 @@ class NavigationFlowController extends ChangeNotifier {
       _approachAnnounced = true;
     }
     if (_arrivalFixes >= 1) {
->>>>>>> Stashed changes
       _generation++;
       _set(
         FlowArrived(
