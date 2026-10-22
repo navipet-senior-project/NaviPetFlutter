@@ -13,6 +13,7 @@ void main() {
       'roomNumber': '140',
       'floorNumber': '1',
       'navigation': {
+        'arrivalRadiusMeters': 18,
         'outdoorDestination': {'latitude': 33.7832, 'longitude': -118.1147},
         'indoorDestinationId': 'multiset-cob-140',
       },
@@ -22,6 +23,8 @@ void main() {
     expect(place.hasIndoorNavigation, isTrue);
     expect(place.toDestination().coordinate.latitude, 33.7832);
     expect(place.toDestination().coordinate.longitude, -118.1147);
+    expect(place.arrivalRadiusMeters, 18);
+    expect(place.toDestination().arrivalRadiusMeters, 18);
   });
 
   test('recognizes housing, external, and building-alternative results', () {
