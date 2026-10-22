@@ -43,6 +43,47 @@ int? validArrivalRadiusMeters(Object? value) {
   return value;
 }
 
+/// Returns the outer ring of a GeoJSON Polygon `{type, coordinates}` as
+/// coordinates, or null when [value] is absent or malformed so arrival falls
+/// back to the destination point. Holes are ignored.
+List<NavigationCoordinate>? validFootprint(Object? value) {
+  if (value is! Map || value['type'] != 'Polygon') return null;
+  final rings = value['coordinates'];
+  if (rings is! List || rings.isEmpty) return null;
+  final ring = rings.first;
+  if (ring is! List || ring.length < 4) return null;
+  final points = <NavigationCoordinate>[];
+  for (final position in ring) {
+    if (position is! List || position.length < 2) return null;
+    final longitude = position[0];
+    final latitude = position[1];
+    if (longitude is! num || latitude is! num) return null;
+    if (latitude.abs() > 90 || longitude.abs() > 180) return null;
+    points.add(
+      NavigationCoordinate(
+        latitude: latitude.toDouble(),
+        longitude: longitude.toDouble(),
+      ),
+    );
+  }
+  final first = points.first;
+  final last = points.last;
+  if (first.latitude != last.latitude || first.longitude != last.longitude) {
+    return null;
+  }
+  return points;
+}
+
+/// Inverse of [validFootprint], for the recents cache.
+Map<String, Object> footprintToGeoJson(List<NavigationCoordinate> ring) => {
+  'type': 'Polygon',
+  'coordinates': [
+    [
+      for (final point in ring) [point.longitude, point.latitude],
+    ],
+  ],
+};
+
 class NaviDestination {
   const NaviDestination({
     required this.name,
@@ -58,6 +99,7 @@ class NaviDestination {
     this.attribution,
     this.isBuildingAlternative = false,
     this.arrivalRadiusMeters,
+    this.footprint,
   });
 
   final String name;
@@ -75,6 +117,10 @@ class NaviDestination {
 
   /// Server-configured arrival radius, or null when none was supplied.
   final int? arrivalRadiusMeters;
+
+  /// Building outline from the server, a closed ring. When present, arrival
+  /// is measured from this outline instead of [coordinate].
+  final List<NavigationCoordinate>? footprint;
 
   /// Distance at which arrival is detected: the server value when it is in
   /// range, otherwise [defaultArrivalRadiusMeters].

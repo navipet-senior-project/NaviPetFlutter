@@ -123,6 +123,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
     _map = mapboxMap;
+    // Created first so the building outline draws under routes and pins.
+    final footprints = await mapboxMap.annotations
+        .createPolygonAnnotationManager();
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
@@ -143,6 +146,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       routes: routes,
       markers: markers,
       arrowMarkers: arrowMarkers,
+      footprints: footprints,
     );
     if (_is3d) await _naviMap!.setPitch(65);
     await _flow.attachMap(_naviMap!);
