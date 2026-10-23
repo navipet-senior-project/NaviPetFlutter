@@ -4,6 +4,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Unity AR is optional. NaviPetUnity's tools/build-indoor-ar-aar.sh fills the
+// gitignored android/unity-ar/; CI and most machines build without it.
+val unityArDir = rootProject.file("unity-ar")
+val unityArEnabled = unityArDir.resolve("unityLibrary-release.aar").isFile
+
 android {
     namespace = "com.navipet.navipet"
     compileSdk = flutter.compileSdkVersion
@@ -14,15 +19,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.navipet.navipet"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // ARCore and the Unity library need API 25 (Unity 6000.3 + ARCore XR Plugin 6.3).
+        minSdk = if (unityArEnabled) maxOf(flutter.minSdkVersion, 25) else flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        buildConfigField("boolean", "UNITY_AR_ENABLED", unityArEnabled.toString())
     }
 
     buildTypes {
@@ -30,6 +41,18 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    if (unityArEnabled) {
+        // Build-type source sets each carry their own manifest, so the Unity
+        // host is merged in only when the Unity library is present.
+        buildTypes.all {
+            sourceSets.maybeCreate(name).apply {
+                manifest.srcFile("src/unity/AndroidManifest.xml")
+                java.srcDir("src/unity/kotlin")
+                res.srcDir("src/unity/res")
+            }
         }
     }
 }
@@ -42,4 +65,15 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    if (unityArEnabled) {
+        implementation(fileTree(mapOf("dir" to unityArDir, "include" to listOf("*.aar"))))
+        // Remote dependencies the Unity Gradle modules declare, listed by the build script.
+        unityArDir.resolve("maven-deps.txt").takeIf { it.isFile }?.readLines()
+            ?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?.forEach { implementation(it) }
+    }
 }
