@@ -79,6 +79,7 @@ class MapboxNaviMapController implements NaviMapController {
     required PolylineAnnotationManager routes,
     required PointAnnotationManager markers,
     required PointAnnotationManager arrowMarkers,
+    required PolygonAnnotationManager footprints,
   }) : // Initializing formals would force the private field names into the
        // public constructor signature, making it unusable from other
        // libraries. Same resolution as HttpCampusSearchGateway.
@@ -89,12 +90,15 @@ class MapboxNaviMapController implements NaviMapController {
        // ignore: prefer_initializing_formals
        _markers = markers,
        // ignore: prefer_initializing_formals
-       _arrowMarkers = arrowMarkers;
+       _arrowMarkers = arrowMarkers,
+       // ignore: prefer_initializing_formals
+       _footprints = footprints;
 
   final MapboxMap _map;
   final PolylineAnnotationManager _routes;
   final PointAnnotationManager _markers;
   final PointAnnotationManager _arrowMarkers;
+  final PolygonAnnotationManager _footprints;
   bool _guidanceActive = false;
   double _pitch = 0;
   int _pitchRevision = 0;
@@ -225,6 +229,23 @@ class MapboxNaviMapController implements NaviMapController {
   }
 
   Future<void> _showDestination(NaviDestination destination) async {
+    final footprint = destination.footprint;
+    if (footprint != null) {
+      await _footprints.create(
+        PolygonAnnotationOptions(
+          geometry: Polygon(
+            coordinates: [
+              footprint
+                  .map((point) => Position(point.longitude, point.latitude))
+                  .toList(),
+            ],
+          ),
+          fillColor: AppColors.navy.toARGB32(),
+          fillOpacity: 0.18,
+          fillOutlineColor: AppColors.navy.toARGB32(),
+        ),
+      );
+    }
     await _markers.create(destinationPinOptions(destination.coordinate));
     await _markers.create(
       _marker(
@@ -250,6 +271,7 @@ class MapboxNaviMapController implements NaviMapController {
     await _routes.deleteAll();
     await _markers.deleteAll();
     await _arrowMarkers.deleteAll();
+    await _footprints.deleteAll();
   }
 
   PolylineAnnotationOptions _line(
