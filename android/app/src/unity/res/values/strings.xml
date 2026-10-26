@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Unity's player view reads this from its host app. -->
+    <string name="game_view_content_description">AR view</string>
+</resources>
