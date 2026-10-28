@@ -45,6 +45,13 @@ class NavigationFlowController extends ChangeNotifier {
   /// Largest GPS accuracy ever required for an arrival fix.
   static const _arrivalAccuracyCap = 20.0;
 
+  /// GPS accuracy accepted for arrival at a building footprint. Fixes next to
+  /// and inside buildings rarely get under 20 m, and the outline already
+  /// absorbs the size of the building.
+  // shortcut: fixed cap from typical urban-canyon accuracy, not field data;
+  // tune after logging accuracies at VEC.
+  static const _footprintAccuracyCap = 35.0;
+
   final CampusSearchController search;
   final CampusSearchGateway searchGateway;
   final RecentSearchesGateway recentSearches;
@@ -685,20 +692,14 @@ class NavigationFlowController extends ChangeNotifier {
       }
       _lastTripPosition = coordinate;
     }
-    final destinationGap = distanceMeters(
-      coordinate,
-      current.destination.coordinate,
-    );
-    final routeProjection = projectOntoRoute(
-      current.plan.selected.coordinates,
-      coordinate,
-    );
-    final routeGap = routeProjection.remainingMeters;
-    final arrivalRadius = math.max(
-      current.destination.arrivalRadius.toDouble(),
-      _minimumArrivalRadiusMeters,
-    );
-    final arrivalAccuracyLimit = math.min(arrivalRadius, _arrivalAccuracyCap);
+    final footprint = current.destination.footprint;
+    final destinationGap = footprint == null
+        ? distanceMeters(coordinate, current.destination.coordinate)
+        : distanceToFootprintMeters(footprint, coordinate);
+    final arrivalRadius = current.destination.arrivalRadius.toDouble();
+    final arrivalAccuracyLimit = footprint == null
+        ? math.min(arrivalRadius, _arrivalAccuracyCap)
+        : _footprintAccuracyCap;
     final accurate =
         accuracyMeters.isFinite && accuracyMeters <= arrivalAccuracyLimit;
     _arrivalFixes =
