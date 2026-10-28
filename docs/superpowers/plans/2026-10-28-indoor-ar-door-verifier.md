@@ -2046,6 +2046,7 @@ After Part A and after Part C, `lead-engineer` sends `qa` the branch and base. `
 3. Pass: median `checkDistanceM` ≤ 1 m for each door.
    - Bonus, not a pass/fail gate: one or more runs at VEC119. It localizes → the cloud map covers the floor-1 west wing and the distance tests that pose. It fails to localize → the cloud map has no coverage there. Record either way.
 4. Record per run: `checkDistanceM`, the camera position logged on "I'm here", `confidence`, `localizationQueries`, `durationMs`, device model, Android version (from `adb logcat | grep "\[IndoorAr\]"`).
+   - Re-measuring a door: three runs standing at the real door; the corrected position is the mean of the three logged camera positions (x, z; y stays the floor's door height). Writing it to Supabase is a data change and needs the user's yes.
 5. Failure cases once each: camera permission denied, network off, camera covered (localization failure), Exit mid-session.
 6. Reading failures: same offset at every door = frame/origin error; pins mirrored across the corridor = handedness error; random scatter = localization quality.
 7. Evidence (run table + screenshot or video) on issues #42, #47, #49 — posting needs the user's yes.
