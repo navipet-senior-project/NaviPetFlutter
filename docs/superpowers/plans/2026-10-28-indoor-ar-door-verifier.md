@@ -31,12 +31,12 @@
 | Part | Worker | Repo / branch | Starts |
 |---|---|---|---|
 | A — Unity (Tasks A1–A7) | `ar` | `/Users/kaydee/Developer/Navipet/NaviPetUnity`, `feat/indoor-ar-door-verifier` off `feat/indoor-ar-transport-spike` | now |
-| B — Backend | none | — | done: verified by PM 2026-10-28 (see Part B) |
+| B — Backend | none (pane closed) | — | done: verified by PM 2026-10-28 (see Part B) |
 | C — Flutter (Tasks C1–C6) | `flutter` | `/Users/kaydee/Developer/Navipet/NaviPetFlutter`, `feat/indoor-ar-launch` off `main` | after PR #44 merges |
 | D — Review | `qa` (report-only) | both | after each part finishes |
 | E — Device check | humans | — | after A7 and C6 |
 
-`backend` has no task in this plan. `lead-engineer` may use it as a second reviewer for Part A (a different model family from `ar`).
+No `backend` worker: Part B needs no change. `ar` runs on Codex and `flutter` on Cursor Grok; `qa` (Claude) is a different model family from both, so it reviews every part.
 
 Human gates (the worker stops and sends `lead-engineer` a blocker; the lead relays to `project-manager`): A2 step 4 (credentials), A7 step 5 (AAR to a device), Part E.
 
