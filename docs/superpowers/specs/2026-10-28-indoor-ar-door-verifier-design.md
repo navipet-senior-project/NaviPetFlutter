@@ -68,7 +68,7 @@ Flutter /ar?destinationId=…  → IndoorArLaunchScreen
 ### NaviPetUnity — branch `feat/indoor-ar-door-verifier`, off `feat/indoor-ar-transport-spike`
 
 1. `.gitignore`: add `Assets/Samples/MultiSet-SDK/**/Resources/MultiSetConfig.asset` and its `.meta`. Commit this before the SDK is imported.
-2. Add the MultiSet SDK to `Packages/manifest.json` by git URL, pinned to a full commit sha. The vendor's Android link fix (package 1.9.3, commit `7791b41`) has no release tag.
+2. Add the MultiSet SDK to `Packages/manifest.json` by git URL, pinned to a full commit sha: vendor `main` at 1.15.2 (`64e760f`), which has no release tag.
 3. `IndoorArSession`: reads the launch request, runs the state machine below, writes the result.
 4. `DoorPin`: the existing `DoorMarker` prefab, placed as a child of the SDK's `Map Space` at `position`, rotated to `headingDeg`.
 5. HUD: localization status, horizontal distance, floor label, wrong-floor banner, "I'm here" button, Exit button.
