@@ -696,7 +696,18 @@ class NavigationFlowController extends ChangeNotifier {
     final destinationGap = footprint == null
         ? distanceMeters(coordinate, current.destination.coordinate)
         : distanceToFootprintMeters(footprint, coordinate);
-    final arrivalRadius = current.destination.arrivalRadius.toDouble();
+    final routeProjection = projectOntoRoute(
+      current.plan.selected.coordinates,
+      coordinate,
+    );
+    final routeGap = routeProjection.remainingMeters;
+    // A footprint is the building, so its radius stays measured from the wall.
+    final arrivalRadius = footprint == null
+        ? math.max(
+            current.destination.arrivalRadius.toDouble(),
+            _minimumArrivalRadiusMeters,
+          )
+        : current.destination.arrivalRadius.toDouble();
     final arrivalAccuracyLimit = footprint == null
         ? math.min(arrivalRadius, _arrivalAccuracyCap)
         : _footprintAccuracyCap;
