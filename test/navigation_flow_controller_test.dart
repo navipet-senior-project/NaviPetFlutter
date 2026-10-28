@@ -647,7 +647,7 @@ void main() {
     final newMap = harness.RecordingMap();
     await controller.attachMap(newMap);
 
-    expect(newMap.calls, ['followUser']);
+    expect(newMap.calls, ['showGuidance:1']);
   });
 
   test('attaching a map while idle, searching, configuring, or calculating '

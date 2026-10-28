@@ -35,6 +35,10 @@ class SearchHistoryStore {
         external: json['external'] == true,
         attribution: json['attribution'] as String?,
         isBuildingAlternative: json['isBuildingAlternative'] == true,
+        arrivalRadiusMeters: validArrivalRadiusMeters(
+          json['arrivalRadiusMeters'],
+        ),
+        footprint: validFootprint(json['footprint']),
       );
     }).toList();
   }
@@ -65,6 +69,10 @@ class SearchHistoryStore {
               if (item.external) 'external': true,
               if (item.attribution != null) 'attribution': item.attribution,
               if (item.isBuildingAlternative) 'isBuildingAlternative': true,
+              if (item.arrivalRadiusMeters != null)
+                'arrivalRadiusMeters': item.arrivalRadiusMeters,
+              if (item.footprint != null)
+                'footprint': footprintToGeoJson(item.footprint!),
             }),
           )
           .toList(),

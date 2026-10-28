@@ -2,12 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo;
-import 'package:go_router/go_router.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../data/app_state.dart';
 import '../data/mapbox_config.dart';
 import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
@@ -16,7 +14,7 @@ import '../data/navigation_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/place_preview_sheet.dart';
-import '../widgets/profile_avatar.dart';
+import '../widgets/account_button.dart';
 import '../widgets/route_preview_sheet.dart';
 import '../widgets/search_bar_field.dart';
 import '../widgets/search_overlay.dart';
@@ -77,7 +75,37 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_flow.handleAppResumed());
+      unawaited(_refreshLivePosition());
     }
+  }
+
+  Future<void> _refreshLivePosition() async {
+    if (_flow.state is! FlowActiveNavigation) return;
+    try {
+      final position = await geo.Geolocator.getCurrentPosition(
+        locationSettings: const geo.LocationSettings(
+          accuracy: geo.LocationAccuracy.bestForNavigation,
+        ),
+      );
+      if (!mounted) return;
+      _position = position;
+      await _passLivePosition(position);
+    } on Object {
+      // The existing stream and location banner handle a temporarily lost fix.
+    }
+  }
+
+  Future<void> _passLivePosition(geo.Position position) async {
+    if (_flow.state is! FlowActiveNavigation) return;
+    await _flow.onLiveLocation(
+      NavigationCoordinate(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      ),
+      accuracyMeters: position.accuracy,
+      bearing: position.heading,
+      timestamp: position.timestamp,
+    );
   }
 
   @override
@@ -95,9 +123,17 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
     _map = mapboxMap;
+    // Created first so the building outline draws under routes and pins.
+    final footprints = await mapboxMap.annotations
+        .createPolygonAnnotationManager();
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
+    await markers.setTextAllowOverlap(true);
+    final arrowMarkers = await mapboxMap.annotations
+        .createPointAnnotationManager();
+    await arrowMarkers.setTextRotationAlignment(TextRotationAlignment.MAP);
+    await arrowMarkers.setTextAllowOverlap(true);
 
     // Hands the flow a live map and re-issues whatever the current state
     // should already be showing — necessary both on first launch (the flow
@@ -109,6 +145,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       map: mapboxMap,
       routes: routes,
       markers: markers,
+      arrowMarkers: arrowMarkers,
+      footprints: footprints,
     );
     if (_is3d) await _naviMap!.setPitch(65);
     await _flow.attachMap(_naviMap!);
@@ -183,7 +221,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     await _map?.location.updateSettings(
       LocationComponentSettings(
-        enabled: true,
+        enabled: _flow.state is! FlowActiveNavigation,
         pulsingEnabled: true,
         pulsingColor: AppColors.amber.toARGB32(),
         showAccuracyRing: true,
@@ -201,6 +239,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         locationSettings: settings,
       );
       await _rememberPosition(_position!);
+      unawaited(_passLivePosition(_position!));
       if (mounted) {
         setState(() => _locationMessage = null);
         // A live GPS fix must not replace the route camera while a route is
@@ -221,6 +260,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           (position) {
             _position = position;
             unawaited(_rememberPosition(position));
+            unawaited(_passLivePosition(position));
             if (mounted) setState(() => _locationMessage = null);
           },
           onError: (Object error) {
@@ -275,7 +315,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       builder: (context, _) {
         final state = flow.state;
         final padding = MediaQuery.paddingOf(context);
-        final locationMessage = flow.locationNotice ?? _locationMessage;
+        final locationMessage =
+            state is FlowActiveNavigation && state.routeNotice != null
+            ? state.routeNotice
+            : flow.locationNotice ?? _locationMessage;
         return PopScope(
           canPop: state is FlowIdle,
           onPopInvokedWithResult: (didPop, _) {
@@ -283,15 +326,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           },
           child: Scaffold(
             backgroundColor: AppColors.map,
-            bottomNavigationBar: state is FlowActiveNavigation
+            bottomNavigationBar:
+                state is FlowActiveNavigation || state is FlowArrived
                 ? null
                 : const NaviBottomNav(active: NaviTab.location),
             body: Stack(
               children: [
                 _mapWidget(),
                 if (state is FlowIdle) _searchBar(context, padding),
-                if (state is! FlowSearching && state is! FlowRouteSteps)
-                  _mapTypeControls(padding),
                 if (locationMessage != null && state is! FlowSearching)
                   _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
@@ -367,6 +409,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 if (state is FlowActiveNavigation)
                   _activeNavigation(state, flow, padding),
+                if (state is FlowArrived) _arrivalSummary(state, flow, padding),
                 if (state is FlowError) _error(state, flow),
               ],
             ),
@@ -393,26 +436,22 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _mapTypeControls(EdgeInsets padding) => Positioned(
-    top: padding.top + 72,
-    right: AppSpacing.lg,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _mapControlButton(
-          icon: Icons.layers_outlined,
-          label: 'Map type',
-          onPressed: _showMapTypePicker,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _mapControlButton(
-          icon: _is3d ? Icons.map : Icons.threed_rotation,
-          label: _is3d ? 'Switch to 2D map view' : 'Switch to 3D map view',
-          selected: _is3d,
-          onPressed: _toggle3d,
-        ),
-      ],
-    ),
+  Widget _mapTypeControls() => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _mapControlButton(
+        icon: Icons.layers_outlined,
+        label: 'Map type',
+        onPressed: _showMapTypePicker,
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      _mapControlButton(
+        icon: _is3d ? Icons.map : Icons.threed_rotation,
+        label: _is3d ? 'Switch to 2D map view' : 'Switch to 3D map view',
+        selected: _is3d,
+        onPressed: _toggle3d,
+      ),
+    ],
   );
 
   Future<void> _toggle3d() async {
@@ -553,8 +592,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   );
 
   Widget _searchBar(BuildContext context, EdgeInsets padding) {
-    final appState = context.watch<AppState>();
-    final activeUser = appState.activeUser;
     return Positioned(
       top: padding.top + AppSpacing.sm,
       left: AppSpacing.lg,
@@ -562,32 +599,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       child: SearchBarField(
         placeholder: 'Where to?',
         onPressed: _flow.openSearch,
-        right: Semantics(
-          label: 'Account settings',
-          button: true,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => context.push('/account'),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Center(
-                child: ProfileAvatar(
-                  name: activeUser?.name ?? '?',
-                  color: activeUser?.avatarColor ?? AppColors.amber,
-                  imageUrl: activeUser?.avatarUrl,
-                  size: 30,
-                  initialStyle: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                  onImageError: appState.reportAvatarLoadFailed,
-                ),
-              ),
-            ),
-          ),
-        ),
+        right: const AccountButton(),
       ),
     );
   }
@@ -614,16 +626,23 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return Positioned(
       right: 16,
       bottom: bottom,
-      child: Semantics(
-        label: 'Center map on your location',
-        button: true,
-        child: FloatingActionButton.small(
-          heroTag: 'recenter',
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.navy,
-          onPressed: _centerOnBestKnownLocation,
-          child: const Icon(Icons.my_location),
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _mapTypeControls(),
+          const SizedBox(height: AppSpacing.sm),
+          Semantics(
+            label: 'Center map on your location',
+            button: true,
+            child: FloatingActionButton.small(
+              heroTag: 'recenter',
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.navy,
+              onPressed: _centerOnBestKnownLocation,
+              child: const Icon(Icons.my_location),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -800,8 +819,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
+                        if (state is FlowApproaching)
+                          const Text(
+                            'Arriving soon',
+                            style: TextStyle(
+                              color: AppColors.amberInk,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         Text(
-                          '${route.durationLabel} · ${route.distanceLabel}',
+                          '${_remainingDurationLabel(state)} · ${_remainingLabel(state)}',
                           style: const TextStyle(color: AppColors.muted),
                         ),
                       ],
@@ -828,12 +855,64 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
+  String _remainingLabel(FlowActiveNavigation state) {
+    final meters = state.remainingMeters ?? state.plan.selected.distanceMeters;
+    if (meters < 160.9344) return '${(meters * 3.28084).round()} ft remaining';
+    return '${(meters / 1609.344).toStringAsFixed(1)} mi remaining';
+  }
+
+  String _remainingDurationLabel(FlowActiveNavigation state) {
+    final route = state.plan.selected;
+    final fraction = route.distanceMeters <= 0
+        ? 1.0
+        : ((state.remainingMeters ?? route.distanceMeters) /
+                  route.distanceMeters)
+              .clamp(0.0, 1.0);
+    final minutes = (route.durationSeconds * fraction / 60).ceil();
+    return '$minutes min';
+  }
+
+  Widget _arrivalSummary(
+    FlowArrived state,
+    NavigationFlowController flow,
+    EdgeInsets padding,
+  ) => Positioned(
+    left: AppSpacing.lg,
+    right: AppSpacing.lg,
+    bottom: padding.bottom + AppSpacing.lg,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'You’ve arrived!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(state.destination.name),
+            const SizedBox(height: 16),
+            Text('Time: ${state.summary.elapsedLabel}'),
+            Text('Distance traveled: ${state.summary.distanceLabel}'),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: flow.dismissArrival,
+              child: const Text('Return to map'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   Future<void> _confirmEnd(NavigationFlowController flow) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('End this route?'),
-        content: const Text('Guidance stops and the route stays on the map.'),
+        content: const Text('Guidance stops and the route is cleared.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),

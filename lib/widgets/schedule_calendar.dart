@@ -23,6 +23,7 @@ class ScheduleCalendar extends StatefulWidget {
     this.view = CalendarView.week,
     this.scrollToNowRequest = 0,
     this.today,
+    this.parentScrollController,
   });
 
   final List<CourseClass> classes;
@@ -36,6 +37,9 @@ class ScheduleCalendar extends StatefulWidget {
 
   /// Overrides the current date and time; for tests.
   final DateTime? today;
+
+  /// Receives the unused scroll delta when the time grid reaches either edge.
+  final ScrollController? parentScrollController;
 
   static const gridKey = ValueKey('schedule-grid');
   static const nowLineKey = ValueKey('schedule-now');
@@ -285,86 +289,103 @@ class _ScheduleCalendarState extends State<ScheduleCalendar> {
         nowMinutes <= endHour * 60;
     return SizedBox(
       height: math.min(gridHeight, _rowHeight * _viewportRows),
-      child: SingleChildScrollView(
-        controller: _scroll,
-        child: SizedBox(
-          key: ScheduleCalendar.gridKey,
-          height: gridHeight,
-          child: Stack(
-            children: [
-              for (var row = 0; row <= endHour - startHour; row++)
-                Positioned(
-                  top: math.min(row * _rowHeight, gridHeight - 1),
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: _timeWidth,
-                        child: row == endHour - startHour
-                            ? null
-                            : Text(
-                                _hourLabel(startHour + row),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.muted,
-                                ),
-                              ),
-                      ),
-                      Expanded(
-                        child: Container(height: 1, color: AppColors.divider),
-                      ),
-                    ],
-                  ),
-                ),
-              for (var index = 0; index < columns.length; index++)
-                Positioned(
-                  left: _timeWidth + index * columnWidth,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(width: 1, color: AppColors.divider),
-                ),
-              for (var index = 0; index < columns.length; index++)
-                for (final course in _classesOn(columns[index].weekday))
-                  _block(
-                    course,
-                    columns[index].weekday,
-                    left: _timeWidth + index * columnWidth,
-                    width: columnWidth,
-                    startHour: startHour,
-                    gridHeight: gridHeight,
-                    compact: columns.length > 1,
-                  ),
-              if (showNow)
-                Positioned(
-                  key: ScheduleCalendar.nowLineKey,
-                  left: _timeWidth + todayColumn * columnWidth - 4,
-                  width: columnWidth + 4,
-                  top: (nowMinutes - startHour * 60) / 60 * _rowHeight - 4,
-                  height: 8,
-                  child: IgnorePointer(
+      child: NotificationListener<OverscrollNotification>(
+        onNotification: (notification) {
+          final parent = widget.parentScrollController;
+          if (notification.depth != 0 || parent == null || !parent.hasClients) {
+            return false;
+          }
+          final position = parent.position;
+          final target = (position.pixels + notification.overscroll).clamp(
+            position.minScrollExtent,
+            position.maxScrollExtent,
+          );
+          if (target == position.pixels) return false;
+          parent.jumpTo(target);
+          return true;
+        },
+        child: SingleChildScrollView(
+          controller: _scroll,
+          physics: const ClampingScrollPhysics(),
+          child: SizedBox(
+            key: ScheduleCalendar.gridKey,
+            height: gridHeight,
+            child: Stack(
+              children: [
+                for (var row = 0; row <= endHour - startHour; row++)
+                  Positioned(
+                    top: math.min(row * _rowHeight, gridHeight - 1),
+                    left: 0,
+                    right: 0,
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.accentDark,
-                            shape: BoxShape.circle,
-                          ),
+                        SizedBox(
+                          width: _timeWidth,
+                          child: row == endHour - startHour
+                              ? null
+                              : Text(
+                                  _hourLabel(startHour + row),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.muted,
+                                  ),
+                                ),
                         ),
                         Expanded(
-                          child: Container(
-                            height: 2,
-                            color: AppColors.accentDark,
-                          ),
+                          child: Container(height: 1, color: AppColors.divider),
                         ),
                       ],
                     ),
                   ),
-                ),
-            ],
+                for (var index = 0; index < columns.length; index++)
+                  Positioned(
+                    left: _timeWidth + index * columnWidth,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(width: 1, color: AppColors.divider),
+                  ),
+                for (var index = 0; index < columns.length; index++)
+                  for (final course in _classesOn(columns[index].weekday))
+                    _block(
+                      course,
+                      columns[index].weekday,
+                      left: _timeWidth + index * columnWidth,
+                      width: columnWidth,
+                      startHour: startHour,
+                      gridHeight: gridHeight,
+                      compact: columns.length > 1,
+                    ),
+                if (showNow)
+                  Positioned(
+                    key: ScheduleCalendar.nowLineKey,
+                    left: _timeWidth + todayColumn * columnWidth - 4,
+                    width: columnWidth + 4,
+                    top: (nowMinutes - startHour * 60) / 60 * _rowHeight - 4,
+                    height: 8,
+                    child: IgnorePointer(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.accentDark,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Expanded(
+                            child: Container(
+                              height: 2,
+                              color: AppColors.accentDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

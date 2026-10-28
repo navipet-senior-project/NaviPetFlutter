@@ -2747,6 +2747,50 @@
                               },
                               "indoorDestinationId": {
                                 "type": "string"
+                              },
+                              "arrivalRadiusMeters": {
+                                "type": "integer",
+                                "minimum": 3,
+                                "maximum": 50
+                              },
+                              "footprint": {
+                                "type": "object",
+                                "required": [
+                                  "type",
+                                  "coordinates"
+                                ],
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Polygon"
+                                    ]
+                                  },
+                                  "coordinates": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "array",
+                                        "additionalItems": false,
+                                        "items": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "number"
+                                          }
+                                        ],
+                                        "minItems": 2
+                                      },
+                                      "minItems": 4
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 1
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
                               }
                             },
                             "additionalProperties": false
@@ -3128,6 +3172,50 @@
                             },
                             "indoorDestinationId": {
                               "type": "string"
+                            },
+                            "arrivalRadiusMeters": {
+                              "type": "integer",
+                              "minimum": 3,
+                              "maximum": 50
+                            },
+                            "footprint": {
+                              "type": "object",
+                              "required": [
+                                "type",
+                                "coordinates"
+                              ],
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Polygon"
+                                  ]
+                                },
+                                "coordinates": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "array",
+                                      "additionalItems": false,
+                                      "items": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "number"
+                                        }
+                                      ],
+                                      "minItems": 2
+                                    },
+                                    "minItems": 4
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 1
+                                }
+                              },
+                              "additionalProperties": false,
+                              "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
                             }
                           },
                           "additionalProperties": false
@@ -3556,6 +3644,50 @@
                               },
                               "indoorDestinationId": {
                                 "type": "string"
+                              },
+                              "arrivalRadiusMeters": {
+                                "type": "integer",
+                                "minimum": 3,
+                                "maximum": 50
+                              },
+                              "footprint": {
+                                "type": "object",
+                                "required": [
+                                  "type",
+                                  "coordinates"
+                                ],
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Polygon"
+                                    ]
+                                  },
+                                  "coordinates": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "array",
+                                        "additionalItems": false,
+                                        "items": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "number"
+                                          }
+                                        ],
+                                        "minItems": 2
+                                      },
+                                      "minItems": 4
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 1
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
                               }
                             },
                             "additionalProperties": false
@@ -3926,6 +4058,50 @@
                             },
                             "indoorDestinationId": {
                               "type": "string"
+                            },
+                            "arrivalRadiusMeters": {
+                              "type": "integer",
+                              "minimum": 3,
+                              "maximum": 50
+                            },
+                            "footprint": {
+                              "type": "object",
+                              "required": [
+                                "type",
+                                "coordinates"
+                              ],
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Polygon"
+                                  ]
+                                },
+                                "coordinates": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "array",
+                                      "additionalItems": false,
+                                      "items": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "number"
+                                        }
+                                      ],
+                                      "minItems": 2
+                                    },
+                                    "minItems": 4
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 1
+                                }
+                              },
+                              "additionalProperties": false,
+                              "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
                             }
                           },
                           "additionalProperties": false
@@ -4287,6 +4463,50 @@
                               },
                               "indoorDestinationId": {
                                 "type": "string"
+                              },
+                              "arrivalRadiusMeters": {
+                                "type": "integer",
+                                "minimum": 3,
+                                "maximum": 50
+                              },
+                              "footprint": {
+                                "type": "object",
+                                "required": [
+                                  "type",
+                                  "coordinates"
+                                ],
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "Polygon"
+                                    ]
+                                  },
+                                  "coordinates": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "array",
+                                        "additionalItems": false,
+                                        "items": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "number"
+                                          }
+                                        ],
+                                        "minItems": 2
+                                      },
+                                      "minItems": 4
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 1
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
                               }
                             },
                             "additionalProperties": false

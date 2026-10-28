@@ -8,6 +8,7 @@ import '../data/app_state.dart';
 import '../data/course_class.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/account_button.dart';
 import '../widgets/class_detail_sheet.dart';
 import '../widgets/class_editor_sheet.dart';
 import '../widgets/schedule_calendar.dart';
@@ -26,10 +27,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   DateTime _selectedDate = DateTime.now();
   CalendarView _view = CalendarView.week;
-  int _scrollToNowRequest = 0;
   Timer? _onlineTimer;
   final _pageController = ScrollController();
-  final _dailyTasksKey = GlobalKey();
 
   @override
   void initState() {
@@ -79,26 +78,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  void _goToToday() {
-    setState(() {
-      _selectedDate = DateTime.now();
-      _view = CalendarView.day;
-      _scrollToNowRequest++;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final context = _dailyTasksKey.currentContext;
-      if (context != null) {
-        Scrollable.ensureVisible(
-          context,
-          duration: const Duration(milliseconds: 450),
-          curve: Curves.easeOut,
-          alignment: 0.08,
-        );
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -113,17 +92,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           icon: const Icon(Icons.arrow_back),
         ),
         title: const Text('Calendar'),
-        actions: [
-          IconButton(
-            tooltip: 'Account',
-            onPressed: () => context.push('/account'),
-            icon: const CircleAvatar(
-              radius: 16,
-              backgroundImage: AssetImage('assets/images/shark_face.png'),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
+        actions: [const AccountButton(), const SizedBox(width: 8)],
       ),
       body: RefreshIndicator(
         onRefresh: state.refreshClasses,
@@ -141,10 +110,10 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             _calendarToolbar(),
             const SizedBox(height: AppSpacing.md),
             ScheduleCalendar(
+              parentScrollController: _pageController,
               classes: state.classes,
               selectedDate: _selectedDate,
               view: _view,
-              scrollToNowRequest: _scrollToNowRequest,
               onSelectDate: (date) => setState(() => _selectedDate = date),
               onTapClass: (course) => _showClass(context, course),
             ),
@@ -177,7 +146,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               ),
             const SizedBox(height: AppSpacing.xl),
             Container(
-              key: _dailyTasksKey,
               child: _sectionTitle(
                 'Daily tasks',
                 '${tasks.where((task) => task.done).length}/${tasks.length} done',
@@ -232,18 +200,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             side: const BorderSide(color: AppColors.cardBorder),
             visualDensity: VisualDensity.compact,
           ),
-        ),
-      ),
-      const SizedBox(width: AppSpacing.sm),
-      OutlinedButton.icon(
-        onPressed: _goToToday,
-        icon: const Icon(Icons.today_outlined, size: 18),
-        label: const Text('Today', style: _buttonLabel),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.petInk,
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: AppColors.petInk),
-          visualDensity: VisualDensity.compact,
         ),
       ),
     ],

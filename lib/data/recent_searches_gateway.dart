@@ -228,6 +228,8 @@ class CachedRecentSearches implements RecentSearchesGateway {
     roomNumber: destination.roomNumber,
     floorNumber: destination.floorNumber,
     outdoorDestination: destination.coordinate,
+    arrivalRadiusMeters: destination.arrivalRadiusMeters,
+    footprint: destination.footprint,
     indoorDestinationId: destination.indoorDestinationId,
     external: destination.external,
     attribution: destination.attribution,

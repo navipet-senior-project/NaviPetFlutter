@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../data/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/account_button.dart';
 
 /// Pet Customization screen, cloned from the Figma "Pet cuztomization" frame
 /// (node 17:3). Shows the dressed mascot, quick-action pills and a wardrobe
@@ -122,22 +123,35 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3F3F4),
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: Row(
-              children: const [
-                Icon(Icons.diamond_outlined, size: 14, color: AppColors.blue),
-                SizedBox(width: 4),
-                Text(
-                  '${context.watch<AppState>().points} points',
-                  style: TextStyle(fontSize: 16, color: AppColors.petInk),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F3F4),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
-              ],
-            ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.diamond_outlined,
+                      size: 14,
+                      color: AppColors.blue,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${context.watch<AppState>().points} points',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: AppColors.petInk,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              const AccountButton(),
+            ],
           ),
         ],
       ),

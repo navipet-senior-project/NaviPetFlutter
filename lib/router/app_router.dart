@@ -1,12 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/app_state.dart';
+import '../data/indoor_ar_launcher.dart';
 import '../screens/account_settings_screen.dart';
 import '../screens/ar_navigation_screen.dart';
 import '../screens/change_email_screen.dart';
 import '../screens/checklist_screen.dart';
 import '../screens/email_sent_screen.dart';
 import '../screens/forgot_password_screen.dart';
+import '../screens/indoor_ar_spike_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/pet_customization_screen.dart';
 import '../screens/register_screen.dart';
@@ -122,5 +125,12 @@ GoRouter createAppRouter(
       path: '/ar',
       builder: (context, state) => const ArNavigationScreen(),
     ),
+    // #41 transport spike; removed with the real launch screen (build step 3).
+    if (kDebugMode)
+      GoRoute(
+        path: '/dev/indoor-ar-spike',
+        builder: (context, state) =>
+            IndoorArSpikeScreen(launcher: AndroidIndoorArLauncher()),
+      ),
   ],
 );
