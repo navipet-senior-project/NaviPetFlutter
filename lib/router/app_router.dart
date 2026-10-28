@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../data/app_state.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../screens/account_settings_screen.dart';
-import '../screens/ar_navigation_screen.dart';
+import '../screens/indoor_ar_launch_screen.dart';
 import '../screens/change_email_screen.dart';
 import '../screens/checklist_screen.dart';
 import '../screens/email_sent_screen.dart';
@@ -123,7 +123,10 @@ GoRouter createAppRouter(
     ),
     GoRoute(
       path: '/ar',
-      builder: (context, state) => const ArNavigationScreen(),
+      builder: (context, state) => IndoorArLaunchScreen(
+        destinationId: state.uri.queryParameters['destinationId'] ?? '',
+        launcher: AndroidIndoorArLauncher(),
+      ),
     ),
     // #41 transport spike; removed with the real launch screen (build step 3).
     if (kDebugMode)
