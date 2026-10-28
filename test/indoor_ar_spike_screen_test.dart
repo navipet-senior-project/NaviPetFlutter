@@ -105,4 +105,7 @@ class _PendingLauncher implements IndoorArLauncher {
     completers.add(completer);
     return completer.future;
   }
+
+  @override
+  Future<IndoorArResult?> pendingResult() async => null;
 }

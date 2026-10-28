@@ -19,8 +19,13 @@ class IndoorArChannel(
 ) : MethodChannel.MethodCallHandler {
     private var pending: MethodChannel.Result? = null
     private var startedAt = 0L
+    private val unclaimed = IndoorArResultSlot()
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        if (call.method == "pendingResult") {
+            result.success(unclaimed.take())
+            return
+        }
         if (call.method != "launch") {
             result.notImplemented()
             return
@@ -55,14 +60,19 @@ class IndoorArChannel(
     /** Returns true when the result belonged to the AR activity. */
     fun onActivityResult(requestCode: Int, data: Intent?): Boolean {
         if (requestCode != REQUEST_CODE) return false
-        val result = pending ?: return true
-        pending = null
-        result.success(
-            IndoorArResults.fromActivityResult(
-                data?.getStringExtra(IndoorArResults.RESULT_EXTRA),
-                SystemClock.elapsedRealtime() - startedAt,
-            ),
+        // startedAt is 0 in an activity recreated while Unity ran.
+        val durationMs = if (startedAt == 0L) 0L else SystemClock.elapsedRealtime() - startedAt
+        val json = IndoorArResults.fromActivityResult(
+            data?.getStringExtra(IndoorArResults.RESULT_EXTRA),
+            durationMs,
         )
+        val result = pending
+        if (result == null) {
+            unclaimed.put(json)
+        } else {
+            pending = null
+            result.success(json)
+        }
         return true
     }
 

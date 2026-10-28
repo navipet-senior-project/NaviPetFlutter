@@ -139,4 +139,47 @@ void main() {
     expect(result.checkDistanceM, 0.5);
     expect(fake.requests.single.doorKey, 'VEC119');
   });
+
+  test('pendingResult decodes a held result', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'pendingResult');
+      return '{"status":"arrived","checkDistanceM":0.8,"localizationQueries":3,"durationMs":41000}';
+    });
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
+    ).pendingResult();
+    expect(result?.status, IndoorArStatus.arrived);
+    expect(result?.checkDistanceM, 0.8);
+  });
+
+  test(
+    'pendingResult is null when nothing is held or there is no host',
+    () async {
+      messenger.setMockMethodCallHandler(channel, (call) async => null);
+      expect(
+        await AndroidIndoorArLauncher(isAndroid: true).pendingResult(),
+        isNull,
+      );
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(
+        await AndroidIndoorArLauncher(isAndroid: true).pendingResult(),
+        isNull,
+      );
+      expect(
+        await AndroidIndoorArLauncher(isAndroid: false).pendingResult(),
+        isNull,
+      );
+    },
+  );
+
+  test('the fake returns its pending result once', () async {
+    final fake = FakeIndoorArLauncher()
+      ..pending = const IndoorArResult(
+        status: IndoorArStatus.cancelled,
+        localizationQueries: 0,
+        durationMs: 1,
+      );
+    expect((await fake.pendingResult())?.status, IndoorArStatus.cancelled);
+    expect(await fake.pendingResult(), isNull);
+  });
 }

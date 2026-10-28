@@ -9,6 +9,10 @@ import 'indoor_ar_contract.dart';
 /// the student is back in the app.
 abstract interface class IndoorArLauncher {
   Future<IndoorArResult> launch(IndoorArRequest request);
+
+  /// A result that came back after the app's activity was recreated, so no
+  /// [launch] call was waiting for it. Null when there is none. Returns it once.
+  Future<IndoorArResult?> pendingResult();
 }
 
 /// Talks to `IndoorArChannel` in the Android host (`MainActivity`). The host
@@ -45,6 +49,20 @@ class AndroidIndoorArLauncher implements IndoorArLauncher {
         ? IndoorArResult.decode(raw)
         : const IndoorArResult.badResult();
   }
+
+  @override
+  Future<IndoorArResult?> pendingResult() async {
+    if (!_isAndroid) return null;
+    final Object? raw;
+    try {
+      raw = await _channel.invokeMethod<Object?>('pendingResult');
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+    return raw is String ? IndoorArResult.decode(raw) : null;
+  }
 }
 
 /// Test double. Returns [result] and records every request.
@@ -53,10 +71,18 @@ class FakeIndoorArLauncher implements IndoorArLauncher {
 
   IndoorArResult result;
   final requests = <IndoorArRequest>[];
+  IndoorArResult? pending;
 
   @override
   Future<IndoorArResult> launch(IndoorArRequest request) async {
     requests.add(request);
+    return result;
+  }
+
+  @override
+  Future<IndoorArResult?> pendingResult() async {
+    final result = pending;
+    pending = null;
     return result;
   }
 }
