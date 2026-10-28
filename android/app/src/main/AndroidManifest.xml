@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Indoor AR. Declared here so permission_handler can ask for it in builds without the Unity library too. -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <application
         android:label="navipet"
         android:name="${applicationName}"

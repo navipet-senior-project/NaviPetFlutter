@@ -248,4 +248,14 @@ void main() {
       );
     });
   });
+
+  test('decodes MAP_MISMATCH and unknown error codes as error', () {
+    for (final code in ['MAP_MISMATCH', 'SOMETHING_NEW']) {
+      final result = IndoorArResult.decode(
+        '{"status":"error","errorCode":"$code","localizationQueries":0,"durationMs":1}',
+      );
+      expect(result.status, IndoorArStatus.error);
+      expect(result.errorCode, code);
+    }
+  });
 }
