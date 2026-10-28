@@ -205,4 +205,47 @@ void main() {
       );
     });
   });
+
+  group('IndoorArRequest.fromDoorPose', () {
+    Map<String, dynamic> pose({Object? headingDeg = 185.36}) => {
+      'mapCode': 'MSET_XTBY7AM7ZK77',
+      'frame': 'multiset-mapset',
+      'doorKey': 'VEC119',
+      'floor': '1',
+      'position': {'x': -5.7651, 'y': -1.8186, 'z': 22.6689},
+      'headingDeg': headingDeg,
+    };
+
+    test('builds the v1 request from the backend door pose', () {
+      final request = IndoorArRequest.fromDoorPose(pose(), room: '119')!;
+      expect(request.toJson(), vec119Request().toJson());
+    });
+
+    test('accepts integer coordinates', () {
+      final json = pose(headingDeg: 5)..['position'] = {'x': 1, 'y': 2, 'z': 3};
+      final request = IndoorArRequest.fromDoorPose(json, room: '1')!;
+      expect(request.position.x, 1.0);
+      expect(request.headingDeg, 5.0);
+    });
+
+    test('returns null for a missing or invalid pose', () {
+      expect(IndoorArRequest.fromDoorPose(null, room: '119'), isNull);
+      expect(
+        IndoorArRequest.fromDoorPose(pose(headingDeg: 360), room: '119'),
+        isNull,
+      );
+      expect(
+        IndoorArRequest.fromDoorPose(pose(headingDeg: 'x'), room: '119'),
+        isNull,
+      );
+      expect(
+        IndoorArRequest.fromDoorPose(pose()..remove('position'), room: '119'),
+        isNull,
+      );
+      expect(
+        IndoorArRequest.fromDoorPose(pose()..['doorKey'] = '', room: '119'),
+        isNull,
+      );
+    });
+  });
 }

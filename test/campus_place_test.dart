@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/campus_place.dart';
 
+import 'support/indoor_ar_fixtures.dart';
+
 void main() {
   test('parses room metadata and converts only the verified outdoor point', () {
     final place = CampusPlace.fromJson({
@@ -116,5 +118,36 @@ void main() {
         expect(place.toDestination().arrivalRadius, 10, reason: '$bad');
       }
     });
+  });
+
+  test('parses the indoor door pose into an AR request', () {
+    final place = CampusPlace.fromJson({
+      'id': '3c011e42-ad7d-4f6c-81d5-e7b23e977d1f',
+      'type': 'room',
+      'title': 'VEC 119',
+      'subtitle': 'VEC',
+      'source': 'csulb',
+      'roomNumber': '119',
+      'indoor': {
+        'mapCode': 'MSET_XTBY7AM7ZK77',
+        'frame': 'multiset-mapset',
+        'doorKey': 'VEC119',
+        'floor': '1',
+        'position': {'x': -5.7651, 'y': -1.8186, 'z': 22.6689},
+        'headingDeg': 185.36,
+      },
+    });
+    expect(place.indoorRequest?.toJson(), vec119Request().toJson());
+  });
+
+  test('has no AR request without an indoor pose', () {
+    final place = CampusPlace.fromJson({
+      'id': 'x',
+      'type': 'room',
+      'title': 'VEC 119',
+      'subtitle': 'VEC',
+      'source': 'csulb',
+    });
+    expect(place.indoorRequest, isNull);
   });
 }

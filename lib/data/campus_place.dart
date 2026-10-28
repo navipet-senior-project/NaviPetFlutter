@@ -1,3 +1,4 @@
+import 'indoor_ar_contract.dart';
 import 'navigation_models.dart';
 
 export 'navigation_models.dart' show CampusDestinationType;
@@ -35,6 +36,7 @@ class CampusPlace {
     this.arrivalRadiusMeters,
     this.footprint,
     this.indoorDestinationId,
+    this.indoorRequest,
     this.external = false,
     this.attribution,
     this.distanceMeters,
@@ -72,6 +74,10 @@ class CampusPlace {
       indoorDestinationId: _optionalString(
         navigationJson['indoorDestinationId'],
       ),
+      indoorRequest: IndoorArRequest.fromDoorPose(
+        json['indoor'],
+        room: _optionalString(json['roomNumber']) ?? '',
+      ),
       external: json['external'] == true,
       attribution: _optionalString(json['attribution']),
       distanceMeters: (json['distanceMeters'] as num?)?.round(),
@@ -95,6 +101,7 @@ class CampusPlace {
   /// Building outline from the server; null when absent or malformed.
   final List<NavigationCoordinate>? footprint;
   final String? indoorDestinationId;
+  final IndoorArRequest? indoorRequest;
   final bool external;
   final String? attribution;
   final int? distanceMeters;
