@@ -93,6 +93,8 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
   /// Signed avatar URLs last about an hour; a resume after a long background
   /// stint reloads the URL before the old one expires on screen.
   static const _avatarUrlMaxAge = Duration(minutes: 10);
+  Timer? _nearbyTaskTimer;
+  bool _foreground = true;
 
   late final _router = createAppRouter(widget.appState);
   late final NavigationFlowController _flow = _buildFlow();
@@ -111,12 +113,17 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
     _flowIdentity = widget.appState.activeUser?.id;
     widget.appState.addListener(_onAppStateChanged);
     WidgetsBinding.instance.addObserver(this);
+    _nearbyTaskTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_foreground) unawaited(widget.appState.completeNearbyTasks());
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.resumed) {
       unawaited(widget.appState.refreshProfile(maxAge: _avatarUrlMaxAge));
+      unawaited(widget.appState.completeNearbyTasks());
     }
   }
 
@@ -125,6 +132,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
     if (identity == _flowIdentity) return;
     _flowIdentity = identity;
     _flow.resetForNewIdentity();
+    if (identity != null) unawaited(widget.appState.completeNearbyTasks());
   }
 
   NavigationFlowController _buildFlow() {
@@ -161,6 +169,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _nearbyTaskTimer?.cancel();
     widget.appState.removeListener(_onAppStateChanged);
     _router.dispose();
     widget.appState.dispose();
