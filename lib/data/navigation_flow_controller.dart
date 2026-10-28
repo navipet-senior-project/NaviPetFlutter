@@ -36,6 +36,7 @@ class NavigationFlowController extends ChangeNotifier {
   /// Height reserved for the bottom sheet when framing the map.
   static const placeSheetInset = 280.0;
   static const routeSheetInset = 320.0;
+  static const _minimumArrivalRadiusMeters = 200 * 0.3048;
 
   /// Distance at which the "Arriving soon" state is emitted. App-wide, not
   /// per destination; skipped when the arrival radius is at least this large.
@@ -695,22 +696,37 @@ class NavigationFlowController extends ChangeNotifier {
     final destinationGap = footprint == null
         ? distanceMeters(coordinate, current.destination.coordinate)
         : distanceToFootprintMeters(footprint, coordinate);
-    final arrivalRadius = current.destination.arrivalRadius.toDouble();
+    final routeProjection = projectOntoRoute(
+      current.plan.selected.coordinates,
+      coordinate,
+    );
+    final routeGap = routeProjection.remainingMeters;
+    // A footprint is the building, so its radius stays measured from the wall.
+    final arrivalRadius = footprint == null
+        ? math.max(
+            current.destination.arrivalRadius.toDouble(),
+            _minimumArrivalRadiusMeters,
+          )
+        : current.destination.arrivalRadius.toDouble();
     final arrivalAccuracyLimit = footprint == null
         ? math.min(arrivalRadius, _arrivalAccuracyCap)
         : _footprintAccuracyCap;
     final accurate =
         accuracyMeters.isFinite && accuracyMeters <= arrivalAccuracyLimit;
-    _arrivalFixes = accurate && destinationGap <= arrivalRadius
-        ? _arrivalFixes + 1
+    _arrivalFixes =
+        accurate &&
+            (destinationGap <= arrivalRadius ||
+                (routeGap <= arrivalRadius &&
+                    routeProjection.offRouteMeters <= 20))
+        ? 1
         : 0;
     if (accurate &&
         !_approachAnnounced &&
-        arrivalRadius < approachRadius &&
+        current.destination.arrivalRadius < approachRadius &&
         destinationGap <= approachRadius) {
       _approachAnnounced = true;
     }
-    if (_arrivalFixes >= 2) {
+    if (_arrivalFixes >= 1) {
       _generation++;
       _set(
         FlowArrived(
@@ -1080,6 +1096,7 @@ class NavigationFlowController extends ChangeNotifier {
     subtitle: destination.address,
     source: 'cache',
     buildingCode: destination.buildingCode,
+    arrivalRadiusMeters: destination.arrivalRadiusMeters,
     roomNumber: destination.roomNumber,
     floorNumber: destination.floorNumber,
     outdoorDestination: destination.coordinate,

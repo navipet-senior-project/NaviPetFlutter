@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo;
+import 'package:go_router/go_router.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -620,6 +621,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         state is FlowConfiguringRoute ||
         state is FlowRoutePreview) {
       bottom = 294;
+    } else if (state is FlowArrived) {
+      bottom = 320 + padding.bottom;
     } else {
       bottom = 24;
     }
@@ -897,6 +900,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             Text('Time: ${state.summary.elapsedLabel}'),
             Text('Distance traveled: ${state.summary.distanceLabel}'),
             const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/ar'),
+              icon: const Icon(Icons.view_in_ar_outlined),
+              label: const Text('AR mode'),
+            ),
+            const SizedBox(height: 8),
             FilledButton(
               onPressed: flow.dismissArrival,
               child: const Text('Return to map'),
