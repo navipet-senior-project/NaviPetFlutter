@@ -36,7 +36,7 @@ Out of scope:
 - Supabase `vec_destination_points` holds 17 active doors, all `map_code = MSET_XTBY7AM7ZK77`, `frame = multiset-mapset`, `map_version = 1`, each linked to a `campus_destinations` row:
   - Floor 1 (y ≈ −1.8 m): VEC119, 120, 121, 124, 127, 128, 132, 134, 136.
   - Floor 2 (y = 2.33 m): VEC201, 202, 215, 217, 218, 220, 224, 227.
-- These are Jomar's v2 export: positions relative to the `Floor 1 2` map root (`MAP_YXEW0CKO9CX8`), which is the MapSet's locked origin. Jomar's merge of the other maps moved only `3 4` and `Floor 5`, so it does not affect floors 1–2.
+- Positions are relative to the `Floor 1 2` map root (`MAP_YXEW0CKO9CX8`), which is the MapSet's locked origin. No v2 door file exists in Jomar's repo: the Supabase poses match the v1 export run through the `Floor 1 2` transform (yaw −5.356°, offset (−0.2, 2.2116, −0.86)) within 0.001 m. Both come from the same data, so they do not verify each other; only the device check does. Jomar's merge of the other maps moved only `3 4` and `Floor 5`, so it does not affect floors 1–2.
 - `NaviPetUnity/Assets/IndoorNavigation/Data/vec_floors1and2.json` is the v1 export, relative to `IndoorMapOrigin`. It is never used at runtime.
 - NavipetBackend already returns the door pose on `/places/:placeId` (`findIndoorDoorPoint`, `src/plugins/supabase.ts`).
 - NaviPetUnity has no MultiSet SDK, config or scene in any commit. The SDK installs from `https://github.com/MultiSet-AI/multiset-unity-sdk.git`; credentials live in `Assets/Samples/MultiSet-SDK/<version>/Sample Scenes/Resources/MultiSetConfig.asset`; `MapLocalizationManager` supports a MapSet mode and a runtime map code.
@@ -68,7 +68,7 @@ Flutter /ar?destinationId=…  → IndoorArLaunchScreen
 ### NaviPetUnity — branch `feat/indoor-ar-door-verifier`, off `feat/indoor-ar-transport-spike`
 
 1. `.gitignore`: add `Assets/Samples/MultiSet-SDK/**/Resources/MultiSetConfig.asset` and its `.meta`. Commit this before the SDK is imported.
-2. Add the MultiSet SDK to `Packages/manifest.json` by git URL, pinned to a release tag.
+2. Add the MultiSet SDK to `Packages/manifest.json` by git URL, pinned to a full commit sha. The vendor's Android link fix (package 1.9.3, commit `7791b41`) has no release tag.
 3. `IndoorArSession`: reads the launch request, runs the state machine below, writes the result.
 4. `DoorPin`: the existing `DoorMarker` prefab, placed as a child of the SDK's `Map Space` at `position`, rotated to `headingDeg`.
 5. HUD: localization status, horizontal distance, floor label, wrong-floor banner, "I'm here" button, Exit button.
@@ -147,7 +147,8 @@ The mesh check proves the export and the GLB import agree. It does not prove the
 ### Manual device check
 
 - One ARCore Android phone, APK built with the AAR and the tester's credentials.
-- Doors on opposite wings: VEC119 and VEC128 (floor 1), VEC201 and VEC227 (floor 2).
+- Doors farthest apart per floor among those that pass the mesh check: VEC127 and VEC128 (floor 1, 24.3 m), VEC201 and VEC227 (floor 2, 45.6 m). VEC119, 120, 121 and 124 have no floor geometry in `floor 1 + 2.glb`.
+- Bonus, not pass/fail: one or more runs at VEC119 to probe whether the cloud map covers the floor-1 west wing.
 - Three runs per door, launched from `/dev/indoor-ar-spike`, standing at the door when tapping "I'm here".
 - Pass: median `checkDistanceM` ≤ 1 m for each door.
 - Record per run: `checkDistanceM`, `confidence`, `localizationQueries`, `durationMs`, device model, Android version.

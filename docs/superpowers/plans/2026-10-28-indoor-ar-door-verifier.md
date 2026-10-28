@@ -47,7 +47,7 @@ NaviPetUnity (`Assets/IndoorAr/…` unless noted):
 | File | Change | Responsibility |
 |---|---|---|
 | `.gitignore` (repo root) | modify | ignore `MultiSetConfig.asset` |
-| `Packages/manifest.json` (repo root) | modify | MultiSet SDK by git URL, pinned tag |
+| `Packages/manifest.json` (repo root) | modify | MultiSet SDK by git URL, pinned to a full commit sha (see Deviations) |
 | `Scripts/IndoorArContract.cs` | modify | error-code constants, `CheckMap`, `LocalizationFailed`; frame check leaves `TryParseRequest` |
 | `Scripts/IndoorArSession.cs` | create | pure state machine, distance, wrong floor |
 | `Scripts/IIndoorArLocalizer.cs` | create | what the runner needs from MultiSet |
@@ -2042,8 +2042,9 @@ After Part A and after Part C, `lead-engineer` sends `qa` the branch and base. `
 ## Part E — Device check (humans; `lead-engineer` prepares, `project-manager` runs it with the user)
 
 1. Build the APK with the AAR and the tester's credentials: `flutter build apk --debug --dart-define=NAVIPET_DEV_ROUTE=/dev/indoor-ar-spike` (plus the app's usual `--dart-define`s). Install on one ARCore phone. Team devices only.
-2. In VEC: VEC119 and VEC128 (floor 1), VEC201 and VEC227 (floor 2). Three runs per door, launched from the picker, standing at the door when tapping "I'm here".
+2. In VEC: VEC127 and VEC128 (floor 1), VEC201 and VEC227 (floor 2): the farthest-apart pair in XZ per floor among doors that pass the mesh check (24.3 m and 45.6 m), so a yaw error shows as a distance-dependent miss. Three runs per door, launched from the picker, standing at the door when tapping "I'm here".
 3. Pass: median `checkDistanceM` ≤ 1 m for each door.
+   - Bonus, not a pass/fail gate: one or more runs at VEC119. It localizes → the cloud map covers the floor-1 west wing and the distance tests that pose. It fails to localize → the cloud map has no coverage there. Record either way.
 4. Record per run: `checkDistanceM`, `confidence`, `localizationQueries`, `durationMs`, device model, Android version (from `adb logcat | grep "\[IndoorAr\]"`).
 5. Failure cases once each: camera permission denied, network off, camera covered (localization failure), Exit mid-session.
 6. Reading failures: same offset at every door = frame/origin error; pins mirrored across the corridor = handedness error; random scatter = localization quality.
@@ -2057,3 +2058,5 @@ After Part A and after Part C, `lead-engineer` sends `qa` the branch and base. `
 - `pendingResult` is collected by the room picker (on start and on resume), not by the launch screen. When Android recreates `MainActivity`, the Flutter engine restarts at the initial route, so the launch screen never resumes; device-check builds start at the picker.
 - PR #44's AR button shows only for rooms with indoor navigation.
 - No `confidence` from Unity yet: the SDK's confidence value is unknown until A6 reads the SDK. If A6 finds one, `ar` reports it to the lead as a follow-up; the contract already carries `confidence`.
+- Device-check doors: VEC127 replaces VEC119 on floor 1. The mesh check (A5) found no floor geometry in `floor 1 + 2.glb` under VEC119, 120, 121 and 124. Jomar's repo has no other mesh or door data for them (qa, read-only). VEC119 stays as a bonus run.
+- MultiSet SDK pinned to commit `7791b41975823afe2d039a2c51a9ee2e5d8a51f6` (package version 1.9.3) on the vendor's `main`, not a release tag: 1.9.0 fails the Android AAR link on iOS-only native symbols, and the vendor never tagged 1.9.3. Do not move past this commit: a later commit (`8399fec`) changes map coordinates from global to local.
