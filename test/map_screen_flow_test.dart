@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:navipet/data/app_state.dart';
+import 'package:navipet/data/campus_place.dart';
 import 'package:navipet/data/location_service.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/screens/map_screen.dart';
@@ -227,4 +229,68 @@ void main() {
 
     expect(find.text('Turn on location to route from here.'), findsOneWidget);
   });
+
+  testWidgets('AR mode opens the arrived room when it has indoor navigation', (
+    tester,
+  ) async {
+    final place = CampusPlace(
+      id: harness.horn.id,
+      type: harness.horn.type,
+      title: harness.horn.title,
+      subtitle: harness.horn.subtitle,
+      source: harness.horn.source,
+      buildingCode: harness.horn.buildingCode,
+      outdoorDestination: harness.hornCoordinate,
+      indoorDestinationId: 'vec-119',
+    );
+    final opened = await _arrive(tester, place);
+    expect(find.text('AR mode'), findsOneWidget);
+    await tester.tap(find.text('AR mode'));
+    await tester.pumpAndSettle();
+    expect(opened, [harness.horn.id]);
+  });
+
+  testWidgets('AR mode is absent without indoor navigation', (tester) async {
+    await _arrive(tester, harness.horn);
+    expect(find.text('AR mode'), findsNothing);
+  });
+}
+
+Future<List<String>> _arrive(WidgetTester tester, CampusPlace place) async {
+  final search = harness.FakeSearchGateway()..results = [place];
+  final controller = harness.build(search: search)..openSearch();
+  final opened = <String>[];
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, _) => MapScreen(controller: controller),
+      ),
+      GoRoute(
+        path: '/ar',
+        builder: (_, state) {
+          opened.add(state.uri.queryParameters['destinationId']!);
+          return const Text('ar');
+        },
+      ),
+    ],
+  );
+  addTearDown(router.dispose);
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppState()),
+        ChangeNotifierProvider.value(value: controller),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ),
+  );
+  await controller.selectPlace(place);
+  await controller.requestDirections();
+  await controller.calculateRoute();
+  await controller.startRoute();
+  await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+  await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+  await tester.pump();
+  return opened;
 }
