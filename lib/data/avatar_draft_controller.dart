@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 
 import 'profile_gateway.dart';
 
@@ -18,7 +19,9 @@ class AvatarDraftController extends ChangeNotifier {
   /// image is too large; the earlier draft then stays.
   String? pick(Uint8List bytes) {
     if (bytes.length > maxBytes) return tooLargeMessage;
+    final previous = _bytes;
     _bytes = bytes;
+    if (previous != null) MemoryImage(previous).evict();
     notifyListeners();
     return null;
   }

@@ -22,7 +22,9 @@ String _roleLabel(String? role) => switch (role) {
 };
 
 class AccountSettingsScreen extends StatelessWidget {
-  const AccountSettingsScreen({super.key});
+  const AccountSettingsScreen({super.key, this.pickImage});
+
+  final Future<XFile?> Function()? pickImage;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +40,9 @@ class AccountSettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
         children: [
-          Center(child: _AccountAvatar(name: name)),
+          Center(
+            child: _AccountAvatar(name: name, pickImage: pickImage),
+          ),
           const SizedBox(height: 18),
           Text(
             name,
@@ -886,8 +890,9 @@ class _EditableAvatar extends StatelessWidget {
 /// The Profile & Settings avatar. There is no Save step on that screen, so a
 /// cropped photo is saved straight away.
 class _AccountAvatar extends StatefulWidget {
-  const _AccountAvatar({required this.name});
+  const _AccountAvatar({required this.name, this.pickImage});
   final String name;
+  final Future<XFile?> Function()? pickImage;
   @override
   State<_AccountAvatar> createState() => _AccountAvatarState();
 }
@@ -898,7 +903,7 @@ class _AccountAvatarState extends State<_AccountAvatar> {
   Future<void> _change() async {
     final appState = context.read<AppState>();
     if (!appState.canEditAvatar || _busy) return;
-    final bytes = await pickAndCropAvatar(context);
+    final bytes = await pickAndCropAvatar(context, pickImage: widget.pickImage);
     if (bytes == null || !mounted) return;
     if (bytes.length > AvatarDraftController.maxBytes) {
       _prototypeNotice(context, AvatarDraftController.tooLargeMessage);
