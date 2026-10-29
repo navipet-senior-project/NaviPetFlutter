@@ -110,6 +110,14 @@ void main() {
       },
     );
 
+    test('a 100 m server radius is kept', () async {
+      final controller = await _guide(radius: 100);
+      await _fix(controller, 110);
+      expect(controller.state, isA<FlowActiveNavigation>());
+      await _fix(controller, 90);
+      expect(controller.state, isA<FlowArrived>());
+    });
+
     test(
       'off-route projection cannot trigger arrival past the radius',
       () async {
