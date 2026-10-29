@@ -71,10 +71,44 @@ Future<XFile?> _pickFromLibrary() => ImagePicker().pickImage(
 /// the user's original photo.
 Future<void> _deletePickedCopy(XFile file) async {
   if (file.path.isEmpty) return; // XFile.fromData in tests has no file.
+  final picked = File(file.path);
   try {
-    await File(file.path).delete();
+    await picked.delete();
   } on FileSystemException {
     // Already gone.
+  }
+  // image_picker writes cache/<uuid>/<name> and returns cache/scaled_<name>.
+  final base = picked.uri.pathSegments.where((part) => part.isNotEmpty).last;
+  if (!base.startsWith('scaled_')) return;
+  final name = base.substring('scaled_'.length);
+  if (name.isEmpty) return;
+  final uuid = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+  List<FileSystemEntity> children;
+  try {
+    children = picked.parent.listSync(followLinks: false);
+  } on FileSystemException {
+    return;
+  }
+  for (final entity in children) {
+    if (entity is! Directory) continue;
+    final dirName = entity.uri.pathSegments
+        .where((part) => part.isNotEmpty)
+        .last;
+    if (!uuid.hasMatch(dirName)) continue;
+    final original = File('${entity.path}${Platform.pathSeparator}$name');
+    if (!original.existsSync()) continue;
+    try {
+      await original.delete();
+    } on FileSystemException {
+      // Already gone.
+    }
+    try {
+      await entity.delete();
+    } on FileSystemException {
+      // Not empty, or already gone.
+    }
   }
 }
 

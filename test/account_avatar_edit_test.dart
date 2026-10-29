@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -14,6 +15,7 @@ import 'package:navipet/data/app_state.dart';
 import 'package:navipet/data/profile_gateway.dart';
 import 'package:navipet/router/app_router.dart';
 import 'package:navipet/screens/account_settings_screen.dart';
+import 'package:navipet/screens/avatar_crop_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -427,6 +429,49 @@ void main() {
     expect(imageCache.containsKey(_memoryPreview(tester)), isTrue);
     await tester.pumpWidget(const SizedBox());
     state.dispose();
+  });
+
+  testWidgets('a scaled pick also deletes its uuid cache copy', (tester) async {
+    final png = await _solidPng(tester, const Color(0xFF00AA00));
+    final cache = Directory.systemTemp.createTempSync('avatar_cache');
+    addTearDown(() => cache.deleteSync(recursive: true));
+    const uuid = '11111111-1111-4111-8111-111111111111';
+    const uuid2 = '22222222-2222-4222-8222-222222222222';
+    final scaled = File('${cache.path}/scaled_a.png')..writeAsBytesSync(png);
+    Directory('${cache.path}/$uuid').createSync();
+    File('${cache.path}/$uuid/a.png').writeAsBytesSync(png);
+    Directory('${cache.path}/$uuid2').createSync();
+    File('${cache.path}/$uuid2/b.png').writeAsBytesSync([1]);
+    Directory('${cache.path}/notuuid').createSync();
+    File('${cache.path}/notuuid/a.png').writeAsBytesSync(png);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => pickAndCropAvatar(
+              context,
+              pickImage: () async => XFile(scaled.path),
+            ),
+            child: const Text('pick'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('pick'));
+    await _settleUntil(
+      tester,
+      'the crop screen',
+      () => find.text('Done').evaluate().isNotEmpty,
+    );
+
+    expect(scaled.existsSync(), isFalse);
+    expect(Directory('${cache.path}/$uuid').existsSync(), isFalse);
+    expect(File('${cache.path}/$uuid2/b.png').existsSync(), isTrue);
+    expect(Directory('${cache.path}/$uuid2').existsSync(), isTrue);
+    expect(File('${cache.path}/notuuid/a.png').existsSync(), isTrue);
+    expect(Directory('${cache.path}/notuuid').existsSync(), isTrue);
+    await tester.pumpWidget(const SizedBox());
   });
 
   for (final (label, screen) in [
