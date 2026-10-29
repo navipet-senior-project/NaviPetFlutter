@@ -702,11 +702,10 @@ class NavigationFlowController extends ChangeNotifier {
     );
     final routeGap = routeProjection.remainingMeters;
     // A footprint is the building, so its radius stays measured from the wall.
-    // A point keeps at least 200 ft, including a larger raw server radius.
-    final serverMeters = current.destination.arrivalRadiusMeters?.toDouble();
+    // A point uses arrivalRadius (3–50 m, otherwise 10) and at least 200 ft.
     final arrivalRadius = footprint == null
         ? math.max(
-            serverMeters ?? current.destination.arrivalRadius.toDouble(),
+            current.destination.arrivalRadius.toDouble(),
             _minimumArrivalRadiusMeters,
           )
         : current.destination.arrivalRadius.toDouble();

@@ -110,11 +110,11 @@ void main() {
       },
     );
 
-    test('a 100 m server radius is kept', () async {
+    test('a 100 m server radius falls back to the 200 ft floor', () async {
       final controller = await _guide(radius: 100);
-      await _fix(controller, 110);
-      expect(controller.state, isA<FlowActiveNavigation>());
       await _fix(controller, 90);
+      expect(controller.state, isA<FlowActiveNavigation>());
+      await _fix(controller, 60);
       expect(controller.state, isA<FlowArrived>());
     });
 
