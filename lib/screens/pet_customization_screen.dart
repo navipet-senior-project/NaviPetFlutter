@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../data/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/account_button.dart';
@@ -16,21 +18,51 @@ class PetCustomizationScreen extends StatefulWidget {
 }
 
 class _Outfit {
-  const _Outfit(this.label, this.icon);
+  const _Outfit(this.id, this.label, this.icon, this.price);
+  final String id;
   final String label;
   final IconData icon;
+  final int price;
 }
 
 class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
   // Grid order matches the Figma layout: tee (active), cap, shades, hat.
   static const _outfits = [
-    _Outfit('CSULB Tee', Icons.checkroom),
-    _Outfit('Grad Cap', Icons.school_outlined),
-    _Outfit('Shades', Icons.remove_red_eye_outlined),
-    _Outfit('Beach Hat', Icons.beach_access_outlined),
+    _Outfit('csulb_tee', 'CSULB Tee', Icons.checkroom, 20),
+    _Outfit('grad_cap', 'Grad Cap', Icons.school_outlined, 30),
+    _Outfit('shades', 'Shades', Icons.remove_red_eye_outlined, 15),
+    _Outfit('beach_hat', 'Beach Hat', Icons.beach_access_outlined, 25),
   ];
 
-  int _selected = 0;
+  bool _buying = false;
+
+  Future<void> _selectOutfit(_Outfit outfit) async {
+    final state = context.read<AppState>();
+    if (_buying) return;
+    setState(() => _buying = true);
+    try {
+      final owned = state.ownedOutfits.contains(outfit.id);
+      if (!owned) await state.buyOutfit(outfit.id);
+      await state.equipOutfit(outfit.id);
+      if (mounted && !owned) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${outfit.label} purchased for ${outfit.price} points.',
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not select ${outfit.label}: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _buying = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,16 +132,19 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Row(
-                  children: const [
-                    Icon(
+                  children: [
+                    const Icon(
                       Icons.diamond_outlined,
                       size: 14,
                       color: AppColors.blue,
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
-                      '\$1,250',
-                      style: TextStyle(fontSize: 16, color: AppColors.petInk),
+                      '${context.watch<AppState>().points} points',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: AppColors.petInk,
+                      ),
                     ),
                   ],
                 ),
@@ -124,6 +159,8 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
   }
 
   Widget _mascot() {
+    final equippedId = context.watch<AppState>().equippedOutfit;
+    final equipped = _outfits.where((outfit) => outfit.id == equippedId);
     return Column(
       children: [
         Container(
@@ -134,53 +171,29 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Image.asset('assets/images/shark_dressed.png', width: 176),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.asset('assets/images/shark_dressed.png', width: 176),
+              if (equipped.isNotEmpty)
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: CircleAvatar(
+                    backgroundColor: AppColors.yellow,
+                    child: Icon(equipped.first.icon, color: AppColors.petInk),
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _pill(label: 'Current Look', filled: true, onTap: () {}),
-            const SizedBox(width: AppSpacing.sm),
-            _pill(label: 'Save Outfit', filled: false, onTap: () {}),
-          ],
+        Text(
+          equipped.isEmpty
+              ? 'Choose an outfit from the store'
+              : 'Wearing ${equipped.first.label}',
         ),
       ],
-    );
-  }
-
-  Widget _pill({
-    required String label,
-    required bool filled,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(
-          color: filled ? AppColors.yellow : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: filled ? null : Border.all(color: AppColors.petInk, width: 2),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0D000000),
-              offset: Offset(0, 1),
-              blurRadius: 1,
-            ),
-          ],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 16,
-            color: filled ? AppColors.yellowInk : AppColors.petInk,
-          ),
-        ),
-      ),
     );
   }
 
@@ -188,18 +201,9 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
-              'OUTFITS',
-              style: TextStyle(fontSize: 16, color: AppColors.petInk),
-            ),
-            Text(
-              'See All',
-              style: TextStyle(fontSize: 16, color: AppColors.fieldIcon),
-            ),
-          ],
+        const Text(
+          'PET STORE · OUTFITS',
+          style: TextStyle(fontSize: 16, color: AppColors.petInk),
         ),
         const SizedBox(height: AppSpacing.lg),
         GridView.count(
@@ -217,9 +221,13 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
 
   Widget _outfitCard(int index) {
     final outfit = _outfits[index];
-    final active = _selected == index;
+    final state = context.watch<AppState>();
+    final owned = state.ownedOutfits.contains(outfit.id);
+    final active = state.equippedOutfit == outfit.id;
     return GestureDetector(
-      onTap: () => setState(() => _selected = index),
+      onTap: () {
+        _selectOutfit(outfit);
+      },
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -250,6 +258,9 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
                       fontSize: 16,
                       color: AppColors.petInk,
                     ),
+                  ),
+                  Text(
+                    owned ? 'Owned · Tap to equip' : '${outfit.price} points',
                   ),
                 ],
               ),

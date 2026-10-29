@@ -120,6 +120,16 @@ Supabase Auth owns passwords and sessions. `profiles` stores app-facing account
 data, `classes` stores each user's schedule and locations, and
 `task_completions` stores daily progress. Owner-only policies protect each row.
 
+The points feature also requires [`docs/points_schema.sql`](docs/points_schema.sql)
+to be applied to the same Supabase project before this Flutter release. It adds
+wallets, a transaction ledger, owned outfits, and atomic RPCs for claims and
+purchases. In-person tasks award 10 points once per class per day when the
+device is within 150 meters of the saved class location during its scheduled
+time (with a 15-minute margin). Online attendance and preparation award 5
+points. The app checks nearby classes every 30 seconds while in the foreground;
+location permission must already be granted for automatic check-ins. The pet
+store prices are defined in the SQL migration so the client cannot set them.
+
 ## Authentication flow
 
 NaviPet uses the Fastify authentication endpoints and then hands successful
