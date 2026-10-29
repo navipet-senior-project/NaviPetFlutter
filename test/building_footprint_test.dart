@@ -178,6 +178,16 @@ void main() {
       expect(controller.state, isA<FlowArrived>());
     });
 
+    test('an outside fix resets an inside count', () async {
+      final controller = await _guide(footprint: _square);
+      await controller.onLiveLocation(_offset(0), accuracyMeters: 5);
+      expect(controller.state, isNot(isA<FlowArrived>()));
+      await controller.onLiveLocation(_offset(50), accuracyMeters: 5);
+      expect(controller.state, isNot(isA<FlowArrived>()));
+      await controller.onLiveLocation(_offset(0), accuracyMeters: 5);
+      expect(controller.state, isNot(isA<FlowArrived>()));
+    });
+
     test('announces approach between the wall radius and 15 m', () async {
       final controller = await _guide(footprint: _square);
       await controller.onLiveLocation(_offset(32), accuracyMeters: 5);
