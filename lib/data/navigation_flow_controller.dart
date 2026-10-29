@@ -726,6 +726,7 @@ class NavigationFlowController extends ChangeNotifier {
         : footprint == null
         ? 1
         : _arrivalFixes + 1;
+    // Approach is only reachable for a footprint; a point radius is at least 200 ft.
     if (accurate &&
         !_approachAnnounced &&
         arrivalRadius < approachRadius &&
