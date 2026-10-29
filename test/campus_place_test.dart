@@ -150,4 +150,26 @@ void main() {
     });
     expect(place.indoorRequest, isNull);
   });
+
+  test('a blank room number drops the indoor pose', () {
+    for (final roomNumber in ['', '   ', null]) {
+      final place = CampusPlace.fromJson({
+        'id': '3c011e42-ad7d-4f6c-81d5-e7b23e977d1f',
+        'type': 'room',
+        'title': 'VEC 119',
+        'subtitle': 'VEC',
+        'source': 'csulb',
+        'roomNumber': ?roomNumber,
+        'indoor': {
+          'mapCode': 'MSET_XTBY7AM7ZK77',
+          'frame': 'multiset-mapset',
+          'doorKey': 'VEC119',
+          'floor': '1',
+          'position': {'x': -5.7651, 'y': -1.8186, 'z': 22.6689},
+          'headingDeg': 185.36,
+        },
+      });
+      expect(place.indoorRequest, isNull, reason: '$roomNumber');
+    }
+  });
 }

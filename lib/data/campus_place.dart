@@ -52,6 +52,8 @@ class CampusPlace {
     final latitude = outdoorJson?['latitude'];
     final longitude = outdoorJson?['longitude'];
 
+    final room = _optionalString(json['roomNumber']);
+
     return CampusPlace(
       id: _requiredString(json, 'id'),
       type: _parseType(_requiredString(json, 'type')),
@@ -59,7 +61,7 @@ class CampusPlace {
       subtitle: _requiredString(json, 'subtitle'),
       source: _requiredString(json, 'source'),
       buildingCode: _optionalString(json['buildingCode']),
-      roomNumber: _optionalString(json['roomNumber']),
+      roomNumber: room,
       floorNumber: _optionalString(json['floorNumber']),
       outdoorDestination: latitude is num && longitude is num
           ? NavigationCoordinate(
@@ -74,10 +76,9 @@ class CampusPlace {
       indoorDestinationId: _optionalString(
         navigationJson['indoorDestinationId'],
       ),
-      indoorRequest: IndoorArRequest.fromDoorPose(
-        json['indoor'],
-        room: _optionalString(json['roomNumber']) ?? '',
-      ),
+      indoorRequest: room == null
+          ? null
+          : IndoorArRequest.fromDoorPose(json['indoor'], room: room),
       external: json['external'] == true,
       attribution: _optionalString(json['attribution']),
       distanceMeters: (json['distanceMeters'] as num?)?.round(),
