@@ -702,6 +702,7 @@ class NavigationFlowController extends ChangeNotifier {
     );
     final routeGap = routeProjection.remainingMeters;
     // A footprint is the building, so its radius stays measured from the wall.
+    // A point uses arrivalRadius (3–50 m, otherwise 10) and at least 200 ft.
     final arrivalRadius = footprint == null
         ? math.max(
             current.destination.arrivalRadius.toDouble(),
@@ -713,20 +714,27 @@ class NavigationFlowController extends ChangeNotifier {
         : _footprintAccuracyCap;
     final accurate =
         accuracyMeters.isFinite && accuracyMeters <= arrivalAccuracyLimit;
-    _arrivalFixes =
-        accurate &&
-            (destinationGap <= arrivalRadius ||
-                (routeGap <= arrivalRadius &&
-                    routeProjection.offRouteMeters <= 20))
+    // Route-end arrival covers a pin offset from the route. The footprint
+    // already is the building, so only the wall distance counts.
+    final onRouteEnd =
+        footprint == null &&
+        routeGap <= arrivalRadius &&
+        routeProjection.offRouteMeters <= 20;
+    final inRange = destinationGap <= arrivalRadius || onRouteEnd;
+    _arrivalFixes = !accurate || !inRange
+        ? 0
+        : footprint == null
         ? 1
-        : 0;
+        : _arrivalFixes + 1;
+    // Approach is only reachable for a footprint; a point radius is at least 200 ft.
     if (accurate &&
         !_approachAnnounced &&
-        current.destination.arrivalRadius < approachRadius &&
+        arrivalRadius < approachRadius &&
         destinationGap <= approachRadius) {
       _approachAnnounced = true;
     }
-    if (_arrivalFixes >= 1) {
+    final fixesNeeded = footprint == null ? 1 : 2;
+    if (_arrivalFixes >= fixesNeeded) {
       _generation++;
       _set(
         FlowArrived(
