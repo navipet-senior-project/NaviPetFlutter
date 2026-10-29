@@ -55,13 +55,14 @@ class IndoorArRequest {
     if (x is! num || y is! num || z is! num || heading is! num) return null;
     if (doorKey is! String || floor is! String) return null;
     if (mapCode is! String || frame is! String) return null;
+    final headingDeg = ((heading.toDouble() % 360) + 360) % 360;
     try {
       return IndoorArRequest(
         room: room,
         doorKey: doorKey,
         floor: floor,
         position: IndoorArVector3(x.toDouble(), y.toDouble(), z.toDouble()),
-        headingDeg: heading.toDouble(),
+        headingDeg: headingDeg,
         mapCode: mapCode,
         frame: frame,
       );

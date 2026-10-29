@@ -228,10 +228,27 @@ void main() {
       expect(request.headingDeg, 5.0);
     });
 
+    test('wraps a heading onto [0, 360)', () {
+      expect(
+        IndoorArRequest.fromDoorPose(
+          pose(headingDeg: 360),
+          room: '119',
+        )?.headingDeg,
+        0,
+      );
+      expect(
+        IndoorArRequest.fromDoorPose(
+          pose(headingDeg: -90),
+          room: '119',
+        )?.headingDeg,
+        270,
+      );
+    });
+
     test('returns null for a missing or invalid pose', () {
       expect(IndoorArRequest.fromDoorPose(null, room: '119'), isNull);
       expect(
-        IndoorArRequest.fromDoorPose(pose(headingDeg: 360), room: '119'),
+        IndoorArRequest.fromDoorPose(pose(headingDeg: double.nan), room: '119'),
         isNull,
       );
       expect(
