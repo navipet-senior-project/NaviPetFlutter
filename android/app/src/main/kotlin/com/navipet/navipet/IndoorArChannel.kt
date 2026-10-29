@@ -17,7 +17,7 @@ class IndoorArChannel(
     private val activity: Activity,
     private val unityEnabled: Boolean,
 ) : MethodChannel.MethodCallHandler {
-    private var pending: MethodChannel.Result? = null
+    internal var pending: MethodChannel.Result? = null
     private var startedAt = 0L
     private val unclaimed = IndoorArResultSlot()
 
@@ -50,10 +50,12 @@ class IndoorArChannel(
             activity.startActivityForResult(intent, REQUEST_CODE)
         } catch (e: ActivityNotFoundException) {
             pending = null
+            startedAt = 0L
             result.success(IndoorArResults.unavailable())
         } catch (e: RuntimeException) {
             // SecurityException, IllegalStateException: never leave a call pending.
             pending = null
+            startedAt = 0L
             Log.w(TAG, "startActivityForResult failed", e)
             result.success(IndoorArResults.error(IndoorArResults.UNITY_EXITED, 0))
         }
@@ -69,13 +71,20 @@ class IndoorArChannel(
             durationMs,
         )
         val result = pending
+        pending = null
+        startedAt = 0L
         if (result == null) {
             unclaimed.put(json)
         } else {
-            pending = null
             result.success(json)
         }
         return true
+    }
+
+    /** Drops a launch whose Dart caller is gone, so the next launch is not BAD_REQUEST. */
+    fun detach() {
+        pending = null
+        startedAt = 0L
     }
 
     companion object {
