@@ -184,7 +184,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         : null;
     final gateway = appState.profileGateway;
     if (gateway != null && appState.canEditAvatar) {
-      _avatar = AvatarDraftController(gateway)..addListener(_onAvatarChanged);
+      _avatar = AvatarDraftController()..addListener(_onAvatarChanged);
     }
   }
 
@@ -194,7 +194,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
-    // Leaving without saving discards the pending upload (fire-and-forget).
+    // The draft never reached the server; wiping the in-memory preview is
+    // the whole cleanup.
+    final previewBytes = _avatar?.pendingBytes;
+    if (previewBytes != null) MemoryImage(previewBytes).evict();
     _avatar
       ?..removeListener(_onAvatarChanged)
       ..dispose();
@@ -207,8 +210,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (avatar == null || _saving) return;
     final bytes = await pickAndCropAvatar(context, pickImage: widget.pickImage);
     if (bytes == null || !mounted) return;
-    final error = await avatar.upload(bytes, 'avatar.png');
-    if (error != null && mounted) _prototypeNotice(context, error);
+    final error = avatar.pick(bytes);
+    if (error != null) _prototypeNotice(context, error);
   }
 
   Future<void> _save() async {
@@ -233,37 +236,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
     final nameChanged = name != user.name;
-    if (avatar.isUploading) return;
     final roleChanged = _role != user.role;
-    if (!nameChanged && !roleChanged && avatar.pendingUploadId == null) {
+    final avatarBytes = avatar.pendingBytes;
+    if (!nameChanged && !roleChanged && avatarBytes == null) {
       context.pop();
       return;
     }
 
     setState(() => _saving = true);
-    final uploadId = avatar.takeForCommit();
     try {
       await appState.saveProfile(
         displayName: nameChanged ? name : null,
-        avatarUploadId: uploadId,
         role: roleChanged ? _role : null,
+        avatarBytes: avatarBytes,
       );
       if (!mounted) return;
       _prototypeNotice(context, 'Profile saved.');
       context.pop();
     } on ProfileApiException catch (error) {
-      final expired = error.statusCode == 404 && uploadId != null;
-      if (uploadId != null) {
-        avatar.restoreAfterFailedCommit(uploadId, expired: expired);
-      }
+      // The draft keeps the bytes, so Save can simply be tapped again.
       if (!mounted) return;
       _prototypeNotice(
         context,
-        expired
-            ? AvatarDraftController.expiredMessage
-            : error.statusCode == 0 || error.statusCode == 408
-            ? error.message
-            : 'Could not save your profile. Please try again.',
+        AvatarDraftController.messageFor(error) ??
+            'Could not save your profile. Please try again.',
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -280,8 +276,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _role = fetchedRole;
     }
     final avatar = _avatar;
-    final uploading = avatar?.isUploading ?? false;
-    final previewUrl = avatar?.previewUrl;
+    final previewBytes = avatar?.pendingBytes;
     return Scaffold(
       backgroundColor: _page,
       appBar: _appBar(context, 'Edit Profile'),
@@ -289,8 +284,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: FilledButton.icon(
-            // Saving mid-upload would commit the previous (or no) photo.
-            onPressed: _saving || uploading ? null : _save,
+            onPressed: _saving ? null : _save,
             icon: const Icon(Icons.save_outlined, size: 18),
             label: const Text('Save Changes'),
             style: _filledStyle(),
@@ -304,18 +298,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Center(
             child: _EditableAvatar(
               editable: avatar != null,
-              busy: uploading,
+              busy: _saving,
               onEdit: _saving ? null : _pickAvatar,
               avatar: _Avatar(
                 name: _name.text,
                 color: AppColors.blue,
                 radius: 48,
-                imageUrl: previewUrl ?? appState.activeUser?.avatarUrl,
-                // A failed preview is not the saved avatar; refetching the
-                // profile would not help it.
-                onImageError: previewUrl == null
-                    ? appState.reportAvatarLoadFailed
-                    : null,
+                imageBytes: previewBytes,
+                imageUrl: appState.activeUser?.avatarUrl,
+                onImageError: appState.reportAvatarLoadFailed,
               ),
             ),
           ),
@@ -818,12 +809,14 @@ class _Avatar extends StatelessWidget {
     this.color,
     this.radius = 46,
     this.imageUrl,
+    this.imageBytes,
     this.onImageError,
   });
   final String name;
   final Color? color;
   final double radius;
   final String? imageUrl;
+  final Uint8List? imageBytes;
   final ValueChanged<String>? onImageError;
   @override
   Widget build(BuildContext context) => CircleAvatar(
@@ -834,6 +827,7 @@ class _Avatar extends StatelessWidget {
       color: color ?? AppColors.blue,
       size: radius * 2,
       imageUrl: imageUrl,
+      imageBytes: imageBytes,
       onImageError: onImageError,
       initialStyle: TextStyle(
         fontSize: radius * .72,
@@ -890,7 +884,7 @@ class _EditableAvatar extends StatelessWidget {
 }
 
 /// The Profile & Settings avatar. There is no Save step on that screen, so a
-/// cropped photo is uploaded and committed straight away.
+/// cropped photo is saved straight away.
 class _AccountAvatar extends StatefulWidget {
   const _AccountAvatar({required this.name});
   final String name;
@@ -899,49 +893,27 @@ class _AccountAvatar extends StatefulWidget {
 }
 
 class _AccountAvatarState extends State<_AccountAvatar> {
-  /// Created on first use; disposing it discards an upload still in flight
-  /// when the user leaves the screen.
-  AvatarDraftController? _draft;
   bool _busy = false;
-
-  @override
-  void dispose() {
-    _draft?.dispose();
-    super.dispose();
-  }
 
   Future<void> _change() async {
     final appState = context.read<AppState>();
-    final gateway = appState.profileGateway;
-    if (gateway == null || !appState.canEditAvatar || _busy) return;
+    if (!appState.canEditAvatar || _busy) return;
     final bytes = await pickAndCropAvatar(context);
     if (bytes == null || !mounted) return;
-    final draft = _draft ??= AvatarDraftController(gateway);
+    if (bytes.length > AvatarDraftController.maxBytes) {
+      _prototypeNotice(context, AvatarDraftController.tooLargeMessage);
+      return;
+    }
     setState(() => _busy = true);
     try {
-      final error = await draft.upload(bytes, 'avatar.png');
-      if (error != null) {
-        if (mounted) _prototypeNotice(context, error);
-        return;
-      }
-      final uploadId = draft.takeForCommit();
-      if (uploadId == null) return;
-      try {
-        await appState.saveProfile(avatarUploadId: uploadId);
-      } on ProfileApiException catch (error) {
-        // After a timeout or lost connection the update may still have
-        // committed the upload, and a committed upload must never be
-        // discarded; the server clears a stranded one after 24 hours.
-        final ambiguous = error.statusCode == 0 || error.statusCode == 408;
-        if (!ambiguous) gateway.discardAvatarUpload(uploadId).ignore();
-        if (mounted) {
-          _prototypeNotice(
-            context,
-            ambiguous
-                ? error.message
-                : 'Could not update your profile photo. Please try again.',
-          );
-        }
+      await appState.saveProfile(avatarBytes: bytes);
+    } on ProfileApiException catch (error) {
+      if (mounted) {
+        _prototypeNotice(
+          context,
+          AvatarDraftController.messageFor(error) ??
+              'Could not update your profile photo. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

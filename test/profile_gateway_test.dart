@@ -134,56 +134,77 @@ void main() {
     });
   });
 
-  group('uploadAvatar', () {
-    test('posts the bytes as multipart in the avatar field', () async {
-      final upload = await gateway(
-        (_) => _json({
-          'uploadId': '6f1c1f0e-0000-4000-8000-000000000001',
-          'avatarUrl': 'https://cdn.test/pending.jpg?token=1',
-        }, 200),
-      ).uploadAvatar(bytes: [0xFF, 0xD8, 0xFF, 0xE0], filename: 'me.jpg');
+  group('updateProfile', () {
+    test(
+      'sends JSON with only the provided fields when there is no avatar',
+      () async {
+        await gateway(
+          (_) => _json(_profile(), 200),
+        ).updateProfile(displayName: 'Jane');
+
+        final request = requests.single;
+        expect(request.method, 'PATCH');
+        expect(request.url.path, '/profiles/me');
+        expect(request.headers['Content-Type'], startsWith('application/json'));
+        expect(jsonDecode(request.body), {'displayName': 'Jane'});
+      },
+    );
+
+    test('sends the avatar and fields as one multipart PATCH', () async {
+      final profile =
+          await gateway(
+            (_) => _json(_profile(avatarUrl: 'https://cdn.test/new.png'), 200),
+          ).updateProfile(
+            displayName: 'Jane',
+            role: 'student',
+            avatarBytes: [0x89, 0x50, 0x4E, 0x47],
+          );
 
       final request = requests.single;
-      expect(request.method, 'POST');
-      expect(request.url.path, '/profiles/me/avatar');
-      expect(request.headers['Authorization'], 'Bearer token-1');
+      expect(request.method, 'PATCH');
+      expect(request.url.path, '/profiles/me');
       expect(
         request.headers['content-type'],
         startsWith('multipart/form-data; boundary='),
       );
       final body = latin1.decode(request.bodyBytes);
-      expect(body, contains('name="avatar"; filename="me.jpg"'));
-      expect(body, contains(latin1.decode([0xFF, 0xD8, 0xFF, 0xE0])));
-      expect(upload.uploadId, '6f1c1f0e-0000-4000-8000-000000000001');
-      expect(upload.avatarUrl, 'https://cdn.test/pending.jpg?token=1');
+      expect(body, contains('name="avatar"; filename="avatar.png"'));
+      expect(body, contains(latin1.decode([0x89, 0x50, 0x4E, 0x47])));
+      expect(body, contains('name="displayName"'));
+      expect(body, contains('name="role"'));
+      expect(body, isNot(contains('avatar${'Upload'}Id')));
+      expect(profile.avatarUrl, 'https://cdn.test/new.png');
+    });
+
+    test('an avatar-only update sends no text fields', () async {
+      await gateway(
+        (_) => _json(_profile(), 200),
+      ).updateProfile(avatarBytes: [1, 2, 3]);
+
+      final body = latin1.decode(requests.single.bodyBytes);
+      expect(body, contains('name="avatar"'));
+      expect(body, isNot(contains('name="displayName"')));
+      expect(body, isNot(contains('name="role"')));
     });
 
     test('rebuilds the multipart request for the 401 retry', () async {
       var calls = 0;
-      final upload = await gateway(
-        (request) {
-          calls++;
-          return calls == 1
-              ? _error(401, 'expired')
-              : _json({
-                  'uploadId': 'u1',
-                  'avatarUrl': 'https://cdn.test/p',
-                }, 200);
-        },
+      await gateway(
+        (_) => ++calls == 1 ? _error(401, 'expired') : _json(_profile(), 200),
         auth: FakeAuth(['stale', 'fresh']),
-      ).uploadAvatar(bytes: [1, 2, 3], filename: 'me.png');
+      ).updateProfile(avatarBytes: [1, 2, 3]);
 
-      expect(upload.uploadId, 'u1');
       expect(requests, hasLength(2));
       expect(latin1.decode(requests.last.bodyBytes), contains('name="avatar"'));
+      expect(requests.last.headers['Authorization'], 'Bearer fresh');
     });
 
-    for (final status in [400, 413, 415, 502, 503]) {
+    for (final status in [400, 413, 415, 422, 502, 503]) {
       test('maps $status to a typed exception', () async {
         await expectLater(
           gateway(
             (_) => _error(status, 'nope'),
-          ).uploadAvatar(bytes: [1], filename: 'x.heic'),
+          ).updateProfile(avatarBytes: [1]),
           throwsA(
             isA<ProfileApiException>().having(
               (e) => e.statusCode,
@@ -195,41 +216,6 @@ void main() {
       });
     }
 
-    test('rejects a response without an uploadId', () async {
-      await expectLater(
-        gateway(
-          (_) => _json({'avatarUrl': 'https://cdn.test/p'}, 200),
-        ).uploadAvatar(bytes: [1], filename: 'x.jpg'),
-        throwsA(isA<ProfileApiException>()),
-      );
-    });
-  });
-
-  group('updateProfile', () {
-    test('patches only the provided fields', () async {
-      final profile = await gateway(
-        (_) => _json(_profile(avatarUrl: 'https://cdn.test/new.jpg'), 200),
-      ).updateProfile(avatarUploadId: 'u1');
-
-      final request = requests.single;
-      expect(request.method, 'PATCH');
-      expect(request.url.path, '/profiles/me');
-      expect(request.headers['Content-Type'], startsWith('application/json'));
-      expect(jsonDecode(request.body), {'avatarUploadId': 'u1'});
-      expect(profile.avatarUrl, 'https://cdn.test/new.jpg');
-    });
-
-    test('sends the display name alongside the upload', () async {
-      await gateway(
-        (_) => _json(_profile(), 200),
-      ).updateProfile(displayName: 'Jane', avatarUploadId: 'u1');
-
-      expect(jsonDecode(requests.single.body), {
-        'displayName': 'Jane',
-        'avatarUploadId': 'u1',
-      });
-    });
-
     test('sends and reads the selected role', () async {
       final profile = await gateway(
         (_) => _json({
@@ -239,47 +225,6 @@ void main() {
 
       expect(jsonDecode(requests.single.body), {'role': 'professor'});
       expect(profile.role, 'professor');
-    });
-
-    test('surfaces a 404 for an upload that no longer exists', () async {
-      await expectLater(
-        gateway(
-          (_) => _error(404, 'Avatar upload not found.'),
-        ).updateProfile(avatarUploadId: 'gone'),
-        throwsA(
-          isA<ProfileApiException>().having((e) => e.statusCode, 'status', 404),
-        ),
-      );
-    });
-  });
-
-  group('discardAvatarUpload', () {
-    test('deletes the pending upload by id', () async {
-      await gateway(
-        (_) => http.Response('', 204),
-      ).discardAvatarUpload('6f1c1f0e-0000-4000-8000-000000000001');
-
-      expect(requests.single.method, 'DELETE');
-      expect(
-        requests.single.url.path,
-        '/profiles/me/avatar/6f1c1f0e-0000-4000-8000-000000000001',
-      );
-      expect(requests.single.headers['Authorization'], 'Bearer token-1');
-    });
-
-    test('treats 404 (already gone) as success', () async {
-      await gateway(
-        (_) => _error(404, 'Temporary avatar not found.'),
-      ).discardAvatarUpload('u1');
-    });
-
-    test('throws for other failures', () async {
-      await expectLater(
-        gateway((_) => _error(502, 'down')).discardAvatarUpload('u1'),
-        throwsA(
-          isA<ProfileApiException>().having((e) => e.statusCode, 'status', 502),
-        ),
-      );
     });
   });
 }

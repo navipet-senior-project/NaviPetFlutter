@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -26,7 +27,13 @@ Future<Uint8List?> pickAndCropAvatar(
     return null;
   }
   if (file == null || !context.mounted) return null;
-  final image = await decodeAvatarImage(await file.readAsBytes());
+  final Uint8List bytes;
+  try {
+    bytes = await file.readAsBytes();
+  } finally {
+    await _deletePickedCopy(file);
+  }
+  final image = await decodeAvatarImage(bytes);
   if (!context.mounted) {
     image?.dispose();
     return null;
@@ -55,6 +62,19 @@ Future<XFile?> _pickFromLibrary() => ImagePicker().pickImage(
   maxWidth: 2048,
   maxHeight: 2048,
 );
+
+/// image_picker copies every pick into the app cache (Android cacheDir,
+/// iOS tmp). The draft lives in memory from here on, so the copy goes now
+/// instead of whenever the OS clears the cache. The OS sandbox keeps the
+/// user's original photo out of reach.
+Future<void> _deletePickedCopy(XFile file) async {
+  if (file.path.isEmpty) return; // XFile.fromData in tests has no file.
+  try {
+    await File(file.path).delete();
+  } on FileSystemException {
+    // Already gone.
+  }
+}
 
 /// Decodes the first frame of [bytes], or returns `null` when Flutter cannot
 /// decode it. The caller owns (and disposes) the image.

@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,33 +16,33 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _FakeProfileGateway implements ProfileGateway {
-  final List<(List<int>, String)> uploads = [];
+  _FakeProfileGateway({this.role});
+
+  final String? role;
+  final List<({String? displayName, String? role, List<int>? avatarBytes})>
+  updates = [];
 
   @override
   Future<RemoteProfile> fetchProfile() async =>
-      const RemoteProfile(displayName: 'Jane');
-
-  @override
-  Future<AvatarUpload> uploadAvatar({
-    required List<int> bytes,
-    required String filename,
-  }) async {
-    uploads.add((bytes, filename));
-    return const AvatarUpload(
-      uploadId: 'upload-1',
-      avatarUrl: 'https://cdn.test/pending.png',
-    );
-  }
+      RemoteProfile(displayName: 'Jane', role: role);
 
   @override
   Future<RemoteProfile> updateProfile({
     String? displayName,
-    String? avatarUploadId,
     String? role,
-  }) => throw UnimplementedError();
-
-  @override
-  Future<void> discardAvatarUpload(String uploadId) async {}
+    List<int>? avatarBytes,
+  }) async {
+    updates.add((
+      displayName: displayName,
+      role: role,
+      avatarBytes: avatarBytes,
+    ));
+    return const RemoteProfile(
+      displayName: 'Jane',
+      role: 'student',
+      avatarUrl: 'https://cdn.test/new.png',
+    );
+  }
 }
 
 /// An offline Supabase client with a restored session: a non-JWT access
@@ -163,7 +165,7 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('Edit Profile: pencil, pick, crop and upload a PNG', (
+  testWidgets('Edit Profile: pencil, pick, crop and save a PNG', (
     tester,
   ) async {
     final png = (await tester.runAsync(() async {
@@ -177,19 +179,32 @@ void main() {
       image.dispose();
       return data!.buffer.asUint8List();
     }))!;
-    final gateway = _FakeProfileGateway();
+    final gateway = _FakeProfileGateway(role: 'student');
     final state = AppState(
       supabase: await _signedIn(anonymous: false),
       profileGateway: gateway,
     );
+    final router = GoRouter(
+      initialLocation: '/settings/edit',
+      routes: [
+        GoRoute(
+          path: '/settings',
+          builder: (_, _) => const Scaffold(body: Text('settings')),
+          routes: [
+            GoRoute(
+              path: 'edit',
+              builder: (_, _) => EditProfileScreen(
+                pickImage: () async => XFile.fromData(png, name: 'photo.heic'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: state,
-        child: MaterialApp(
-          home: EditProfileScreen(
-            pickImage: () async => XFile.fromData(png, name: 'photo.heic'),
-          ),
-        ),
+        child: MaterialApp.router(routerConfig: router),
       ),
     );
     await tester.pumpAndSettle();
@@ -204,15 +219,63 @@ void main() {
     await tester.pumpAndSettle(); // Let the route finish sliding in.
 
     await tester.tap(find.text('Done'));
-    await _settleUntil(tester, 'the upload', () => gateway.uploads.isNotEmpty);
+    await _settleUntil(
+      tester,
+      'the preview',
+      () => find.text('Done').evaluate().isEmpty,
+    );
+    await tester.pumpAndSettle();
+    expect(gateway.updates, isEmpty, reason: 'nothing is sent before Save');
 
-    final (bytes, filename) = gateway.uploads.single;
-    expect(filename, 'avatar.png');
-    expect(Uint8List.fromList(bytes.sublist(0, 8)), [
+    await tester.tap(find.text('Save Changes'));
+    await _settleUntil(tester, 'the save', () => gateway.updates.isNotEmpty);
+
+    final update = gateway.updates.single;
+    expect(update.displayName, isNull);
+    expect(Uint8List.fromList(update.avatarBytes!.sublist(0, 8)), [
       137, 80, 78, 71, 13, 10, 26, 10, // PNG signature
     ]);
-    // Leaving the screen unsaved discards the pending upload; unmount it
-    // before disposing the state it listens to.
+    await tester.pumpWidget(const SizedBox());
+    state.dispose();
+  });
+
+  testWidgets('the picked file is deleted once its bytes are read', (
+    tester,
+  ) async {
+    final png = (await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawRect(
+        const Rect.fromLTWH(0, 0, 30, 20),
+        Paint()..color = const Color(0xFF00AA00),
+      );
+      final image = await recorder.endRecording().toImage(30, 20);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      return data!.buffer.asUint8List();
+    }))!;
+    final dir = Directory.systemTemp.createTempSync('avatar_pick');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final picked = File('${dir.path}/picked.png')..writeAsBytesSync(png);
+    final state = AppState(
+      supabase: await _signedIn(anonymous: false),
+      profileGateway: _FakeProfileGateway(),
+    );
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: state,
+        child: MaterialApp(
+          home: EditProfileScreen(pickImage: () async => XFile(picked.path)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(pencil);
+    await _settleUntil(
+      tester,
+      'the crop screen',
+      () => find.text('Done').evaluate().isNotEmpty,
+    );
+    expect(picked.existsSync(), isFalse);
     await tester.pumpWidget(const SizedBox());
     state.dispose();
   });

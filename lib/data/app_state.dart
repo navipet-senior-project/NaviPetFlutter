@@ -205,12 +205,12 @@ class AppState extends ChangeNotifier {
   }
 
   /// Saves profile edits through the backend and applies the response.
-  /// Throws [ProfileApiException]; a 404 with [avatarUploadId] means that
-  /// upload no longer exists.
+  /// [avatarBytes] becomes the avatar in the same request. Throws
+  /// [ProfileApiException].
   Future<void> saveProfile({
     String? displayName,
-    String? avatarUploadId,
     String? role,
+    List<int>? avatarBytes,
   }) async {
     final gateway = _profileGateway;
     final user = _activeUser;
@@ -219,8 +219,8 @@ class AppState extends ChangeNotifier {
     }
     final profile = await gateway.updateProfile(
       displayName: displayName,
-      avatarUploadId: avatarUploadId,
       role: role,
+      avatarBytes: avatarBytes,
     );
     final current = _activeUser;
     if (current == null || current.id != user.id) return;
