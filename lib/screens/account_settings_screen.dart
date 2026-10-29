@@ -214,8 +214,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (avatar == null || _saving) return;
     final bytes = await pickAndCropAvatar(context, pickImage: widget.pickImage);
     if (bytes == null || !mounted) return;
+    final previous = avatar.pendingBytes;
     final error = avatar.pick(bytes);
-    if (error != null) _prototypeNotice(context, error);
+    if (error != null) {
+      _prototypeNotice(context, error);
+      return;
+    }
+    if (previous != null) MemoryImage(previous).evict();
   }
 
   Future<void> _save() async {
@@ -891,6 +896,7 @@ class _EditableAvatar extends StatelessWidget {
 /// cropped photo is saved straight away.
 class _AccountAvatar extends StatefulWidget {
   const _AccountAvatar({required this.name, this.pickImage});
+
   final String name;
   final Future<XFile?> Function()? pickImage;
   @override

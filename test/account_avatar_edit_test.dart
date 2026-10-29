@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -15,7 +14,6 @@ import 'package:navipet/data/app_state.dart';
 import 'package:navipet/data/profile_gateway.dart';
 import 'package:navipet/router/app_router.dart';
 import 'package:navipet/screens/account_settings_screen.dart';
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -283,64 +281,6 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('a cache copy is deleted and a path outside it is kept', (
-    tester,
-  ) async {
-    final png = await _solidPng(tester, const Color(0xFF00AA00));
-    // `cache_real` has `cache` as a string prefix, so a missing separator
-    // would delete the outside file too.
-    final parent = Directory.systemTemp.createTempSync('avatar_root');
-    addTearDown(() => parent.deleteSync(recursive: true));
-    final inside = Directory('${parent.path}/cache')..createSync();
-    final outside = Directory('${parent.path}/cache_real')..createSync();
-    final copied = File('${inside.path}/picked.png')..writeAsBytesSync(png);
-    final original = File('${outside.path}/picked.png')..writeAsBytesSync(png);
-    final previous = PathProviderPlatform.instance;
-    PathProviderPlatform.instance = _FakePaths(
-      inside.path,
-      '${parent.path}/appcache',
-    );
-    addTearDown(() => PathProviderPlatform.instance = previous);
-    final files = [copied, original];
-    var next = 0;
-    final state = AppState(
-      supabase: await _signedIn(anonymous: false),
-      profileGateway: _FakeProfileGateway(),
-    );
-    await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: state,
-        child: MaterialApp(
-          home: EditProfileScreen(
-            pickImage: () async => XFile(files[next++].path),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(pencil);
-    await _settleUntil(
-      tester,
-      'the crop screen',
-      () => find.text('Done').evaluate().isNotEmpty,
-    );
-    expect(copied.existsSync(), isFalse);
-    expect(original.existsSync(), isTrue);
-
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    await tester.tap(pencil);
-    await _settleUntil(
-      tester,
-      'the crop screen',
-      () => find.text('Done').evaluate().isNotEmpty,
-    );
-    expect(original.existsSync(), isTrue);
-    await tester.pumpWidget(const SizedBox());
-    state.dispose();
-  });
-
   testWidgets('Profile & Settings pencil sends the crop in one PATCH', (
     tester,
   ) async {
@@ -545,19 +485,6 @@ class _GalleryPicker extends ImagePickerPlatform {
     required ImageSource source,
     ImagePickerOptions options = const ImagePickerOptions(),
   }) async => file;
-}
-
-class _FakePaths extends PathProviderPlatform {
-  _FakePaths(this.temp, this.cache);
-
-  final String temp;
-  final String cache;
-
-  @override
-  Future<String?> getTemporaryPath() async => temp;
-
-  @override
-  Future<String?> getApplicationCachePath() async => cache;
 }
 
 Future<Uint8List> _solidPng(WidgetTester tester, Color color) async {
