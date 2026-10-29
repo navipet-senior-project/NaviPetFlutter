@@ -23,6 +23,7 @@ class IndoorArChannel(
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         if (call.method == "pendingResult") {
+            // TODO: release path not built; only the debug room picker collects pendingResult (plan Deviation).
             result.success(unclaimed.take())
             return
         }
@@ -30,6 +31,7 @@ class IndoorArChannel(
             result.notImplemented()
             return
         }
+        unclaimed.take()
         if (!unityEnabled) {
             result.success(IndoorArResults.unavailable())
             return
