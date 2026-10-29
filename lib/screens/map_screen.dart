@@ -900,12 +900,17 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             Text('Time: ${state.summary.elapsedLabel}'),
             Text('Distance traveled: ${state.summary.distanceLabel}'),
             const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => context.push('/ar'),
-              icon: const Icon(Icons.view_in_ar_outlined),
-              label: const Text('AR mode'),
-            ),
-            const SizedBox(height: 8),
+            if (state.destination.hasIndoorNavigation &&
+                state.destination.id != null) ...[
+              OutlinedButton.icon(
+                onPressed: () => context.push(
+                  '/ar?destinationId=${Uri.encodeQueryComponent(state.destination.id!)}',
+                ),
+                icon: const Icon(Icons.view_in_ar_outlined),
+                label: const Text('AR mode'),
+              ),
+              const SizedBox(height: 8),
+            ],
             FilledButton(
               onPressed: flow.dismissArrival,
               child: const Text('Return to map'),

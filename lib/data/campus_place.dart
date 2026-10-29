@@ -1,3 +1,4 @@
+import 'indoor_ar_contract.dart';
 import 'navigation_models.dart';
 
 export 'navigation_models.dart' show CampusDestinationType;
@@ -35,6 +36,7 @@ class CampusPlace {
     this.arrivalRadiusMeters,
     this.footprint,
     this.indoorDestinationId,
+    this.indoorRequest,
     this.external = false,
     this.attribution,
     this.distanceMeters,
@@ -50,6 +52,8 @@ class CampusPlace {
     final latitude = outdoorJson?['latitude'];
     final longitude = outdoorJson?['longitude'];
 
+    final room = _optionalString(json['roomNumber']);
+
     return CampusPlace(
       id: _requiredString(json, 'id'),
       type: _parseType(_requiredString(json, 'type')),
@@ -57,7 +61,7 @@ class CampusPlace {
       subtitle: _requiredString(json, 'subtitle'),
       source: _requiredString(json, 'source'),
       buildingCode: _optionalString(json['buildingCode']),
-      roomNumber: _optionalString(json['roomNumber']),
+      roomNumber: room,
       floorNumber: _optionalString(json['floorNumber']),
       outdoorDestination: latitude is num && longitude is num
           ? NavigationCoordinate(
@@ -72,6 +76,9 @@ class CampusPlace {
       indoorDestinationId: _optionalString(
         navigationJson['indoorDestinationId'],
       ),
+      indoorRequest: room == null
+          ? null
+          : IndoorArRequest.fromDoorPose(json['indoor'], room: room),
       external: json['external'] == true,
       attribution: _optionalString(json['attribution']),
       distanceMeters: (json['distanceMeters'] as num?)?.round(),
@@ -95,6 +102,7 @@ class CampusPlace {
   /// Building outline from the server; null when absent or malformed.
   final List<NavigationCoordinate>? footprint;
   final String? indoorDestinationId;
+  final IndoorArRequest? indoorRequest;
   final bool external;
   final String? attribution;
   final int? distanceMeters;

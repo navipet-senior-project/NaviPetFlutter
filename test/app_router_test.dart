@@ -6,6 +6,7 @@ import 'package:navipet/data/app_state.dart';
 import 'package:navipet/router/app_router.dart';
 import 'package:navipet/screens/account_settings_screen.dart';
 import 'package:navipet/screens/change_email_screen.dart';
+import 'package:navipet/screens/indoor_ar_launch_screen.dart';
 import 'package:navipet/screens/indoor_ar_spike_screen.dart';
 import 'package:navipet/screens/verify_email_screen.dart';
 
@@ -111,6 +112,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(IndoorArSpikeScreen), findsOneWidget);
+  });
+
+  testWidgets('/ar builds the indoor AR launch screen', (tester) async {
+    final appState = _RouterAppState(
+      authenticated: true,
+      passwordRecovery: false,
+    );
+    final router = createAppRouter(appState, initialLocation: '/ar');
+    addTearDown(router.dispose);
+    addTearDown(appState.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>.value(
+        value: appState,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IndoorArLaunchScreen), findsOneWidget);
+    expect(
+      find.text("Indoor AR isn't available for this room"),
+      findsOneWidget,
+    );
   });
 
   testWidgets('redirects a guest from the indoor AR spike route to sign in', (

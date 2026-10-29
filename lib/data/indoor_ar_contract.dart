@@ -42,6 +42,35 @@ class IndoorArRequest {
     }
   }
 
+  /// Builds a request from the `indoor` door pose on `/places/:placeId`.
+  /// Null when the pose is missing or fails this class's validation.
+  static IndoorArRequest? fromDoorPose(Object? json, {required String room}) {
+    if (json is! Map<String, dynamic>) return null;
+    final position = json['position'];
+    if (position is! Map<String, dynamic>) return null;
+    final (x, y, z) = (position['x'], position['y'], position['z']);
+    final heading = json['headingDeg'];
+    final (doorKey, floor) = (json['doorKey'], json['floor']);
+    final (mapCode, frame) = (json['mapCode'], json['frame']);
+    if (x is! num || y is! num || z is! num || heading is! num) return null;
+    if (doorKey is! String || floor is! String) return null;
+    if (mapCode is! String || frame is! String) return null;
+    final headingDeg = ((heading.toDouble() % 360) + 360) % 360;
+    try {
+      return IndoorArRequest(
+        room: room,
+        doorKey: doorKey,
+        floor: floor,
+        position: IndoorArVector3(x.toDouble(), y.toDouble(), z.toDouble()),
+        headingDeg: headingDeg,
+        mapCode: mapCode,
+        frame: frame,
+      );
+    } on ArgumentError {
+      return null;
+    }
+  }
+
   static const schemaVersion = 1;
 
   final String room;

@@ -16,6 +16,16 @@ class MainActivity : FlutterActivity() {
         indoorAr = channel
     }
 
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        indoorAr?.detach()
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun onDestroy() {
+        indoorAr?.detach()
+        super.onDestroy()
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (indoorAr?.onActivityResult(requestCode, data) == true) return
         super.onActivityResult(requestCode, resultCode, data)
