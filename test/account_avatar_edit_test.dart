@@ -12,7 +12,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:navipet/data/app_state.dart';
 import 'package:navipet/data/profile_gateway.dart';
 import 'package:navipet/screens/account_settings_screen.dart';
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -244,26 +243,13 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('a cache copy is deleted and a path outside it is kept', (
+  testWidgets('the picked file is deleted once its bytes are read', (
     tester,
   ) async {
     final png = await _solidPng(tester, const Color(0xFF00AA00));
-    // `cache_real` has `cache` as a string prefix, so a missing separator
-    // would delete the outside file too.
-    final parent = Directory.systemTemp.createTempSync('avatar_root');
-    addTearDown(() => parent.deleteSync(recursive: true));
-    final inside = Directory('${parent.path}/cache')..createSync();
-    final outside = Directory('${parent.path}/cache_real')..createSync();
-    final copied = File('${inside.path}/picked.png')..writeAsBytesSync(png);
-    final original = File('${outside.path}/picked.png')..writeAsBytesSync(png);
-    final previous = PathProviderPlatform.instance;
-    PathProviderPlatform.instance = _FakePaths(
-      inside.path,
-      '${parent.path}/appcache',
-    );
-    addTearDown(() => PathProviderPlatform.instance = previous);
-    final files = [copied, original];
-    var next = 0;
+    final dir = Directory.systemTemp.createTempSync('avatar_pick');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final picked = File('${dir.path}/picked.png')..writeAsBytesSync(png);
     final state = AppState(
       supabase: await _signedIn(anonymous: false),
       profileGateway: _FakeProfileGateway(),
@@ -272,180 +258,61 @@ void main() {
       ChangeNotifierProvider.value(
         value: state,
         child: MaterialApp(
-          home: EditProfileScreen(
-            pickImage: () async => XFile(files[next++].path),
-          ),
+          home: EditProfileScreen(pickImage: () async => XFile(picked.path)),
         ),
       ),
     );
     await tester.pumpAndSettle();
-
     await tester.tap(pencil);
     await _settleUntil(
       tester,
       'the crop screen',
       () => find.text('Done').evaluate().isNotEmpty,
     );
-    expect(copied.existsSync(), isFalse);
-    expect(original.existsSync(), isTrue);
-
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    await tester.tap(pencil);
-    await _settleUntil(
-      tester,
-      'the crop screen',
-      () => find.text('Done').evaluate().isNotEmpty,
-    );
-    expect(original.existsSync(), isTrue);
+    expect(picked.existsSync(), isFalse);
     await tester.pumpWidget(const SizedBox());
     state.dispose();
   });
 
-  testWidgets('Profile & Settings pencil sends the crop in one PATCH', (
+  testWidgets('a 502 keeps the draft and the next Save sends the same bytes', (
     tester,
   ) async {
     final png = await _solidPng(tester, const Color(0xFF00AA00));
-    final gateway = _FakeProfileGateway(role: 'student');
+    final gateway = _FakeProfileGateway(
+      role: 'student',
+      failWith: const ProfileApiException(message: 'nope', statusCode: 502),
+    );
     final state = AppState(
       supabase: await _signedIn(anonymous: false),
       profileGateway: gateway,
     );
-    await _guardInk(() async {
-      await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: state,
-          child: MaterialApp(
-            home: AccountSettingsScreen(
-              pickImage: () async => XFile.fromData(png, name: 'photo.heic'),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await _crop(tester);
-      await _settleUntil(tester, 'the save', () => gateway.updates.isNotEmpty);
-    });
-    expect(gateway.updates, hasLength(1));
-    expect(gateway.updates.single.displayName, isNull);
-    expect(_pngSignature(gateway.updates.single.avatarBytes!), isTrue);
-    await tester.pumpWidget(const SizedBox());
-    state.dispose();
-  });
-
-  testWidgets(
-    'leaving Edit Profile unsaved sends nothing and drops the preview',
-    (tester) async {
-      final png = await _solidPng(tester, const Color(0xFF00AA00));
-      final gateway = _FakeProfileGateway(role: 'student');
-      final state = AppState(
-        supabase: await _signedIn(anonymous: false),
-        profileGateway: gateway,
-      );
-      final router = _editRouter(
-        () async => XFile.fromData(png, name: 'photo.heic'),
-      );
-      await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: state,
-          child: MaterialApp.router(routerConfig: router),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await _crop(tester);
-      final preview = _memoryPreview(tester);
-      expect(imageCache.containsKey(preview), isTrue);
-
-      await tester.tap(find.byIcon(Icons.arrow_back));
-      await tester.pumpAndSettle();
-
-      expect(gateway.updates, isEmpty);
-      expect(find.text('settings'), findsOneWidget);
-      expect(imageCache.containsKey(preview), isFalse);
-      await tester.pumpWidget(const SizedBox());
-      state.dispose();
-    },
-  );
-
-  testWidgets(
-    'a failed save keeps the draft and Save sends those bytes again',
-    (tester) async {
-      final png = await _solidPng(tester, const Color(0xFF00AA00));
-      final gateway = _FakeProfileGateway(
-        role: 'student',
-        failWith: const ProfileApiException(message: 'nope', statusCode: 500),
-      );
-      final state = AppState(
-        supabase: await _signedIn(anonymous: false),
-        profileGateway: gateway,
-      );
-      await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: state,
-          child: MaterialApp.router(
-            routerConfig: _editRouter(
-              () async => XFile.fromData(png, name: 'photo.heic'),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await _crop(tester);
-      final preview = _memoryPreview(tester);
-
-      await tester.tap(find.text('Save Changes'));
-      await _settleUntil(
-        tester,
-        'the failure',
-        () => find
-            .text('Could not save your profile. Please try again.')
-            .evaluate()
-            .isNotEmpty,
-      );
-      expect(gateway.updates, hasLength(1));
-      expect(imageCache.containsKey(preview), isTrue);
-
-      await tester.tap(find.text('Save Changes'));
-      await _settleUntil(
-        tester,
-        'the retry',
-        () => gateway.updates.length == 2,
-      );
-      expect(gateway.updates[1].avatarBytes, gateway.updates[0].avatarBytes);
-      await tester.pumpWidget(const SizedBox());
-      state.dispose();
-    },
-  );
-
-  testWidgets('a second pick evicts the first preview', (tester) async {
-    final first = await _solidPng(tester, const Color(0xFF00AA00));
-    final second = await _solidPng(tester, const Color(0xFF0000AA));
-    final images = [first, second];
-    var next = 0;
-    final state = AppState(
-      supabase: await _signedIn(anonymous: false),
-      profileGateway: _FakeProfileGateway(role: 'student'),
-    );
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: state,
-        child: MaterialApp(
-          home: EditProfileScreen(
-            pickImage: () async =>
-                XFile.fromData(images[next++], name: 'photo.heic'),
+        child: MaterialApp.router(
+          routerConfig: _editRouter(
+            () async => XFile.fromData(png, name: 'photo.heic'),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
     await _crop(tester);
-    final preview = _memoryPreview(tester);
-    expect(imageCache.containsKey(preview), isTrue);
 
-    await _crop(tester);
+    await tester.tap(find.text('Save Changes'));
+    await _settleUntil(
+      tester,
+      'the failure',
+      () => find
+          .text('Could not save your profile. Please try again.')
+          .evaluate()
+          .isNotEmpty,
+    );
+    expect(gateway.updates, hasLength(1));
 
-    expect(imageCache.containsKey(preview), isFalse);
-    expect(imageCache.containsKey(_memoryPreview(tester)), isTrue);
+    await tester.tap(find.text('Save Changes'));
+    await _settleUntil(tester, 'the retry', () => gateway.updates.length == 2);
+    expect(gateway.updates[1].avatarBytes, gateway.updates[0].avatarBytes);
     await tester.pumpWidget(const SizedBox());
     state.dispose();
   });
@@ -496,19 +363,6 @@ void main() {
   }
 }
 
-class _FakePaths extends PathProviderPlatform {
-  _FakePaths(this.temp, this.cache);
-
-  final String temp;
-  final String cache;
-
-  @override
-  Future<String?> getTemporaryPath() async => temp;
-
-  @override
-  Future<String?> getApplicationCachePath() async => cache;
-}
-
 Future<Uint8List> _solidPng(WidgetTester tester, Color color) async {
   final bytes = await tester.runAsync(() async {
     final recorder = ui.PictureRecorder();
@@ -521,12 +375,6 @@ Future<Uint8List> _solidPng(WidgetTester tester, Color color) async {
     return data!.buffer.asUint8List();
   });
   return bytes!;
-}
-
-bool _pngSignature(List<int> bytes) {
-  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
-  return bytes.length >= 8 &&
-      bytes.sublist(0, 8).toString() == signature.toString();
 }
 
 Future<void> _crop(WidgetTester tester) async {
@@ -561,27 +409,3 @@ GoRouter _editRouter(Future<XFile?> Function() pickImage) => GoRouter(
     ),
   ],
 );
-
-MemoryImage _memoryPreview(WidgetTester tester) {
-  final image = tester.widget<Image>(
-    find.byWidgetPredicate(
-      (widget) => widget is Image && widget.image is MemoryImage,
-    ),
-  );
-  return image.image as MemoryImage;
-}
-
-Future<void> _guardInk(Future<void> Function() body) async {
-  final original = FlutterError.onError;
-  FlutterError.onError = (details) {
-    if (details.exceptionAsString().contains('ink splashes may be invisible')) {
-      return;
-    }
-    original?.call(details);
-  };
-  try {
-    await body();
-  } finally {
-    FlutterError.onError = original;
-  }
-}

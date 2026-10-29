@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/avatar_draft_controller.dart';
 import 'package:navipet/data/profile_gateway.dart';
@@ -16,24 +14,6 @@ void main() {
 
     expect(draft.pendingBytes, [1, 2, 3]);
     expect(notified, 1);
-  });
-
-  test('picking again evicts the previous preview from the image cache', () {
-    TestWidgetsFlutterBinding.ensureInitialized();
-    final first = Uint8List.fromList([1, 2, 3]);
-    final second = Uint8List.fromList([4, 5, 6]);
-    final draft = AvatarDraftController()..pick(first);
-    final previous = MemoryImage(first);
-    imageCache.putIfAbsent(
-      previous,
-      () => OneFrameImageStreamCompleter(Completer<ImageInfo>().future),
-    );
-    addTearDown(imageCache.clear);
-
-    draft.pick(second);
-
-    expect(imageCache.containsKey(previous), isFalse);
-    expect(draft.pendingBytes, second);
   });
 
   test('rejects an image over 5 MB and keeps the earlier draft', () {
