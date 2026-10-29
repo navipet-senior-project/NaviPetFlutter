@@ -8,9 +8,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:image_picker/image_picker.dart';
+// Transitive of image_picker. A direct dev dependency would bump pubspec.lock.
+// ignore: depend_on_referenced_packages
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:navipet/data/app_state.dart';
 import 'package:navipet/data/profile_gateway.dart';
+import 'package:navipet/router/app_router.dart';
 import 'package:navipet/screens/account_settings_screen.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
@@ -240,6 +243,42 @@ void main() {
     expect(Uint8List.fromList(update.avatarBytes!.sublist(0, 8)), [
       137, 80, 78, 71, 13, 10, 26, 10, // PNG signature
     ]);
+    await tester.pumpWidget(const SizedBox());
+    state.dispose();
+  });
+
+  testWidgets('a successful avatar save returns to Profile & Settings', (
+    tester,
+  ) async {
+    final png = await _solidPng(tester, const Color(0xFF00AA00));
+    final previous = ImagePickerPlatform.instance;
+    ImagePickerPlatform.instance = _GalleryPicker(XFile.fromData(png));
+    addTearDown(() => ImagePickerPlatform.instance = previous);
+    final gateway = _FakeProfileGateway(role: 'student');
+    final state = AppState(
+      supabase: await _signedIn(anonymous: false),
+      profileGateway: gateway,
+    );
+    final router = createAppRouter(state, initialLocation: '/account');
+    addTearDown(router.dispose);
+    await _guardInk(() async {
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: state,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      router.push('/account/edit');
+      await tester.pumpAndSettle();
+      await _crop(tester);
+      await tester.tap(find.text('Save Changes'));
+      await tester.pumpAndSettle();
+    });
+
+    expect(find.text('Profile saved.'), findsOneWidget);
+    expect(find.text('Profile & Settings'), findsOneWidget);
+    expect(router.state.uri.path, '/account');
     await tester.pumpWidget(const SizedBox());
     state.dispose();
   });
@@ -494,6 +533,18 @@ void main() {
       });
     });
   }
+}
+
+class _GalleryPicker extends ImagePickerPlatform {
+  _GalleryPicker(this.file);
+
+  final XFile file;
+
+  @override
+  Future<XFile?> getImageFromSource({
+    required ImageSource source,
+    ImagePickerOptions options = const ImagePickerOptions(),
+  }) async => file;
 }
 
 class _FakePaths extends PathProviderPlatform {
