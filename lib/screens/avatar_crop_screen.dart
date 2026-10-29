@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../data/avatar_crop_math.dart';
 import '../data/avatar_draft_controller.dart';
@@ -64,17 +65,39 @@ Future<XFile?> _pickFromLibrary() => ImagePicker().pickImage(
 );
 
 /// image_picker copies every pick into the app cache (Android cacheDir,
-/// iOS tmp). The draft lives in memory from here on, so the copy goes now
-/// instead of whenever the OS clears the cache. The app holds no
-/// storage/media permission and image_picker always returns its own cache
-/// copy (Android scoped storage, iOS sandbox), so the delete cannot touch
-/// the user's original photo.
+/// iOS tmp). Delete that copy only. A path outside those directories is left
+/// alone, so a plugin that hands back the original photo cannot erase it.
+/// A trailing separator keeps `/tmp/x` from matching `/tmp/xyz`.
 Future<void> _deletePickedCopy(XFile file) async {
   if (file.path.isEmpty) return; // XFile.fromData in tests has no file.
   try {
-    await File(file.path).delete();
+    final canonical = await File(file.path).resolveSymbolicLinks();
+    if (!await _isPickerCopy(canonical)) return;
+    await File(canonical).delete();
   } on FileSystemException {
-    // Already gone.
+    // Already gone, or not a copy we can see.
+  }
+}
+
+Future<bool> _isPickerCopy(String canonicalFile) async {
+  for (final root in [
+    await _canonicalRoot(getTemporaryDirectory),
+    await _canonicalRoot(getApplicationCacheDirectory),
+  ]) {
+    if (root == null) continue;
+    final prefix = root.endsWith(Platform.pathSeparator)
+        ? root
+        : '$root${Platform.pathSeparator}';
+    if (canonicalFile.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+Future<String?> _canonicalRoot(Future<Directory> Function() read) async {
+  try {
+    return await Directory((await read()).path).resolveSymbolicLinks();
+  } on Object {
+    return null;
   }
 }
 
