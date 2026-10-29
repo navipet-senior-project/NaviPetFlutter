@@ -90,19 +90,19 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   Future<void> _start() async {
     final request = _place!.indoorRequest!;
     setState(() => _phase = _Phase.running);
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      final camera = await widget.requestCamera();
-      if (!mounted) return;
-      if (!camera.isGranted) {
-        setState(
-          () => _phase = camera.isPermanentlyDenied
-              ? _Phase.cameraBlocked
-              : _Phase.cameraDenied,
-        );
-        return;
-      }
-    }
     try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final camera = await widget.requestCamera();
+        if (!mounted) return;
+        if (!camera.isGranted) {
+          setState(
+            () => _phase = camera.isPermanentlyDenied
+                ? _Phase.cameraBlocked
+                : _Phase.cameraDenied,
+          );
+          return;
+        }
+      }
       final result = await widget.launcher.launch(request);
       debugPrint(
         '[IndoorAr] ${request.doorKey} ${result.status.name} '
@@ -113,6 +113,16 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       if (mounted) setState(() => _last = result);
     } catch (error) {
       debugPrint('[IndoorAr] launch failed: $error');
+      if (mounted) {
+        setState(
+          () => _last = const IndoorArResult(
+            status: IndoorArStatus.error,
+            errorCode: 'UNITY_EXITED',
+            localizationQueries: 0,
+            durationMs: 0,
+          ),
+        );
+      }
     } finally {
       // Denial sets its own phase before this; only a finished launch returns here.
       if (mounted && _phase == _Phase.running) {

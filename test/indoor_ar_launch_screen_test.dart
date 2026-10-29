@@ -250,6 +250,34 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start AR'));
     await tester.pumpAndSettle();
+    expect(find.text('AR closed unexpectedly.'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Start AR'))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('a throwing camera request returns to ready', (tester) async {
+    final launcher = FakeIndoorArLauncher(
+      result: const IndoorArResult.unavailable(),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: IndoorArLaunchScreen(
+          destinationId: _vec119Id,
+          launcher: launcher,
+          gateway: FakeSearchGateway()..results = [_vec119()],
+          requestCamera: () async => throw StateError('permission failed'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start AR'));
+    await tester.pumpAndSettle();
+    expect(launcher.requests, isEmpty);
+    expect(find.text('AR closed unexpectedly.'), findsOneWidget);
     expect(
       tester
           .widget<FilledButton>(find.widgetWithText(FilledButton, 'Start AR'))

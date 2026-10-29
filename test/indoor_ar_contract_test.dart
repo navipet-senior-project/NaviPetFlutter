@@ -25,6 +25,10 @@ void main() {
       expect(() => vec119Request(headingDeg: 360), throwsArgumentError);
       expect(() => vec119Request(headingDeg: -0.1), throwsArgumentError);
       expect(() => vec119Request(headingDeg: double.nan), throwsArgumentError);
+      expect(
+        () => vec119Request(headingDeg: double.infinity),
+        throwsArgumentError,
+      );
     });
 
     test('rejects an empty floor or map code', () {
@@ -249,6 +253,20 @@ void main() {
       expect(IndoorArRequest.fromDoorPose(null, room: '119'), isNull);
       expect(
         IndoorArRequest.fromDoorPose(pose(headingDeg: double.nan), room: '119'),
+        isNull,
+      );
+      expect(
+        IndoorArRequest.fromDoorPose(
+          pose(headingDeg: double.infinity),
+          room: '119',
+        ),
+        isNull,
+      );
+      expect(
+        IndoorArRequest.fromDoorPose(
+          pose(headingDeg: double.negativeInfinity),
+          room: '119',
+        ),
         isNull,
       );
       expect(
