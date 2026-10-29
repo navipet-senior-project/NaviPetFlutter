@@ -50,6 +50,7 @@ dependencies:
   image_picker: ^1.2.3
   navipet_api:
     path: packages/navipet_api
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
