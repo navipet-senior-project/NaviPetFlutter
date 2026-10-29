@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/campus_place.dart';
@@ -174,4 +176,95 @@ void main() {
       expect(find.text(text), findsOneWidget);
     });
   }
+
+  testWidgets('a second tap does not launch while the first is waiting', (
+    tester,
+  ) async {
+    final gate = Completer<PermissionStatus>();
+    var asks = 0;
+    final launcher = FakeIndoorArLauncher(
+      result: const IndoorArResult.unavailable(),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: IndoorArLaunchScreen(
+          destinationId: _vec119Id,
+          launcher: launcher,
+          gateway: FakeSearchGateway()..results = [_vec119()],
+          requestCamera: () {
+            asks++;
+            return gate.future;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start AR'));
+    await tester.pump();
+    await tester.tap(find.text('Start AR'));
+    await tester.pump();
+    expect(asks, 1);
+    gate.complete(PermissionStatus.granted);
+    await tester.pumpAndSettle();
+    expect(launcher.requests, hasLength(1));
+  });
+
+  testWidgets('denied camera can try again and then launch', (tester) async {
+    var granted = false;
+    final launcher = FakeIndoorArLauncher(
+      result: const IndoorArResult.unavailable(),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: IndoorArLaunchScreen(
+          destinationId: _vec119Id,
+          launcher: launcher,
+          gateway: FakeSearchGateway()..results = [_vec119()],
+          requestCamera: () async =>
+              granted ? PermissionStatus.granted : PermissionStatus.denied,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start AR'));
+    await tester.pumpAndSettle();
+    expect(launcher.requests, isEmpty);
+    expect(find.text('Try again'), findsOneWidget);
+    granted = true;
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(launcher.requests, hasLength(1));
+  });
+
+  testWidgets('a throwing launch returns to ready', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: IndoorArLaunchScreen(
+          destinationId: _vec119Id,
+          launcher: _ThrowingLauncher(),
+          gateway: FakeSearchGateway()..results = [_vec119()],
+          requestCamera: () async => PermissionStatus.granted,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start AR'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Start AR'))
+          .onPressed,
+      isNotNull,
+    );
+  });
+}
+
+class _ThrowingLauncher implements IndoorArLauncher {
+  @override
+  Future<IndoorArResult> launch(IndoorArRequest request) async {
+    throw StateError('launch failed');
+  }
+
+  @override
+  Future<IndoorArResult?> pendingResult() async => null;
 }

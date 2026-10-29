@@ -89,6 +89,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   Future<void> _start() async {
     final request = _place!.indoorRequest!;
+    setState(() => _phase = _Phase.running);
     if (defaultTargetPlatform == TargetPlatform.android) {
       final camera = await widget.requestCamera();
       if (!mounted) return;
@@ -101,7 +102,6 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         return;
       }
     }
-    setState(() => _phase = _Phase.running);
     try {
       final result = await widget.launcher.launch(request);
       debugPrint(
@@ -111,9 +111,13 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         'error=${result.errorCode}',
       );
       if (mounted) setState(() => _last = result);
+    } catch (error) {
+      debugPrint('[IndoorAr] launch failed: $error');
     } finally {
-      // A throwing launcher must not leave the button disabled.
-      if (mounted) setState(() => _phase = _Phase.ready);
+      // Denial sets its own phase before this; only a finished launch returns here.
+      if (mounted && _phase == _Phase.running) {
+        setState(() => _phase = _Phase.ready);
+      }
     }
   }
 
