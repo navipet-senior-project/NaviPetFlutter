@@ -1,0 +1,32 @@
+appId: com.navipet.navipet
+---
+- launchApp:
+    clearState: false
+# Map home loads slowly after a cold launch.
+- extendedWaitUntil:
+    visible: "Account settings"
+    timeout: 30000
+- startRecording: avatar-upload
+- tapOn: "Account settings"
+- takeScreenshot: 01-before
+# Edit Profile: pick, crop, Save
+- tapOn: "Edit Profile"
+- tapOn: "Change profile photo"
+- runFlow: pick_test_image.yaml
+- tapOn: "Done"
+- tapOn: "Save Changes"
+# The success snackbar is short-lived and races the assertion; the pop only
+# happens on success (failure stays on Edit Profile), so assert the end state.
+- extendedWaitUntil:
+    visible: "Profile & Settings"
+    timeout: 70000
+- assertNotVisible: "Save Changes"
+- takeScreenshot: 02-edit-profile-saved
+# Profile & Settings: pencil saves straight away
+- tapOn: "Change profile photo"
+- runFlow: pick_test_image.yaml
+- tapOn: "Done"
+- assertNotVisible: "Could not update your profile photo. Please try again."
+- assertVisible: "Profile & Settings"
+- takeScreenshot: 03-settings-saved
+- stopRecording
