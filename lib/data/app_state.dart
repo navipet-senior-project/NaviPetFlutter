@@ -148,6 +148,28 @@ class AppState extends ChangeNotifier {
       _activeUser != null &&
       !_activeUser!.isAnonymous;
 
+  /// Notifies only when a redirect input changes. [GoRouter] re-applies the
+  /// last imperative push on every refresh, so profile updates must not.
+  final _RouteRefresh _redirect = _RouteRefresh();
+  Listenable get redirectListenable => _redirect;
+  bool _sawAuth = false;
+  bool _sawRecovery = false;
+  bool _sawEmail = false;
+
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    final auth = isAuthenticated;
+    final recovery = hasPendingPasswordRecovery;
+    final email = canChangeEmail;
+    final changed =
+        auth != _sawAuth || recovery != _sawRecovery || email != _sawEmail;
+    _sawAuth = auth;
+    _sawRecovery = recovery;
+    _sawEmail = email;
+    if (changed) _redirect.ping();
+  }
+
   /// Reloads the signed avatar URL from the backend. The URL expires after
   /// about an hour, so this runs on sign-in, token refresh, and app resume.
   /// [maxAge] skips the request when the last load is at least that recent.
@@ -205,12 +227,12 @@ class AppState extends ChangeNotifier {
   }
 
   /// Saves profile edits through the backend and applies the response.
-  /// Throws [ProfileApiException]; a 404 with [avatarUploadId] means that
-  /// upload no longer exists.
+  /// [avatarBytes] becomes the avatar in the same request. Throws
+  /// [ProfileApiException].
   Future<void> saveProfile({
     String? displayName,
-    String? avatarUploadId,
     String? role,
+    List<int>? avatarBytes,
   }) async {
     final gateway = _profileGateway;
     final user = _activeUser;
@@ -219,8 +241,8 @@ class AppState extends ChangeNotifier {
     }
     final profile = await gateway.updateProfile(
       displayName: displayName,
-      avatarUploadId: avatarUploadId,
       role: role,
+      avatarBytes: avatarBytes,
     );
     final current = _activeUser;
     if (current == null || current.id != user.id) return;
@@ -1142,8 +1164,13 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _redirect.dispose();
     super.dispose();
   }
+}
+
+class _RouteRefresh extends ChangeNotifier {
+  void ping() => notifyListeners();
 }
 
 enum AuthActionStatus {

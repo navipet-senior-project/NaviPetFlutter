@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -26,7 +27,13 @@ Future<Uint8List?> pickAndCropAvatar(
     return null;
   }
   if (file == null || !context.mounted) return null;
-  final image = await decodeAvatarImage(await file.readAsBytes());
+  final Uint8List bytes;
+  try {
+    bytes = await file.readAsBytes();
+  } finally {
+    await _deletePickedCopy(file);
+  }
+  final image = await decodeAvatarImage(bytes);
   if (!context.mounted) {
     image?.dispose();
     return null;
@@ -55,6 +62,55 @@ Future<XFile?> _pickFromLibrary() => ImagePicker().pickImage(
   maxWidth: 2048,
   maxHeight: 2048,
 );
+
+/// image_picker copies every pick into the app cache (Android cacheDir,
+/// iOS tmp). The draft lives in memory from here on, so the copy goes now
+/// instead of whenever the OS clears the cache. The app holds no
+/// storage/media permission and image_picker always returns its own cache
+/// copy (Android scoped storage, iOS sandbox), so the delete cannot touch
+/// the user's original photo.
+Future<void> _deletePickedCopy(XFile file) async {
+  if (file.path.isEmpty) return; // XFile.fromData in tests has no file.
+  final picked = File(file.path);
+  try {
+    await picked.delete();
+  } on FileSystemException {
+    // Already gone.
+  }
+  // image_picker writes cache/<uuid>/<name> and returns cache/scaled_<name>.
+  final base = picked.uri.pathSegments.where((part) => part.isNotEmpty).last;
+  if (!base.startsWith('scaled_')) return;
+  final name = base.substring('scaled_'.length);
+  if (name.isEmpty) return;
+  final uuid = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+  List<FileSystemEntity> children;
+  try {
+    children = picked.parent.listSync(followLinks: false);
+  } on FileSystemException {
+    return;
+  }
+  for (final entity in children) {
+    if (entity is! Directory) continue;
+    final dirName = entity.uri.pathSegments
+        .where((part) => part.isNotEmpty)
+        .last;
+    if (!uuid.hasMatch(dirName)) continue;
+    final original = File('${entity.path}${Platform.pathSeparator}$name');
+    if (!original.existsSync()) continue;
+    try {
+      await original.delete();
+    } on FileSystemException {
+      // Already gone.
+    }
+    try {
+      await entity.delete();
+    } on FileSystemException {
+      // Not empty, or already gone.
+    }
+  }
+}
 
 /// Decodes the first frame of [bytes], or returns `null` when Flutter cannot
 /// decode it. The caller owns (and disposes) the image.

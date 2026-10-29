@@ -19,13 +19,17 @@ import '../screens/verify_email_screen.dart';
 
 /// [initialLocation] overrides the start route. Production leaves it null;
 /// tests use it to open a route without building the map first.
+///
+/// The router listens only to [AppState.redirectListenable]. A profile save
+/// also notifies [AppState], and go_router re-applies the last push when its
+/// refresh listenable fires, which put Edit Profile back on screen after pop.
 GoRouter createAppRouter(
   AppState appState, {
   String? initialLocation,
 }) => GoRouter(
   initialLocation:
       initialLocation ?? (appState.isAuthenticated ? '/map' : '/signin'),
-  refreshListenable: appState,
+  refreshListenable: appState.redirectListenable,
   redirect: (context, state) {
     final location = state.matchedLocation;
     final onPublicRoute = <String>{
