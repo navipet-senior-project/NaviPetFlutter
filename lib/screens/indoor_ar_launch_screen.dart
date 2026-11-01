@@ -112,9 +112,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   void _leave(String? message) {
     if (!mounted) return;
     if (message != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
     context.canPop() ? context.pop() : context.go('/map');
   }
@@ -137,6 +136,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
               action: 'Open settings',
               onAction: _openSettings,
               back: 'Back to map',
+              onBack: () => _leave(null),
             )
           : _rationale
           ? _message(
@@ -145,6 +145,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
               action: 'Continue',
               onAction: _askForCamera,
               back: 'Not now',
+              onBack: () => _leave(
+                'AR needs camera access. Tap the AR button to try again.',
+              ),
             )
           : const CircularProgressIndicator(),
     ),
@@ -155,6 +158,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     required String action,
     required VoidCallback onAction,
     required String back,
+    required VoidCallback onBack,
   }) => Padding(
     padding: const EdgeInsets.all(24),
     child: Column(
@@ -163,7 +167,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         Text(text, textAlign: TextAlign.center),
         const SizedBox(height: 16),
         FilledButton(onPressed: onAction, child: Text(action)),
-        TextButton(onPressed: () => _leave(null), child: Text(back)),
+        TextButton(onPressed: onBack, child: Text(back)),
       ],
     ),
   );

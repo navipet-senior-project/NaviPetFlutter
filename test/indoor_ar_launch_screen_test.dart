@@ -135,6 +135,10 @@ void main() {
     expect(harness.cameraRequests, 0);
     expect(harness.fake.requests, isEmpty);
     expect(find.text('map'), findsOneWidget);
+    expect(
+      find.text('AR needs camera access. Tap the AR button to try again.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('allowing the camera launches once and returns to the map', (
