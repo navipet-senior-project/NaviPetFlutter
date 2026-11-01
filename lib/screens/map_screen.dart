@@ -13,6 +13,7 @@ import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ar_mode_icon.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/place_preview_sheet.dart';
 import '../widgets/account_button.dart';
@@ -410,7 +411,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 if (state is FlowActiveNavigation)
                   _activeNavigation(state, flow, padding),
-                if (state is FlowArrived) _arrivalSummary(state, flow, padding),
+                if (state is FlowArrived) _arrivalActions(flow, padding),
                 if (state is FlowError) _error(state, flow),
               ],
             ),
@@ -622,7 +623,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         state is FlowRoutePreview) {
       bottom = 294;
     } else if (state is FlowArrived) {
-      bottom = 320 + padding.bottom;
+      bottom = 88 + padding.bottom;
     } else {
       bottom = 24;
     }
@@ -632,6 +633,43 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (state is FlowArrived) ...[
+            MergeSemantics(
+              child: Semantics(
+                label: 'AR mode',
+                button: true,
+                child: SizedBox.square(
+                  dimension: 48,
+                  child: FloatingActionButton(
+                    heroTag: 'ar-mode',
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.navy,
+                    onPressed: () => context.push('/ar'),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ArModeIcon(color: AppColors.navy, size: 22),
+                          ExcludeSemantics(
+                            child: Text(
+                              'AR',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           _mapTypeControls(),
           const SizedBox(height: AppSpacing.sm),
           Semantics(
@@ -875,46 +913,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return '$minutes min';
   }
 
-  Widget _arrivalSummary(
-    FlowArrived state,
-    NavigationFlowController flow,
-    EdgeInsets padding,
-  ) => Positioned(
-    left: AppSpacing.lg,
-    right: AppSpacing.lg,
-    bottom: padding.bottom + AppSpacing.lg,
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'You’ve arrived!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Text(state.destination.name),
-            const SizedBox(height: 16),
-            Text('Time: ${state.summary.elapsedLabel}'),
-            Text('Distance traveled: ${state.summary.distanceLabel}'),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => context.push('/ar'),
-              icon: const Icon(Icons.view_in_ar_outlined),
-              label: const Text('AR mode'),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: flow.dismissArrival,
-              child: const Text('Return to map'),
-            ),
-          ],
+  Widget _arrivalActions(NavigationFlowController flow, EdgeInsets padding) =>
+      Positioned(
+        left: AppSpacing.lg,
+        right: AppSpacing.lg,
+        bottom: padding.bottom + AppSpacing.lg,
+        child: FilledButton(
+          onPressed: flow.dismissArrival,
+          child: const Text('Return to map'),
         ),
-      ),
-    ),
-  );
+      );
 
   Future<void> _confirmEnd(NavigationFlowController flow) async {
     final confirmed = await showDialog<bool>(

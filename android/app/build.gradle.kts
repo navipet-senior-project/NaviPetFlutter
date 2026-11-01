@@ -34,6 +34,13 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         buildConfigField("boolean", "UNITY_AR_ENABLED", unityArEnabled.toString())
+        if (unityArEnabled) {
+            // Unity ships arm64 only. The Flutter plugin presets every ABI, so `+=` alone changes nothing.
+            ndk {
+                abiFilters.clear()
+                abiFilters += "arm64-v8a"
+            }
+        }
     }
 
     buildTypes {
