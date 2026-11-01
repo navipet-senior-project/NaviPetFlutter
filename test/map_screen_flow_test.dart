@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:navipet/data/app_state.dart';
 import 'package:navipet/data/location_service.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/screens/map_screen.dart';
+import 'package:navipet/widgets/ar_mode_icon.dart';
 import 'package:navipet/widgets/place_preview_sheet.dart';
 import 'package:navipet/widgets/route_preview_sheet.dart';
 import 'package:navipet/widgets/search_bar_field.dart';
@@ -29,23 +31,115 @@ Widget host(NavigationFlowController controller) => MultiProvider(
 );
 
 void main() {
-  testWidgets('arrival shows a trip summary and returns to the map', (
-    tester,
-  ) async {
-    final controller = harness.build()..openSearch();
-    await tester.pumpWidget(host(controller));
+  Future<void> driveToArrival(NavigationFlowController controller) async {
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
     await controller.calculateRoute();
     await controller.startRoute();
     await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
     await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+  }
+
+  final arButton = find.byType(ArModeIcon);
+
+  testWidgets('arrival shows no message and returns to the map', (
+    tester,
+  ) async {
+    final controller = harness.build()..openSearch();
+    await tester.pumpWidget(host(controller));
+    await driveToArrival(controller);
     await tester.pump();
-    expect(find.text('You’ve arrived!'), findsOneWidget);
-    expect(find.textContaining('Distance traveled:'), findsOneWidget);
+    expect(find.text('You’ve arrived!'), findsNothing);
+    expect(find.text(harness.horn.title), findsNothing);
+    expect(find.textContaining('Distance traveled:'), findsNothing);
     await tester.tap(find.text('Return to map'));
     await tester.pump();
     expect(find.byType(SearchBarField), findsOneWidget);
+    expect(arButton, findsNothing);
+  });
+
+  testWidgets('the AR button shows only on arrival, above the side buttons', (
+    tester,
+  ) async {
+    final controller = harness.build();
+    await tester.pumpWidget(host(controller));
+    await tester.pump();
+    expect(arButton, findsNothing);
+
+    controller.openSearch();
+    await controller.selectPlace(harness.horn);
+    await tester.pump();
+    expect(arButton, findsNothing);
+
+    await controller.requestDirections();
+    await controller.calculateRoute();
+    await tester.pump();
+    expect(arButton, findsNothing);
+
+    await controller.startRoute();
+    await tester.pump();
+    expect(arButton, findsNothing);
+
+    await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+    await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+    await tester.pump();
+    expect(arButton, findsOneWidget);
+    expect(find.text('AR'), findsOneWidget);
+    expect(find.text('AR mode'), findsNothing);
+    expect(find.bySemanticsLabel('AR mode'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('AR mode')),
+      isSemantics(isButton: true, hasTapAction: true),
+    );
+    expect(
+      tester.getBottomLeft(arButton).dy,
+      lessThan(tester.getTopLeft(find.byIcon(Icons.layers_outlined)).dy),
+    );
+  });
+
+  testWidgets('the AR button opens /ar, and the button is there on return', (
+    tester,
+  ) async {
+    final controller = harness.build()..openSearch();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AppState()),
+          ChangeNotifierProvider.value(value: controller),
+        ],
+        child: MaterialApp.router(
+          routerConfig: GoRouter(
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (context, state) => MapScreen(controller: controller),
+              ),
+              GoRoute(
+                path: '/ar',
+                builder: (context, state) => Scaffold(
+                  body: TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('ar screen'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await driveToArrival(controller);
+    await tester.pump();
+
+    await tester.tap(arButton);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('ar screen'), findsOneWidget);
+
+    await tester.tap(find.text('ar screen'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(arButton, findsOneWidget);
   });
 
   testWidgets('walks search to place preview to route preview', (tester) async {
