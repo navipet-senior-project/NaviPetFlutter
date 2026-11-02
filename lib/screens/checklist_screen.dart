@@ -478,17 +478,36 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 ? const Icon(Icons.check_circle, color: AppColors.green)
                 : tasks[index].kind == 'attend_online'
                 ? TextButton(
-                    onPressed: () {
-                      final id = tasks[index].course.id;
-                      if (state.onlineSessionRunning(id)) {
-                        _handleTask(context, state, tasks[index]);
-                      } else {
-                        state.startOnlineSession(id);
-                      }
-                    },
+                    onPressed:
+                        state.onlineSessionHasEnded(tasks[index].course.id) &&
+                            !state.onlineSessionCanClaim(
+                              tasks[index].course.id,
+                              tasks[index].course,
+                            )
+                        ? null
+                        : () {
+                            final id = tasks[index].course.id;
+                            if (state.onlineSessionRunning(id) ||
+                                state.onlineSessionCanClaim(
+                                  id,
+                                  tasks[index].course,
+                                )) {
+                              _handleTask(context, state, tasks[index]);
+                            } else {
+                              _startOnlineSession(context, state, tasks[index]);
+                            }
+                          },
                     child: Text(
-                      state.onlineSessionRunning(tasks[index].course.id)
+                      state.onlineSessionRunning(tasks[index].course.id) ||
+                              state.onlineSessionCanClaim(
+                                tasks[index].course.id,
+                                tasks[index].course,
+                              )
                           ? 'Claim'
+                          : state.onlineSessionHasEnded(
+                              tasks[index].course.id,
+                            )
+                          ? 'Ended'
                           : 'Start',
                     ),
                   )
@@ -518,7 +537,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         TaskClaimResult.notToday =>
           'Tasks can only be completed on the day they are scheduled.',
         TaskClaimResult.sessionTooShort =>
-          'Keep the online session running for the scheduled class duration before claiming points.',
+          'Attend online for at least 30 minutes before claiming points.',
         TaskClaimResult.locationUnavailable =>
           'Turn on location access to check in to this class.',
         TaskClaimResult.tooFar =>
@@ -535,6 +554,35 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           SnackBar(content: Text('Could not update task: $error')),
         );
       }
+    }
+  }
+
+  void _startOnlineSession(
+    BuildContext context,
+    AppState state,
+    DailyClassTask task,
+  ) {
+    final result = state.startOnlineSession(
+      task.course.id,
+      course: task.course,
+      date: _selectedDate,
+    );
+    final message = switch (result) {
+      OnlineSessionStartResult.started ||
+      OnlineSessionStartResult.alreadyRunning => null,
+      OnlineSessionStartResult.notToday =>
+        'The online class timer can only start on its scheduled day.',
+      OnlineSessionStartResult.notScheduled =>
+        'This online class is not scheduled for the selected day.',
+      OnlineSessionStartResult.outsideClassPeriod =>
+        'The timer can only start during the scheduled class period.',
+      OnlineSessionStartResult.notOnline =>
+        'This timer is only available for online classes.',
+    };
+    if (message != null && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 

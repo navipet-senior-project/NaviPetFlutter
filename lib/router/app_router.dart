@@ -115,6 +115,10 @@ GoRouter createAppRouter(
       builder: (context, state) => const AccessibilityScreen(),
     ),
     GoRoute(
+      path: '/account/notifications',
+      builder: (context, state) => const NavigationAlertsScreen(),
+    ),
+    GoRoute(
       path: '/account/privacy',
       builder: (context, state) => const PrivacyPermissionsScreen(),
     ),

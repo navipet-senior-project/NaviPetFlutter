@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../data/app_state.dart';
 import '../data/avatar_draft_controller.dart';
 import '../data/profile_gateway.dart';
+import '../data/navigation_accessibility_preferences.dart';
 import '../theme/app_theme.dart';
 import '../widgets/profile_avatar.dart';
 import 'avatar_crop_screen.dart';
@@ -95,14 +96,9 @@ class AccountSettingsScreen extends StatelessWidget {
                 () => context.push('/account/accessibility'),
               ),
               _SettingsItem(
-                Icons.volume_up_outlined,
-                'Voice and Haptics',
-                () => _prototypeNotice(context),
-              ),
-              _SettingsItem(
                 Icons.notifications_none,
-                'Notifications',
-                () => _prototypeNotice(context),
+                'Navigation Alerts',
+                () => context.push('/account/notifications'),
               ),
               _SettingsItem(
                 Icons.language,
@@ -537,8 +533,11 @@ class AccessibilityScreen extends StatefulWidget {
 }
 
 class _AccessibilityScreenState extends State<AccessibilityScreen> {
-  final Map<String, bool> values = {};
-  Widget group(String title, List<(String, String?)> rows) => Column(
+  Widget group(
+    NavigationAccessibilityPreferences preferences,
+    String title,
+    List<(String, String?)> rows,
+  ) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _sectionTitle(title),
@@ -552,8 +551,8 @@ class _AccessibilityScreenState extends State<AccessibilityScreen> {
           children: [
             for (var i = 0; i < rows.length; i++) ...[
               SwitchListTile(
-                value: values[rows[i].$1] ?? false,
-                onChanged: (v) => setState(() => values[rows[i].$1] = v),
+                value: preferences.value(rows[i].$1),
+                onChanged: (v) => preferences.setValue(rows[i].$1, v),
                 activeThumbColor: _navy,
                 title: Text(rows[i].$1),
                 subtitle: rows[i].$2 == null ? null : Text(rows[i].$2!),
@@ -571,23 +570,39 @@ class _AccessibilityScreenState extends State<AccessibilityScreen> {
     ],
   );
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final preferences = context.watch<NavigationAccessibilityPreferences>();
+    return Scaffold(
     backgroundColor: _page,
     appBar: _appBar(context, 'Accessibility'),
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        group('MOBILITY', const [
+        Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF1F8),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Text(
+            'Your choices are saved on this device. Accessible route, stair, '
+            'elevator, and slope preferences need campus path data that the '
+            'current routing service does not provide yet.',
+            style: TextStyle(color: _navy, height: 1.4),
+          ),
+        ),
+        group(preferences, 'MOBILITY', const [
           ('Accessible routes', 'Prioritize wheelchair and ramp access'),
           ('Avoid stairs', null),
           ('Prefer elevators', null),
           ('Avoid steep slopes', null),
         ]),
-        group('GUIDANCE', const [
+        group(preferences, 'GUIDANCE', const [
           ('Voice guidance', 'Spoken turn-by-turn directions'),
           ('Haptic turn alerts', null),
         ]),
-        group('VISUALS', const [
+        group(preferences, 'VISUALS', const [
           ('High-contrast map', null),
           ('Larger map labels', null),
           ('Reduce motion', null),
@@ -602,7 +617,68 @@ class _AccessibilityScreenState extends State<AccessibilityScreen> {
         const SizedBox(height: 12),
       ],
     ),
-  );
+    );
+  }
+}
+
+class NavigationAlertsScreen extends StatelessWidget {
+  const NavigationAlertsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final preferences = context.watch<NavigationAccessibilityPreferences>();
+    return Scaffold(
+      backgroundColor: _page,
+      appBar: _appBar(context, 'Navigation Alerts'),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const Text(
+            'Choose how often NaviPet alerts you while you are navigating.',
+            style: TextStyle(color: Color(0xFF555861), height: 1.4),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: const Color(0xFFDDDEE2)),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                RadioListTile<NavigationAlertFrequency>(
+                  value: NavigationAlertFrequency.everyTurn,
+                  groupValue: preferences.frequency,
+                  onChanged: (value) {
+                    if (value != null) preferences.setFrequency(value);
+                  },
+                  title: const Text('Every turn'),
+                  subtitle: const Text('Alert when the next direction changes'),
+                  activeColor: _navy,
+                ),
+                const Divider(height: 1),
+                RadioListTile<NavigationAlertFrequency>(
+                  value: NavigationAlertFrequency.every20Feet,
+                  groupValue: preferences.frequency,
+                  onChanged: (value) {
+                    if (value != null) preferences.setFrequency(value);
+                  },
+                  title: const Text('Every 20 feet'),
+                  subtitle: const Text('Alert as you travel along the route'),
+                  activeColor: _navy,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Voice and haptic alerts can be turned on or off in Accessibility.',
+            style: TextStyle(color: Color(0xFF555861), height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class PrivacyPermissionsScreen extends StatefulWidget {

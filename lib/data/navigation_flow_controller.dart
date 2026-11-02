@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
+import 'navigation_accessibility_preferences.dart';
 import 'campus_bounds.dart';
 import 'campus_place.dart';
 import 'campus_search_controller.dart';
@@ -27,16 +30,20 @@ class NavigationFlowController extends ChangeNotifier {
     required this.recentSearches,
     required this.routes,
     required this.location,
+    NavigationAccessibilityPreferences? accessibility,
+    FlutterTts? speech,
     NaviMapController map = const _NoOpMapController(),
     // ignore: prefer_initializing_formals
-  }) : _map = map {
+  }) : _map = map,
+       accessibility = accessibility ?? NavigationAccessibilityPreferences(),
+       _speech = speech ?? FlutterTts() {
     search.addListener(notifyListeners);
   }
 
   /// Height reserved for the bottom sheet when framing the map.
   static const placeSheetInset = 280.0;
   static const routeSheetInset = 320.0;
-  static const _minimumArrivalRadiusMeters = 200 * 0.3048;
+  static const _arrivalRadiusMeters = 100 * 0.3048;
 
   /// Distance at which the "Arriving soon" state is emitted. App-wide, not
   /// per destination; skipped when the arrival radius is at least this large.
@@ -50,6 +57,8 @@ class NavigationFlowController extends ChangeNotifier {
   final RecentSearchesGateway recentSearches;
   final RouteRepository routes;
   final LocationService location;
+  final NavigationAccessibilityPreferences accessibility;
+  final FlutterTts _speech;
 
   // Not final: attachMap()/detachMap() swap it as the real Mapbox map is
   // created and torn down alongside MapScreen's own lifecycle, independent
@@ -72,6 +81,8 @@ class NavigationFlowController extends ChangeNotifier {
   bool _approachAnnounced = false;
   DateTime? _lastRerouteAt;
   bool _rerouteInFlight = false;
+  int _lastAlertedStep = -1;
+  double _lastDistanceAlertMeters = 0;
 
   // Chained so map mutations always apply in the order they were issued
   // rather than the order their underlying async work happens to finish.
@@ -636,6 +647,8 @@ class NavigationFlowController extends ChangeNotifier {
     _generation++;
     _tripStartedAt = DateTime.now();
     _tripDistanceMeters = 0;
+    _lastDistanceAlertMeters = 0;
+    _lastAlertedStep = -1;
     _lastTripPosition = null;
     _routeProgressMeters = 0;
     _offRouteFixes = 0;
@@ -694,10 +707,7 @@ class NavigationFlowController extends ChangeNotifier {
       coordinate,
     );
     final routeGap = routeProjection.remainingMeters;
-    final arrivalRadius = math.max(
-      current.destination.arrivalRadius.toDouble(),
-      _minimumArrivalRadiusMeters,
-    );
+    const arrivalRadius = _arrivalRadiusMeters;
     final arrivalAccuracyLimit = math.min(arrivalRadius, _arrivalAccuracyCap);
     final accurate =
         accuracyMeters.isFinite && accuracyMeters <= arrivalAccuracyLimit;
@@ -764,6 +774,7 @@ class NavigationFlowController extends ChangeNotifier {
       current.plan.selected,
       _routeProgressMeters,
     );
+    _sendGuidanceAlert(current.plan.selected, nextIndex);
     _set(
       _active(
         destination: current.destination,
@@ -797,6 +808,32 @@ class NavigationFlowController extends ChangeNotifier {
       stillCurrent: () =>
           generation == _generation && _state is FlowActiveNavigation,
     );
+  }
+
+  void _sendGuidanceAlert(NavigationRoute route, int stepIndex) {
+    final everyTurn = accessibility.frequency ==
+        NavigationAlertFrequency.everyTurn;
+    final shouldAlert = everyTurn
+        ? stepIndex != _lastAlertedStep
+        : _tripDistanceMeters - _lastDistanceAlertMeters >= 20 * 0.3048;
+    if (!shouldAlert || route.steps.isEmpty) return;
+    _lastAlertedStep = stepIndex;
+    _lastDistanceAlertMeters = _tripDistanceMeters;
+    final instruction = route.steps[
+      stepIndex.clamp(0, route.steps.length - 1).toInt()
+    ]
+        .instruction;
+    if (accessibility.value('Haptic turn alerts')) {
+      unawaited(HapticFeedback.mediumImpact().catchError((Object _) {}));
+    }
+    if (accessibility.value('Voice guidance')) {
+      unawaited(
+        _speech
+            .speak(instruction)
+            .then<void>((_) {})
+            .catchError((Object _) {}),
+      );
+    }
   }
 
   /// Builds the next active-guidance state, keeping the approach state once
@@ -1096,6 +1133,9 @@ class NavigationFlowController extends ChangeNotifier {
     // A reroute still in flight must not write to a disposed controller.
     _generation++;
     search.removeListener(notifyListeners);
+    unawaited(
+      _speech.stop().then<void>((_) {}).catchError((Object _) {}),
+    );
     super.dispose();
   }
 }

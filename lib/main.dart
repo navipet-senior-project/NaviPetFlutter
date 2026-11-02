@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,6 +17,7 @@ import 'data/location_service.dart';
 import 'data/mapbox_config.dart';
 import 'data/mapbox_navigation_service.dart';
 import 'data/navigation_flow_controller.dart';
+import 'data/navigation_accessibility_preferences.dart';
 import 'data/profile_gateway.dart';
 import 'data/recent_searches_gateway.dart';
 import 'data/registration_gateway.dart';
@@ -53,6 +55,8 @@ Future<void> main() async {
   final authTokenProvider = supabase == null
       ? null
       : SupabaseAuthTokenProvider(supabase.auth);
+  final accessibilityPreferences = NavigationAccessibilityPreferences();
+  await accessibilityPreferences.load();
   final profileGateway = AppConfig.hasBackend && authTokenProvider != null
       ? HttpProfileGateway(
           baseUrl: AppConfig.backendBaseUrl,
@@ -72,18 +76,25 @@ Future<void> main() async {
         authTokenProvider: authTokenProvider,
       ),
       authTokenProvider: authTokenProvider,
+      accessibilityPreferences: accessibilityPreferences,
     ),
   );
 }
 
 class NaviPetApp extends StatefulWidget {
-  const NaviPetApp({super.key, required this.appState, this.authTokenProvider});
+  const NaviPetApp({
+    super.key,
+    required this.appState,
+    this.authTokenProvider,
+    this.accessibilityPreferences,
+  });
 
   final AppState appState;
 
   /// Null when Supabase is not configured; the flow's gateways fall back to
   /// [AnonymousAuthTokenProvider] rather than requiring one.
   final AuthTokenProvider? authTokenProvider;
+  final NavigationAccessibilityPreferences? accessibilityPreferences;
 
   @override
   State<NaviPetApp> createState() => _NaviPetAppState();
@@ -95,6 +106,8 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
   static const _avatarUrlMaxAge = Duration(minutes: 10);
 
   late final _router = createAppRouter(widget.appState);
+  late final _accessibility =
+      widget.accessibilityPreferences ?? NavigationAccessibilityPreferences();
   late final NavigationFlowController _flow = _buildFlow();
 
   /// The signed-in identity the flow currently reflects, so a later change
@@ -152,6 +165,8 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
       recentSearches: recents,
       routes: RouteRepository(gateway: routeGateway),
       location: GeolocatorLocationService(),
+      accessibility: _accessibility,
+      speech: FlutterTts(),
       // No `map:` — defaults to a no-op until MapScreen.onMapCreated calls
       // attachMap() with the real Mapbox map. The flow is built here, in
       // initState, always before that map exists.
@@ -174,6 +189,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
       providers: [
         ChangeNotifierProvider.value(value: widget.appState),
         ChangeNotifierProvider.value(value: _flow),
+        ChangeNotifierProvider.value(value: _accessibility),
       ],
       child: MaterialApp.router(
         title: 'NaviPet',
