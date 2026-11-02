@@ -97,7 +97,7 @@ void main() {
     );
   });
 
-  testWidgets('the AR button opens /ar, and the button is there on return', (
+  testWidgets('the AR button passes destination to /ar and survives return', (
     tester,
   ) async {
     final controller = harness.build()..openSearch();
@@ -119,7 +119,9 @@ void main() {
                 builder: (context, state) => Scaffold(
                   body: TextButton(
                     onPressed: () => context.pop(),
-                    child: const Text('ar screen'),
+                    child: Text(
+                      'ar screen ${state.uri.queryParameters['destination']}',
+                    ),
                   ),
                 ),
               ),
@@ -134,9 +136,9 @@ void main() {
     await tester.tap(arButton);
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('ar screen'), findsOneWidget);
+    expect(find.text('ar screen ${harness.horn.id}'), findsOneWidget);
 
-    await tester.tap(find.text('ar screen'));
+    await tester.tap(find.text('ar screen ${harness.horn.id}'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(arButton, findsOneWidget);

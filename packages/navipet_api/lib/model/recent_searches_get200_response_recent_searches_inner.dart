@@ -24,6 +24,7 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
     this.external_,
     this.attribution,
     this.distanceMeters,
+    this.indoor,
     this.navigation,
     required this.searchedAt,
   });
@@ -93,6 +94,14 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
+  AutocompleteGet200ResponseResultsInnerIndoor? indoor;
+
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
   AutocompleteGet200ResponseResultsInnerNavigation? navigation;
 
   String searchedAt;
@@ -112,6 +121,7 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
           other.external_ == external_ &&
           other.attribution == attribution &&
           other.distanceMeters == distanceMeters &&
+          other.indoor == indoor &&
           other.navigation == navigation &&
           other.searchedAt == searchedAt;
 
@@ -129,12 +139,13 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
       (external_ == null ? 0 : external_!.hashCode) +
       (attribution == null ? 0 : attribution!.hashCode) +
       (distanceMeters == null ? 0 : distanceMeters!.hashCode) +
+      (indoor == null ? 0 : indoor!.hashCode) +
       (navigation == null ? 0 : navigation!.hashCode) +
       (searchedAt.hashCode);
 
   @override
   String toString() =>
-      'RecentSearchesGet200ResponseRecentSearchesInner[id=$id, type=$type, title=$title, subtitle=$subtitle, source_=$source_, buildingCode=$buildingCode, roomNumber=$roomNumber, floorNumber=$floorNumber, external_=$external_, attribution=$attribution, distanceMeters=$distanceMeters, navigation=$navigation, searchedAt=$searchedAt]';
+      'RecentSearchesGet200ResponseRecentSearchesInner[id=$id, type=$type, title=$title, subtitle=$subtitle, source_=$source_, buildingCode=$buildingCode, roomNumber=$roomNumber, floorNumber=$floorNumber, external_=$external_, attribution=$attribution, distanceMeters=$distanceMeters, indoor=$indoor, navigation=$navigation, searchedAt=$searchedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -172,6 +183,11 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
       json[r'distanceMeters'] = this.distanceMeters;
     } else {
       json[r'distanceMeters'] = null;
+    }
+    if (this.indoor != null) {
+      json[r'indoor'] = this.indoor;
+    } else {
+      json[r'indoor'] = null;
     }
     if (this.navigation != null) {
       json[r'navigation'] = this.navigation;
@@ -216,6 +232,8 @@ class RecentSearchesGet200ResponseRecentSearchesInner {
         external_: mapValueOfType<bool>(json, r'external'),
         attribution: mapValueOfType<String>(json, r'attribution'),
         distanceMeters: mapValueOfType<int>(json, r'distanceMeters'),
+        indoor: AutocompleteGet200ResponseResultsInnerIndoor.fromJson(
+            json[r'indoor']),
         navigation: AutocompleteGet200ResponseResultsInnerNavigation.fromJson(
             json[r'navigation']),
         searchedAt: mapValueOfType<String>(json, r'searchedAt')!,

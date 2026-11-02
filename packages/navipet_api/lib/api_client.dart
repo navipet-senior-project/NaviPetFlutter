@@ -339,9 +339,17 @@ class ApiClient {
           return AutocompleteGet200ResponseProximity.fromJson(value);
         case 'AutocompleteGet200ResponseResultsInner':
           return AutocompleteGet200ResponseResultsInner.fromJson(value);
+        case 'AutocompleteGet200ResponseResultsInnerIndoor':
+          return AutocompleteGet200ResponseResultsInnerIndoor.fromJson(value);
+        case 'AutocompleteGet200ResponseResultsInnerIndoorPosition':
+          return AutocompleteGet200ResponseResultsInnerIndoorPosition.fromJson(
+              value);
         case 'AutocompleteGet200ResponseResultsInnerNavigation':
           return AutocompleteGet200ResponseResultsInnerNavigation.fromJson(
               value);
+        case 'AutocompleteGet200ResponseResultsInnerNavigationFootprint':
+          return AutocompleteGet200ResponseResultsInnerNavigationFootprint
+              .fromJson(value);
         case 'AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination':
           return AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination
               .fromJson(value);
@@ -420,32 +428,24 @@ class ApiClient {
           return ProfilesMeAccessibilityPatchRequestMobility.fromJson(value);
         case 'ProfilesMeAccessibilityPatchRequestVisuals':
           return ProfilesMeAccessibilityPatchRequestVisuals.fromJson(value);
-        case 'ProfilesMeAvatarPost200Response':
-          return ProfilesMeAvatarPost200Response.fromJson(value);
-        case 'ProfilesMeAvatarPost400Response':
-          return ProfilesMeAvatarPost400Response.fromJson(value);
-        case 'ProfilesMeAvatarPost413Response':
-          return ProfilesMeAvatarPost413Response.fromJson(value);
-        case 'ProfilesMeAvatarPost415Response':
-          return ProfilesMeAvatarPost415Response.fromJson(value);
-        case 'ProfilesMeAvatarUploadIdDelete404Response':
-          return ProfilesMeAvatarUploadIdDelete404Response.fromJson(value);
-        case 'ProfilesMeAvatarUploadIdDelete422Response':
-          return ProfilesMeAvatarUploadIdDelete422Response.fromJson(value);
-        case 'ProfilesMeAvatarUploadIdDelete502Response':
-          return ProfilesMeAvatarUploadIdDelete502Response.fromJson(value);
-        case 'ProfilesMeAvatarUploadIdDelete503Response':
-          return ProfilesMeAvatarUploadIdDelete503Response.fromJson(value);
         case 'ProfilesMeGet200Response':
           return ProfilesMeGet200Response.fromJson(value);
         case 'ProfilesMeGet200ResponseProfile':
           return ProfilesMeGet200ResponseProfile.fromJson(value);
         case 'ProfilesMeGet404Response':
           return ProfilesMeGet404Response.fromJson(value);
-        case 'ProfilesMePatch404Response':
-          return ProfilesMePatch404Response.fromJson(value);
+        case 'ProfilesMeGet502Response':
+          return ProfilesMeGet502Response.fromJson(value);
+        case 'ProfilesMePatch400Response':
+          return ProfilesMePatch400Response.fromJson(value);
+        case 'ProfilesMePatch413Response':
+          return ProfilesMePatch413Response.fromJson(value);
+        case 'ProfilesMePatch415Response':
+          return ProfilesMePatch415Response.fromJson(value);
         case 'ProfilesMePatch422Response':
           return ProfilesMePatch422Response.fromJson(value);
+        case 'ProfilesMePatch503Response':
+          return ProfilesMePatch503Response.fromJson(value);
         case 'ProfilesMePatchRequest':
           return ProfilesMePatchRequest.fromJson(value);
         case 'RecentSearchesGet200Response':

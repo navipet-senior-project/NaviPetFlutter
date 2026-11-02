@@ -2726,6 +2726,63 @@
                             "type": "integer",
                             "minimum": 0
                           },
+                          "indoor": {
+                            "type": "object",
+                            "required": [
+                              "mapCode",
+                              "frame",
+                              "doorKey",
+                              "floor",
+                              "position",
+                              "headingDeg"
+                            ],
+                            "properties": {
+                              "mapCode": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "frame": {
+                                "type": "string",
+                                "enum": [
+                                  "multiset-mapset"
+                                ]
+                              },
+                              "doorKey": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "floor": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "position": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "headingDeg": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMaximum": 360
+                              }
+                            },
+                            "additionalProperties": false
+                          },
                           "navigation": {
                             "type": "object",
                             "properties": {
@@ -2744,14 +2801,6 @@
                                   }
                                 },
                                 "additionalProperties": false
-                              },
-                              "arrivalRadiusMeters": {
-                                "type": "number",
-                                "minimum": 1,
-                                "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
-                              },
-                              "indoorDestinationId": {
-                                "type": "string"
                               },
                               "arrivalRadiusMeters": {
                                 "type": "integer",
@@ -2796,6 +2845,9 @@
                                 },
                                 "additionalProperties": false,
                                 "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
+                              },
+                              "indoorDestinationId": {
+                                "type": "string"
                               }
                             },
                             "additionalProperties": false
@@ -3156,6 +3208,63 @@
                           "type": "integer",
                           "minimum": 0
                         },
+                        "indoor": {
+                          "type": "object",
+                          "required": [
+                            "mapCode",
+                            "frame",
+                            "doorKey",
+                            "floor",
+                            "position",
+                            "headingDeg"
+                          ],
+                          "properties": {
+                            "mapCode": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "frame": {
+                              "type": "string",
+                              "enum": [
+                                "multiset-mapset"
+                              ]
+                            },
+                            "doorKey": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "floor": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "position": {
+                              "type": "object",
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "headingDeg": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMaximum": 360
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "navigation": {
                           "type": "object",
                           "properties": {
@@ -3174,14 +3283,6 @@
                                 }
                               },
                               "additionalProperties": false
-                            },
-                            "arrivalRadiusMeters": {
-                              "type": "number",
-                              "minimum": 1,
-                              "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
-                            },
-                            "indoorDestinationId": {
-                              "type": "string"
                             },
                             "arrivalRadiusMeters": {
                               "type": "integer",
@@ -3226,6 +3327,9 @@
                               },
                               "additionalProperties": false,
                               "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
+                            },
+                            "indoorDestinationId": {
+                              "type": "string"
                             }
                           },
                           "additionalProperties": false
@@ -3633,6 +3737,63 @@
                             "type": "integer",
                             "minimum": 0
                           },
+                          "indoor": {
+                            "type": "object",
+                            "required": [
+                              "mapCode",
+                              "frame",
+                              "doorKey",
+                              "floor",
+                              "position",
+                              "headingDeg"
+                            ],
+                            "properties": {
+                              "mapCode": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "frame": {
+                                "type": "string",
+                                "enum": [
+                                  "multiset-mapset"
+                                ]
+                              },
+                              "doorKey": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "floor": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "position": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "headingDeg": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMaximum": 360
+                              }
+                            },
+                            "additionalProperties": false
+                          },
                           "navigation": {
                             "type": "object",
                             "properties": {
@@ -3651,14 +3812,6 @@
                                   }
                                 },
                                 "additionalProperties": false
-                              },
-                              "arrivalRadiusMeters": {
-                                "type": "number",
-                                "minimum": 1,
-                                "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
-                              },
-                              "indoorDestinationId": {
-                                "type": "string"
                               },
                               "arrivalRadiusMeters": {
                                 "type": "integer",
@@ -3703,6 +3856,9 @@
                                 },
                                 "additionalProperties": false,
                                 "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
+                              },
+                              "indoorDestinationId": {
+                                "type": "string"
                               }
                             },
                             "additionalProperties": false
@@ -4052,6 +4208,63 @@
                           "type": "integer",
                           "minimum": 0
                         },
+                        "indoor": {
+                          "type": "object",
+                          "required": [
+                            "mapCode",
+                            "frame",
+                            "doorKey",
+                            "floor",
+                            "position",
+                            "headingDeg"
+                          ],
+                          "properties": {
+                            "mapCode": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "frame": {
+                              "type": "string",
+                              "enum": [
+                                "multiset-mapset"
+                              ]
+                            },
+                            "doorKey": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "floor": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "position": {
+                              "type": "object",
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "headingDeg": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMaximum": 360
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "navigation": {
                           "type": "object",
                           "properties": {
@@ -4070,14 +4283,6 @@
                                 }
                               },
                               "additionalProperties": false
-                            },
-                            "arrivalRadiusMeters": {
-                              "type": "number",
-                              "minimum": 1,
-                              "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
-                            },
-                            "indoorDestinationId": {
-                              "type": "string"
                             },
                             "arrivalRadiusMeters": {
                               "type": "integer",
@@ -4122,6 +4327,9 @@
                               },
                               "additionalProperties": false,
                               "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
+                            },
+                            "indoorDestinationId": {
+                              "type": "string"
                             }
                           },
                           "additionalProperties": false
@@ -4462,6 +4670,63 @@
                             "type": "integer",
                             "minimum": 0
                           },
+                          "indoor": {
+                            "type": "object",
+                            "required": [
+                              "mapCode",
+                              "frame",
+                              "doorKey",
+                              "floor",
+                              "position",
+                              "headingDeg"
+                            ],
+                            "properties": {
+                              "mapCode": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "frame": {
+                                "type": "string",
+                                "enum": [
+                                  "multiset-mapset"
+                                ]
+                              },
+                              "doorKey": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "floor": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "position": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "headingDeg": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMaximum": 360
+                              }
+                            },
+                            "additionalProperties": false
+                          },
                           "navigation": {
                             "type": "object",
                             "properties": {
@@ -4480,14 +4745,6 @@
                                   }
                                 },
                                 "additionalProperties": false
-                              },
-                              "arrivalRadiusMeters": {
-                                "type": "number",
-                                "minimum": 1,
-                                "description": "Building-specific outdoor arrival radius in meters. Defaults to 10 when omitted."
-                              },
-                              "indoorDestinationId": {
-                                "type": "string"
                               },
                               "arrivalRadiusMeters": {
                                 "type": "integer",
@@ -4532,6 +4789,9 @@
                                 },
                                 "additionalProperties": false,
                                 "description": "GeoJSON Polygon outer ring of the building, as closed [longitude, latitude] positions. Arrival is detected near this outline instead of the outdoor destination point."
+                              },
+                              "indoorDestinationId": {
+                                "type": "string"
                               }
                             },
                             "additionalProperties": false
@@ -6391,218 +6651,6 @@
         }
       }
     },
-    "/profiles/me/avatar/{uploadId}": {
-      "delete": {
-        "summary": "Discard a temporary profile avatar upload",
-        "tags": [
-          "Profiles"
-        ],
-        "description": "Discards a temporary avatar upload, for when the user cancels their profile changes.\n\nRequires `Authorization: Bearer <access_token>`.\n\n`uploadId` is the value returned by `POST /profiles/me/avatar`.\n\nDo not call this after that `uploadId` has been committed through `PATCH /profiles/me`.\n\nAn upload that does not exist for this user returns 404.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "in": "path",
-            "name": "uploadId",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Temporary avatar deleted.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "Temporary avatar deleted."
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Access token is missing, invalid, or expired.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "Access token is missing, invalid, or expired."
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Temporary avatar not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "Temporary avatar not found."
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The uploadId is not a UUID.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "The uploadId is not a UUID."
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Profile storage is unavailable.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "Profile storage is unavailable."
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Avatar storage is not configured on the server.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "Avatar storage is not configured on the server."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/profiles/me": {
       "get": {
         "summary": "Get the authenticated user profile",
@@ -6795,7 +6843,7 @@
         "tags": [
           "Profiles"
         ],
-        "description": "Updates the profile of the authenticated user and returns the saved profile.\n\nRequires `Authorization: Bearer <access_token>`.\n\nSend at least one field. Omitted fields keep their current values.\n\n`displayName` is trimmed and cannot be blank. To change the email, use `POST /auth/change-email`; email is deliberately not editable through this endpoint.\n\n---\n\nTo save a new avatar, first call `POST /profiles/me/avatar`, then send its `uploadId` here as `avatarUploadId`.\n\n---\n\nThe returned `avatarUrl` is a temporary signed URL that expires after about one hour.\n\nIn Swagger UI, delete the fields you do not want to change from the example body before executing.",
+        "description": "Updates the profile of the authenticated user and returns the saved profile.\n\nRequires `Authorization: Bearer <access_token>`.\n\nSend at least one field. Omitted fields keep their current values. Use JSON when changing text fields only. Use multipart form data when including an avatar file; send text fields as ordinary form fields and the image in a field named `avatar`.\n\n`displayName` is trimmed and cannot be blank. To change the email, use `POST /auth/change-email`; email is deliberately not editable through this endpoint.\n\nAvatar images must be JPEG, PNG, or WebP and no larger than 5 MB. The server stores a newly selected avatar only when this request saves successfully.\n\nThe returned `avatarUrl` is a temporary signed URL that expires after about one hour.\n\nIn Swagger UI, delete the fields you do not want to change from the example body before executing.",
         "requestBody": {
           "required": true,
           "content": {
@@ -6824,10 +6872,45 @@
                       }
                     ]
                   },
-                  "avatarUploadId": {
+                  "avatar": {
                     "type": "string",
-                    "format": "uuid",
-                    "description": "The uploadId returned by POST /profiles/me/avatar. Supplying it commits that temporary avatar when the profile is saved."
+                    "format": "binary",
+                    "description": "Optional JPEG, PNG, or WebP file, up to 5 MB."
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "role": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "student"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "professor"
+                        ]
+                      }
+                    ]
+                  },
+                  "avatar": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Optional JPEG, PNG, or WebP file, up to 5 MB."
                   }
                 },
                 "additionalProperties": false,
@@ -6910,7 +6993,7 @@
             }
           },
           "400": {
-            "description": "Malformed JSON body.",
+            "description": "Malformed JSON or multipart request.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6939,7 +7022,7 @@
                       }
                     }
                   },
-                  "description": "Malformed JSON body."
+                  "description": "Malformed JSON or multipart request."
                 }
               }
             }
@@ -6980,7 +7063,7 @@
             }
           },
           "404": {
-            "description": "The authenticated profile, or the avatar upload named by `avatarUploadId`, does not exist.",
+            "description": "The authenticated profile does not exist.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7009,242 +7092,7 @@
                       }
                     }
                   },
-                  "description": "The authenticated profile, or the avatar upload named by `avatarUploadId`, does not exist."
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request body failed validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "The request body failed validation."
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Profile storage is unavailable.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "Profile storage is unavailable."
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Avatar storage is not configured on the server.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "Avatar storage is not configured on the server."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/profiles/me/avatar": {
-      "post": {
-        "summary": "Upload a temporary profile avatar",
-        "tags": [
-          "Profiles"
-        ],
-        "description": "Uploads one image as a temporary avatar. It is not the saved profile avatar until it is committed.\n\nRequires `Authorization: Bearer <access_token>`.\n\nSend `multipart/form-data` with the file in a field named `avatar`.\n\nAccepted formats are JPEG, PNG, and WebP, up to 5 MB.\n\n---\n\n**To keep it:** send the returned `uploadId` as `avatarUploadId` in `PATCH /profiles/me`.\n\n---\n\n**To discard it:** call `DELETE /profiles/me/avatar/{uploadId}`.\n\n---\n\nThe returned `avatarUrl` is a preview link that expires after about one hour.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "avatar"
-                ],
-                "properties": {
-                  "avatar": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "Avatar image file."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "uploadId",
-                    "avatarUrl"
-                  ],
-                  "properties": {
-                    "uploadId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "avatarUrl": {
-                      "type": "string",
-                      "format": "uri"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The multipart body is malformed, has no file, or does not use the `avatar` field.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "The multipart body is malformed, has no file, or does not use the `avatar` field."
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Access token is missing, invalid, or expired.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "error"
-                  ],
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "requestId": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  },
-                  "description": "Access token is missing, invalid, or expired."
+                  "description": "The authenticated profile does not exist."
                 }
               }
             }
@@ -7285,7 +7133,7 @@
             }
           },
           "415": {
-            "description": "The request is not multipart/form-data, or the file is not a JPEG, PNG, or WebP image.",
+            "description": "The request encoding or avatar image type is unsupported.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7314,7 +7162,42 @@
                       }
                     }
                   },
-                  "description": "The request is not multipart/form-data, or the file is not a JPEG, PNG, or WebP image."
+                  "description": "The request encoding or avatar image type is unsupported."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "description": "The request body failed validation."
                 }
               }
             }

@@ -19,6 +19,7 @@ Name | Type | Description | Notes
 **external_** | **bool** |  | [optional] 
 **attribution** | **String** |  | [optional] 
 **distanceMeters** | **int** |  | [optional] 
+**indoor** | [**AutocompleteGet200ResponseResultsInnerIndoor**](AutocompleteGet200ResponseResultsInnerIndoor.md) |  | [optional] 
 **navigation** | [**AutocompleteGet200ResponseResultsInnerNavigation**](AutocompleteGet200ResponseResultsInnerNavigation.md) |  | [optional] 
 **searchedAt** | **String** |  | 
 
