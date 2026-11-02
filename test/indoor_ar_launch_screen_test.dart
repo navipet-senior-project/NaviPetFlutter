@@ -362,7 +362,10 @@ void main() {
       await harness.pump(tester);
       await harness.tapAr(tester);
 
-      expect(find.textContaining("Indoor AR isn't available"), findsOneWidget);
+      expect(
+        find.text("Couldn't start AR. Check your connection and try again."),
+        findsOneWidget,
+      );
       expect(harness.fake.requests, isEmpty);
       expect(find.text('map'), findsNothing);
 

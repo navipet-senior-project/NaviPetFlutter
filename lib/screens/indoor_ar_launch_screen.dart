@@ -57,6 +57,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   IndoorArRequest? _request;
   var _unavailable = false;
+  var _tokenFailed = false;
   var _rationale = false;
   var _blocked = false;
 
@@ -73,7 +74,10 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       _leave("AR mode isn't available on this device.");
       return;
     }
-    setState(() => _unavailable = false);
+    setState(() {
+      _unavailable = false;
+      _tokenFailed = false;
+    });
     try {
       final id = widget.destinationId;
       if (id == null || id.trim().isEmpty) {
@@ -142,7 +146,12 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         throw const IndoorArTokenException(0);
       }
     } on IndoorArTokenException {
-      if (mounted) setState(() => _unavailable = true);
+      if (mounted) {
+        setState(() {
+          _unavailable = true;
+          _tokenFailed = true;
+        });
+      }
       return;
     }
     if (!mounted) return;
@@ -168,9 +177,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   void _leave(String? message) {
     if (!mounted) return;
     if (message != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
     context.canPop() ? context.pop() : context.go('/map');
   }
@@ -189,7 +197,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     body: Center(
       child: _unavailable
           ? _message(
-              "Indoor AR isn't available for this room",
+              _tokenFailed
+                  ? "Couldn't start AR. Check your connection and try again."
+                  : "Indoor AR isn't available for this room",
               action: 'Retry',
               onAction: _start,
               back: 'Back to map',
