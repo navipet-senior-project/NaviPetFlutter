@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
 import '../data/indoor_ar_launcher.dart';
+import '../data/navigation_flow_controller.dart';
 import '../screens/account_settings_screen.dart';
 import '../screens/change_email_screen.dart';
 import '../screens/checklist_screen.dart';
@@ -127,8 +129,11 @@ GoRouter createAppRouter(
     ),
     GoRoute(
       path: '/ar',
-      builder: (context, state) =>
-          IndoorArLaunchScreen(launcher: AndroidIndoorArLauncher()),
+      builder: (context, state) => IndoorArLaunchScreen(
+        launcher: AndroidIndoorArLauncher(),
+        destinationId: state.uri.queryParameters['destination'],
+        gateway: context.read<NavigationFlowController>().searchGateway,
+      ),
     ),
     // #41 transport spike; removed with the real launch screen (build step 3).
     if (kDebugMode)

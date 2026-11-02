@@ -1,3 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:navipet/data/campus_search_gateway.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,7 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:navipet/data/indoor_ar_contract.dart';
 import 'package:navipet/data/indoor_ar_launcher.dart';
 import 'package:navipet/screens/indoor_ar_launch_screen.dart';
-import 'package:navipet/screens/indoor_ar_spike_screen.dart';
+import 'support/indoor_ar_fixtures.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 const _rationale =
@@ -40,6 +46,8 @@ class _Harness {
     this.status = PermissionStatus.denied,
     this.camera = PermissionStatus.granted,
     IndoorArLauncher? launcher,
+    String? destinationId = _destinationId,
+    Future<http.Response> Function(http.Request)? fetch,
   }) : fake = FakeIndoorArLauncher(result: result) {
     final activeLauncher = launcher ?? fake;
     router = GoRouter(
@@ -49,7 +57,12 @@ class _Harness {
           path: '/map',
           builder: (context, state) => Scaffold(
             body: TextButton(
-              onPressed: () => context.push('/ar'),
+              onPressed: () => context.push(
+                Uri(
+                  path: '/ar',
+                  queryParameters: {'destination': ?destinationId},
+                ).toString(),
+              ),
               child: const Text('map'),
             ),
           ),
@@ -58,6 +71,16 @@ class _Harness {
           path: '/ar',
           builder: (context, state) => IndoorArLaunchScreen(
             launcher: activeLauncher,
+            destinationId: state.uri.queryParameters['destination'],
+            gateway: HttpCampusSearchGateway(
+              baseUrl: 'https://example.test',
+              client: MockClient((request) async {
+                fetchedIds.add(request.url.pathSegments.last);
+                return fetch != null
+                    ? await fetch(request)
+                    : http.Response(_fixture, 200);
+              }),
+            ),
             cameraStatus: () async {
               statusChecks++;
               return status;
@@ -76,6 +99,7 @@ class _Harness {
     );
   }
 
+  final fetchedIds = <String>[];
   final FakeIndoorArLauncher fake;
   late final GoRouter router;
   PermissionStatus status;
@@ -101,14 +125,108 @@ class _Harness {
   }
 }
 
+const _destinationId = '00000000-0000-4000-8000-000000000119';
+final _fixture = File('test/fixtures/vec119_place.json').readAsStringSync();
+
 void main() {
+  testWidgets('selected destination uses fetched pose, never the spike door', (
+    tester,
+  ) async {
+    final json = jsonDecode(_fixture) as Map<String, dynamic>;
+    final place = json['place'] as Map<String, dynamic>;
+    place['id'] = 'another-room';
+    place['roomNumber'] = '120';
+    place['indoor'] = {
+      'mapCode': 'another-map',
+      'frame': 'multiset-mapset',
+      'doorKey': 'VEC120',
+      'floor': '2',
+      'position': {'x': 1, 'y': 2, 'z': 3},
+      'headingDeg': 90,
+    };
+    final harness = _Harness(
+      status: PermissionStatus.granted,
+      destinationId: 'another-room',
+      fetch: (_) async => http.Response(jsonEncode(json), 200),
+    );
+    await harness.pump(tester);
+    await harness.tapAr(tester);
+    expect(harness.fetchedIds, ['another-room']);
+    expect(harness.fake.requests.single.toJson(), {
+      'schemaVersion': 1,
+      'room': '120',
+      'mapCode': 'another-map',
+      'frame': 'multiset-mapset',
+      'doorKey': 'VEC120',
+      'floor': '2',
+      'position': {'x': 1.0, 'y': 2.0, 'z': 3.0},
+      'headingDeg': 90.0,
+    });
+  });
+
+  for (final failure in [
+    'missing indoor',
+    'fetch failure',
+    'malformed indoor',
+  ]) {
+    testWidgets(
+      '$failure offers retry without launching or asking for camera',
+      (tester) async {
+        var attempts = 0;
+        final harness = _Harness(
+          status: PermissionStatus.granted,
+          fetch: (_) async {
+            if (++attempts > 1) return http.Response(_fixture, 200);
+            if (failure == 'fetch failure') {
+              throw const SocketException('offline');
+            }
+            final json = jsonDecode(_fixture) as Map<String, dynamic>;
+            final place = json['place'] as Map<String, dynamic>;
+            place['indoor'] = failure == 'missing indoor'
+                ? null
+                : {'doorKey': 'broken'};
+            return http.Response(jsonEncode(json), 200);
+          },
+        );
+        await harness.pump(tester);
+        await harness.tapAr(tester);
+        expect(
+          find.text("Indoor AR isn't available for this room"),
+          findsOneWidget,
+        );
+        expect(harness.fake.requests, isEmpty);
+        expect(harness.statusChecks, 0);
+        await tester.tap(find.text('Retry'));
+        await tester.pumpAndSettle();
+        expect(harness.fetchedIds, [_destinationId, _destinationId]);
+        expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
+        expect(find.text('map'), findsOneWidget);
+      },
+    );
+  }
+
+  testWidgets('missing destination never fetches or launches', (tester) async {
+    final harness = _Harness(destinationId: null);
+    await harness.pump(tester);
+    await harness.tapAr(tester);
+    expect(
+      find.text("Indoor AR isn't available for this room"),
+      findsOneWidget,
+    );
+    expect(harness.fetchedIds, isEmpty);
+    expect(harness.fake.requests, isEmpty);
+    await tester.tap(find.text('Back to map'));
+    await tester.pumpAndSettle();
+    expect(find.text('map'), findsOneWidget);
+  });
+
   testWidgets('a granted camera launches straight away', (tester) async {
     final harness = _Harness(status: PermissionStatus.granted);
     await harness.pump(tester);
     await harness.tapAr(tester);
 
     expect(harness.cameraRequests, 0);
-    expect(harness.fake.requests, [IndoorArSpikeScreen.vec119]);
+    expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
     expect(find.text('map'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
   });
@@ -149,7 +267,7 @@ void main() {
     await harness.tapArAndContinue(tester);
 
     expect(harness.cameraRequests, 1);
-    expect(harness.fake.requests, [IndoorArSpikeScreen.vec119]);
+    expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
     expect(find.text('map'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
   });

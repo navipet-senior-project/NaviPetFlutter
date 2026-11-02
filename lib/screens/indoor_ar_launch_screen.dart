@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../data/campus_search_gateway.dart';
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
-import 'indoor_ar_spike_screen.dart';
 
 /// Asks for the camera, opens the Unity AR camera and returns to the map.
 /// Opened fresh by every AR tap, so every tap asks again.
@@ -13,12 +13,16 @@ class IndoorArLaunchScreen extends StatefulWidget {
   const IndoorArLaunchScreen({
     super.key,
     required this.launcher,
+    required this.destinationId,
+    required this.gateway,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
     this.openSettings = openAppSettings,
   });
 
   final IndoorArLauncher launcher;
+  final String? destinationId;
+  final CampusSearchGateway gateway;
   final Future<PermissionStatus> Function() cameraStatus;
   final Future<PermissionStatus> Function() requestCamera;
   final Future<bool> Function() openSettings;
@@ -42,6 +46,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     'BAD_RESULT': 'AR returned an unreadable result.',
   };
 
+  IndoorArRequest? _request;
+  var _unavailable = false;
   var _rationale = false;
   var _blocked = false;
 
@@ -53,8 +59,36 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _start() async {
+    if (!mounted) return;
     if (defaultTargetPlatform != TargetPlatform.android) {
       _leave("AR mode isn't available on this device.");
+      return;
+    }
+    setState(() => _unavailable = false);
+    try {
+      final id = widget.destinationId;
+      if (id == null || id.trim().isEmpty) {
+        setState(() => _unavailable = true);
+        return;
+      }
+      final place = await widget.gateway.place(id);
+      if (!mounted) return;
+      final indoor = place.indoor;
+      if (indoor == null) {
+        setState(() => _unavailable = true);
+        return;
+      }
+      _request = IndoorArRequest(
+        room: place.roomNumber ?? place.title,
+        doorKey: indoor.doorKey,
+        floor: indoor.floor,
+        position: indoor.position,
+        headingDeg: indoor.headingDeg,
+        mapCode: indoor.mapCode,
+        frame: indoor.frame,
+      );
+    } catch (_) {
+      if (mounted) setState(() => _unavailable = true);
       return;
     }
     try {
@@ -88,9 +122,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _launch() async {
-    // shortcut: the Unity contract requires a door, so this sends a fixed
-    // valid one that the camera scene ignores; replaced by the door flow.
-    final result = await widget.launcher.launch(IndoorArSpikeScreen.vec119);
+    final result = await widget.launcher.launch(_request!);
     if (!mounted) return;
     _leave(_resultText(result));
   }
@@ -127,11 +159,19 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: _blocked || _rationale
+    appBar: _blocked || _rationale || _unavailable
         ? AppBar(title: const Text('AR mode'))
         : null,
     body: Center(
-      child: _blocked
+      child: _unavailable
+          ? _message(
+              "Indoor AR isn't available for this room",
+              action: 'Retry',
+              onAction: _start,
+              back: 'Back to map',
+              onBack: () => _leave(null),
+            )
+          : _blocked
           ? _message(
               _cameraOff,
               action: 'Open settings',
