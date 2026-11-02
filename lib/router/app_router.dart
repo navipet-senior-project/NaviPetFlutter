@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
 import '../data/indoor_ar_launcher.dart';
+import '../data/indoor_ar_token_gateway.dart';
 import '../data/navigation_flow_controller.dart';
 import '../screens/account_settings_screen.dart';
 import '../screens/change_email_screen.dart';
@@ -28,6 +29,7 @@ import '../screens/verify_email_screen.dart';
 GoRouter createAppRouter(
   AppState appState, {
   String? initialLocation,
+  IndoorArTokenGateway? indoorArTokenGateway,
 }) => GoRouter(
   initialLocation:
       initialLocation ?? (appState.isAuthenticated ? '/map' : '/signin'),
@@ -133,6 +135,7 @@ GoRouter createAppRouter(
         launcher: AndroidIndoorArLauncher(),
         destinationId: state.uri.queryParameters['destination'],
         gateway: context.read<NavigationFlowController>().searchGateway,
+        tokenGateway: indoorArTokenGateway,
       ),
     ),
     // #41 transport spike; removed with the real launch screen (build step 3).
