@@ -28,8 +28,8 @@ android {
         applicationId = "com.navipet.navipet"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // ARCore and the Unity library need API 25 (Unity 6000.3 + ARCore XR Plugin 6.3).
-        minSdk = if (unityArEnabled) maxOf(flutter.minSdkVersion, 25) else flutter.minSdkVersion
+        // ARCore and the Unity library need API 26 (Unity 6000.3 + ARCore XR Plugin 6.3).
+        minSdk = if (unityArEnabled) maxOf(flutter.minSdkVersion, 26) else flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
