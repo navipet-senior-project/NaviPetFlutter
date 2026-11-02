@@ -177,8 +177,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   void _leave(String? message) {
     if (!mounted) return;
     if (message != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
     context.canPop() ? context.pop() : context.go('/map');
   }

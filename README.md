@@ -11,8 +11,11 @@ includes:
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
 - Existing Pet, Checklist, and Account screens. On Android, the arrival AR
-  button loads the selected place and sends its backend door pose to Unity.
-  Rooms without a valid indoor pose show an unavailable message with Retry.
+  button loads the selected place and sends its backend door pose, plus a
+  short-lived MultiSet token fetched from the backend (`POST /indoor/ar-token`),
+  to Unity. The MultiSet secret never ships in the app. Rooms without a valid
+  indoor pose show an unavailable message with Retry; token failures show a
+  separate retry message.
   Unity AR still requires verification on a physical phone.
 
 ## Project structure
