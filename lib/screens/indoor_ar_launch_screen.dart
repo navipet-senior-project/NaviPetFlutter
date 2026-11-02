@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../data/campus_search_gateway.dart';
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
+import '../data/indoor_ar_token_gateway.dart';
 
 /// Asks for the camera, opens the Unity AR camera and returns to the map.
 /// Opened fresh by every AR tap, so every tap asks again.
@@ -15,6 +16,8 @@ class IndoorArLaunchScreen extends StatefulWidget {
     required this.launcher,
     required this.destinationId,
     required this.gateway,
+    required this.tokenGateway,
+    this.now = DateTime.now,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
     this.openSettings = openAppSettings,
@@ -23,6 +26,10 @@ class IndoorArLaunchScreen extends StatefulWidget {
   final IndoorArLauncher launcher;
   final String? destinationId;
   final CampusSearchGateway gateway;
+
+  /// Null when the app has no backend session to ask; AR is then unavailable.
+  final IndoorArTokenGateway? tokenGateway;
+  final DateTime Function() now;
   final Future<PermissionStatus> Function() cameraStatus;
   final Future<PermissionStatus> Function() requestCamera;
   final Future<bool> Function() openSettings;
@@ -37,6 +44,8 @@ class IndoorArLaunchScreen extends StatefulWidget {
 }
 
 class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
+  /// A token this close to expiry could lapse before Unity localises.
+  static const _tokenMargin = Duration(minutes: 1);
   static const _cameraOff =
       'Camera access is off. Turn it on in Settings to use AR directions.';
   static const _errorText = {
@@ -48,6 +57,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   IndoorArRequest? _request;
   var _unavailable = false;
+  var _tokenFailed = false;
   var _rationale = false;
   var _blocked = false;
 
@@ -64,7 +74,10 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       _leave("AR mode isn't available on this device.");
       return;
     }
-    setState(() => _unavailable = false);
+    setState(() {
+      _unavailable = false;
+      _tokenFailed = false;
+    });
     try {
       final id = widget.destinationId;
       if (id == null || id.trim().isEmpty) {
@@ -122,7 +135,27 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _launch() async {
-    final result = await widget.launcher.launch(_request!);
+    // Minted now, after the camera step, so it is as fresh as possible and a
+    // refused permission never spends one of the 5-per-minute requests.
+    final IndoorArToken token;
+    try {
+      final gateway = widget.tokenGateway;
+      if (gateway == null) throw const IndoorArTokenException(0);
+      token = await gateway.fetch();
+      if (!token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
+        throw const IndoorArTokenException(0);
+      }
+    } on IndoorArTokenException {
+      if (mounted) {
+        setState(() {
+          _unavailable = true;
+          _tokenFailed = true;
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
+    final result = await widget.launcher.launch(_request!.withArToken(token));
     if (!mounted) return;
     _leave(_resultText(result));
   }
@@ -165,7 +198,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     body: Center(
       child: _unavailable
           ? _message(
-              "Indoor AR isn't available for this room",
+              _tokenFailed
+                  ? "Couldn't start AR. Check your connection and try again."
+                  : "Indoor AR isn't available for this room",
               action: 'Retry',
               onAction: _start,
               back: 'Back to map',
