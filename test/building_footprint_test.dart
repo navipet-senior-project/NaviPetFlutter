@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/campus_place.dart';
+import 'package:navipet/data/location_service.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/data/navigation_flow_state.dart';
 import 'package:navipet/data/navigation_models.dart';
@@ -272,6 +273,45 @@ void main() {
       final [cached] = await store.load();
       expect(cached.footprint, hasLength(5));
       expect(cached.footprint!.last.latitude, _square.last.latitude);
+    });
+  });
+
+  group('selecting the building the user is inside', () {
+    Future<(NavigationFlowController, harness.RecordingMap)> selectAt(
+      NavigationCoordinate position,
+    ) async {
+      final place = _horn(footprint: _square);
+      final search = harness.FakeSearchGateway()..results = [place];
+      final map = harness.RecordingMap();
+      final location = harness.FakeLocationService()
+        ..reading = LocationReading(
+          availability: LocationAvailability.available,
+          coordinate: position,
+        );
+      final controller = harness.build(
+        search: search,
+        location: location,
+        map: map,
+      )..openSearch();
+      await controller.selectPlace(place);
+      return (controller, map);
+    }
+
+    test(
+      'shows already here and skips destination preview inside footprint',
+      () async {
+        final (controller, map) = await selectAt(_offset(0));
+        final state = controller.state as FlowPlacePreview;
+        expect(state.alreadyHere, isTrue);
+        expect(map.calls, isEmpty);
+      },
+    );
+
+    test('shows the normal map destination outside footprint', () async {
+      final (controller, map) = await selectAt(_offset(50));
+      final state = controller.state as FlowPlacePreview;
+      expect(state.alreadyHere, isFalse);
+      expect(map.calls, contains('showPlace:Horn Center'));
     });
   });
 }

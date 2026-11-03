@@ -102,6 +102,7 @@ class FlowPlacePreview extends NavigationFlowState {
     required this.place,
     required this.destination,
     this.previousQuery = '',
+    this.alreadyHere = false,
   });
 
   final CampusPlace place;
@@ -110,6 +111,10 @@ class FlowPlacePreview extends NavigationFlowState {
   final NaviDestination? destination;
 
   final String previousQuery;
+
+  /// True when the user's location falls inside the selected building's
+  /// server-provided footprint.
+  final bool alreadyHere;
 
   bool get routable => destination != null;
 }

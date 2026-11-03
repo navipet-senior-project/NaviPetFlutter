@@ -107,7 +107,25 @@ class PlacePreviewSheet extends StatelessWidget {
                 ),
               ),
             ),
-            if (!state.routable) ...[
+            if (state.alreadyHere) ...[
+              const SizedBox(height: AppSpacing.lg),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 18,
+                    color: AppColors.navy,
+                  ),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      "You're already here.",
+                      style: TextStyle(color: AppColors.navy),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (!state.routable) ...[
               const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
@@ -130,14 +148,18 @@ class PlacePreviewSheet extends StatelessWidget {
             SizedBox(
               height: 48,
               child: FilledButton.icon(
-                onPressed: state.routable ? onDirections : null,
+                onPressed: state.routable && !state.alreadyHere
+                    ? onDirections
+                    : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.navy,
                   foregroundColor: Colors.white,
                   shape: const StadiumBorder(),
                 ),
                 icon: const Icon(Icons.directions_outlined),
-                label: const Text('Directions'),
+                label: Text(
+                  state.alreadyHere ? "You're already here" : 'Directions',
+                ),
               ),
             ),
           ],

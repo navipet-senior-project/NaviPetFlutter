@@ -346,6 +346,23 @@ class NavigationFlowController extends ChangeNotifier {
         ? null
         : resolved.toDestination();
 
+    // Use the same server-provided footprint used by arrival guidance. A pin
+    // radius can cover neighboring buildings, so it cannot decide whether a
+    // student is already inside this building.
+    var alreadyHere = false;
+    final footprint = resolved.footprint;
+    if (destination != null &&
+        resolved.type == CampusDestinationType.building &&
+        footprint != null) {
+      final reading = await location.current();
+      if (generation != _generation) return;
+      final position = reading.coordinate;
+      alreadyHere =
+          reading.usable &&
+          position != null &&
+          distanceToFootprintMeters(footprint, position) == 0;
+    }
+
     // Picking an origin (rather than an ordinary destination search)
     // restores the interrupted route configuration with the new origin
     // instead of falling through to a plain place preview, which would
@@ -378,11 +395,12 @@ class NavigationFlowController extends ChangeNotifier {
         place: resolved,
         destination: destination,
         previousQuery: query,
+        alreadyHere: alreadyHere,
       ),
     );
 
     _recordRecent(resolved);
-    if (destination != null) {
+    if (destination != null && !alreadyHere) {
       await _queueMap(
         () => _map.showPlace(
           destination.coordinate,
