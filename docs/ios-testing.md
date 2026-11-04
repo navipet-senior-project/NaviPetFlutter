@@ -1,7 +1,8 @@
 # iPhone testing
 
-Indoor AR is unavailable on iOS in this build. The iOS `navipet/indoor_ar`
-channel returns `unavailable`, even if a Unity export is present. The rest of
+Indoor AR needs a prebuilt, gitignored `UnityFramework` (see "Indoor AR"
+below). Without it the app builds and the `navipet/indoor_ar` channel answers
+`unavailable`. The rest of
 NaviPet can be tested on an iPhone 14 Plus (iOS 16 or later); the app's
 minimum target is iOS 15. No distribution account is needed.
 
@@ -31,18 +32,32 @@ provisioning profiles expire after seven days and must be renewed through Xcode.
 without signing, run `flutter build ios --no-codesign`. To build for a simulator,
 run `flutter build ios --simulator`.
 
-## Unity export status
+## Indoor AR
 
-The separate NaviPetUnity project currently targets Unity **6000.3.26f1** and
-has Android-only request/result transport and an ARCore loader. It needs an
-iOS request/result bridge and ARKit package and loader before an iOS export
-can provide indoor AR. Simply adding a `UnityFramework` to this Flutter project
-will not enable it. No framework is linked or embedded by the current iOS
-build.
+The Runner has the iOS counterpart of Android's `IndoorArChannel`: the same
+`navipet/indoor_ar` channel and `launch` call, the same request JSON
+(schemaVersion 1 or 2, optional `arToken`) and the same result JSON
+(`status`, `errorCode`). Host-built outcomes are `unavailable`, `BAD_REQUEST`
+and `UNITY_EXITED`. It hands the request to `IndoorArHost` inside
+`UnityFramework` and returns the string Unity delivers.
 
-Once that Unity work is available, install the matching Unity Editor and its
-iOS Build Support module through Unity Hub, open the Unity project, switch the
-active build platform to iOS under File > Build Profiles, select the indoor AR
-scene and build to a separate output directory. The export contains an Xcode
-project and `UnityFramework` target. Integration and verification of that
-framework depend on the Unity-side iOS bridge and are not implemented here.
+It is off by default. To turn it on:
+
+1. In NaviPetUnity (branch `fm/unity-ios-ar`, Unity **6000.3.26f1** with iOS
+   Build Support) follow `docs/ios-export.md` to export the Xcode project and
+   build `UnityFramework.framework` for a generic iOS device (arm64).
+2. Copy the framework to `ios/unity-ar/UnityFramework.framework` and
+   `ios/UnityAr.xcconfig.template` to `ios/unity-ar/UnityAr.xcconfig`. The
+   directory is gitignored. The xcconfig defines `UNITY_AR_ENABLED`, links
+   the framework and adds its search path; the Runner's "Embed Unity AR" build
+   phase copies and signs it into the app when present.
+3. Build and run as above. Camera access is requested through
+   `NSCameraUsageDescription`. Delete `ios/unity-ar/UnityAr.xcconfig` to go
+   back to AR unavailable.
+
+The export may contain MultiSet credentials: share the framework privately and
+never commit it.
+
+This code path is not compiled against a real `UnityFramework` and has not been
+run on a device. Re-entering AR after Unity unloads (`runEmbedded` again) in
+particular needs checking on the phone.

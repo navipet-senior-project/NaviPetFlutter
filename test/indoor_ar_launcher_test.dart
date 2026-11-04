@@ -88,6 +88,33 @@ void main() {
     expect(result.errorCode, 'BAD_RESULT');
   });
 
+  test('decodes the host-built iOS results', () async {
+    for (final (reply, status, code) in [
+      (
+        '{"status":"unavailable","localizationQueries":0,"durationMs":0}',
+        IndoorArStatus.unavailable,
+        null,
+      ),
+      (
+        '{"status":"error","errorCode":"UNITY_EXITED","localizationQueries":0,"durationMs":40}',
+        IndoorArStatus.error,
+        'UNITY_EXITED',
+      ),
+      (
+        '{"status":"error","errorCode":"BAD_REQUEST","localizationQueries":0,"durationMs":0}',
+        IndoorArStatus.error,
+        'BAD_REQUEST',
+      ),
+    ]) {
+      messenger.setMockMethodCallHandler(channel, (call) async => reply);
+      final result = await NativeIndoorArLauncher(
+        isSupportedPlatform: true,
+      ).launch(vec119Request());
+      expect(result.status, status);
+      expect(result.errorCode, code);
+    }
+  });
+
   test('defaults to the current platform', () async {
     messenger.setMockMethodCallHandler(
       channel,
