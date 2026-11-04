@@ -37,8 +37,8 @@ run `flutter build ios --simulator`.
 The Runner has the iOS counterpart of Android's `IndoorArChannel`: the same
 `navipet/indoor_ar` channel and `launch` call, the same request JSON
 (schemaVersion 1 or 2, optional `arToken`) and the same result JSON
-(`status`, `errorCode`). Host-built outcomes are `unavailable`, `BAD_REQUEST`
-and `UNITY_EXITED`. It hands the request to `IndoorArHost` inside
+(`status`, `errorCode`). Host-built outcomes are `unavailable`, `BAD_REQUEST`,
+`BUSY` (a launch is already in flight) and `UNITY_EXITED`. It hands the request to `IndoorArHost` inside
 `UnityFramework` and returns the string Unity delivers.
 
 It is off by default. To turn it on:

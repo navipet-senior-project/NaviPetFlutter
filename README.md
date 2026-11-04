@@ -10,7 +10,8 @@ includes:
 - Mapbox destination autocomplete and walking directions.
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
-- Existing Pet, Checklist, and Account screens. On Android, the arrival AR
+- Existing Pet, Checklist, and Account screens. On Android (and on iOS when a
+  prebuilt UnityFramework is present, see `docs/ios-testing.md`), the arrival AR
   button loads the selected place and sends its backend door pose, plus a
   short-lived MultiSet token fetched from the backend (`POST /indoor/ar-token`),
   to Unity. The MultiSet secret never ships in the app. Rooms without a valid
