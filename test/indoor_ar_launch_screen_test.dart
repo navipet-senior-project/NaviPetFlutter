@@ -552,8 +552,21 @@ void main() {
     expect(find.text('map'), findsOneWidget);
   });
 
-  testWidgets('off Android it does not check the camera', (tester) async {
+  testWidgets('on iOS it checks the camera and launches', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final harness = _Harness(status: PermissionStatus.granted);
+    await harness.pump(tester);
+    await harness.tapAr(tester);
+
+    expect(harness.statusChecks, 1);
+    expect(harness.fake.requests, hasLength(1));
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('on other platforms it does not check the camera', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final harness = _Harness();
     await harness.pump(tester);
     await harness.tapAr(tester);

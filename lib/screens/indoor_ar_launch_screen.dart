@@ -70,7 +70,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   Future<void> _start() async {
     if (!mounted) return;
-    if (defaultTargetPlatform != TargetPlatform.android) {
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
       _leave("AR mode isn't available on this device.");
       return;
     }

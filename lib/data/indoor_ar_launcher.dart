@@ -11,24 +11,25 @@ abstract interface class IndoorArLauncher {
   Future<IndoorArResult> launch(IndoorArRequest request);
 }
 
-/// Talks to `IndoorArChannel` in the Android host (`MainActivity`). The host
-/// answers every call with a result JSON string, including builds without
-/// the Unity library (`unavailable`).
-class AndroidIndoorArLauncher implements IndoorArLauncher {
-  AndroidIndoorArLauncher({MethodChannel? channel, bool? isAndroid})
+/// Talks to the native indoor AR channel on Android and iOS. Hosts without
+/// a Unity runtime answer with an `unavailable` result.
+class NativeIndoorArLauncher implements IndoorArLauncher {
+  NativeIndoorArLauncher({MethodChannel? channel, bool? isSupportedPlatform})
     : _channel = channel ?? const MethodChannel(channelName),
-      _isAndroid =
-          isAndroid ??
-          (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
+      _isSupportedPlatform =
+          isSupportedPlatform ??
+          (!kIsWeb &&
+              (defaultTargetPlatform == TargetPlatform.android ||
+                  defaultTargetPlatform == TargetPlatform.iOS));
 
   static const channelName = 'navipet/indoor_ar';
 
   final MethodChannel _channel;
-  final bool _isAndroid;
+  final bool _isSupportedPlatform;
 
   @override
   Future<IndoorArResult> launch(IndoorArRequest request) async {
-    if (!_isAndroid) return const IndoorArResult.unavailable();
+    if (!_isSupportedPlatform) return const IndoorArResult.unavailable();
     final Object? raw;
     try {
       raw = await _channel.invokeMethod<Object?>(
