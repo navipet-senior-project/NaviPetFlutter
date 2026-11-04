@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/mapbox_config.dart';
+import '../data/indoor_building_catalog.dart';
 import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
@@ -44,6 +45,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   MapboxMap? _map;
   CameraViewportState? _initialMapViewport;
   MapboxNaviMapController? _naviMap;
+  PointAnnotationManager? _indoorBuildingMarkers;
+  Cancelable? _indoorBuildingMarkerTap;
+  bool _openingVecIndoorMap = false;
   bool _is3d = false;
   bool _raisedBuildings = true;
   bool _bicycling = false;
@@ -114,6 +118,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
+    _indoorBuildingMarkerTap?.cancel();
     // MapScreen remounts every time NaviBottomNav routes away and back
     // (e.g. to /checklist or /pet) while the flow itself — app-scoped —
     // keeps whatever state it was in. Detaching here means a route
@@ -125,12 +130,51 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
     _map = mapboxMap;
+    mapboxMap.addInteraction(
+      TapInteraction.onMap((gesture) {
+        final tapped = gesture.point.coordinates;
+        final distance = geo.Geolocator.distanceBetween(
+          tapped.lat.toDouble(),
+          tapped.lng.toDouble(),
+          IndoorBuildingCatalog.vecAnchor.latitude,
+          IndoorBuildingCatalog.vecAnchor.longitude,
+        );
+        if (distance <= IndoorBuildingCatalog.vecHitRadiusMeters) {
+          unawaited(_openVecIndoorMap());
+        }
+      }),
+      interactionID: 'vec-indoor-map-proximity',
+    );
     // Created first so the building outline draws under routes and pins.
     final footprints = await mapboxMap.annotations
         .createPolygonAnnotationManager();
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
+    final indoorMarkers = await mapboxMap.annotations
+        .createPointAnnotationManager();
+    _indoorBuildingMarkers = indoorMarkers;
+    await indoorMarkers.setTextAllowOverlap(true);
+    _indoorBuildingMarkerTap = indoorMarkers.tapEvents(
+      onTap: (_) {
+        unawaited(_openVecIndoorMap());
+      },
+    );
+    await indoorMarkers.create(
+      PointAnnotationOptions(
+        geometry: Point(
+          coordinates: Position(
+            IndoorBuildingCatalog.vecAnchor.longitude,
+            IndoorBuildingCatalog.vecAnchor.latitude,
+          ),
+        ),
+        textField: 'VEC · Indoor map',
+        textColor: AppColors.navy.toARGB32(),
+        textHaloColor: Colors.white.toARGB32(),
+        textHaloWidth: 2.5,
+        textSize: 14,
+      ),
+    );
     await markers.setTextAllowOverlap(true);
     final arrowMarkers = await mapboxMap.annotations
         .createPointAnnotationManager();
@@ -336,6 +380,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               children: [
                 _mapWidget(),
                 if (state is FlowIdle) _searchBar(context, padding),
+                if (state is FlowIdle) _vecIndoorMapShortcut(),
                 if (locationMessage != null && state is! FlowSearching)
                   _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
@@ -436,6 +481,62 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       viewport: _initialMapViewport,
       onMapCreated: _onMapCreated,
     );
+  }
+
+  Widget _vecIndoorMapShortcut() => Positioned(
+    left: 16,
+    bottom: 16,
+    child: Material(
+      elevation: 4,
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => unawaited(_openVecIndoorMap()),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.apartment, color: AppColors.navy, size: 20),
+              SizedBox(width: 8),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Vivian Engineering Center',
+                    style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    'Open indoor map · VEC',
+                    style: TextStyle(color: AppColors.muted, fontSize: 10),
+                  ),
+                ],
+              ),
+              SizedBox(width: 5),
+              Icon(Icons.chevron_right, color: AppColors.muted, size: 18),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Future<void> _openVecIndoorMap() async {
+    if (!mounted || _openingVecIndoorMap || _indoorBuildingMarkers == null) {
+      return;
+    }
+    _openingVecIndoorMap = true;
+    try {
+      await context.push<void>('/buildings/vec');
+    } finally {
+      _openingVecIndoorMap = false;
+    }
   }
 
   Widget _mapTypeControls() => Column(

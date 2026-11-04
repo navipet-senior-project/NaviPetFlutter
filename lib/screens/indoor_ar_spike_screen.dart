@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/indoor_ar_contract.dart';
+import '../data/indoor_building_catalog.dart';
 import '../data/indoor_ar_launcher.dart';
 
 /// Debug-only screen for the #41 transport spike: one request in, one result
@@ -17,8 +18,8 @@ class IndoorArSpikeScreen extends StatefulWidget {
     floor: '1',
     position: const IndoorArVector3(-5.7651, -1.8186, 22.6689),
     headingDeg: 185.36,
-    mapCode: 'MSET_XTBY7AM7ZK77',
-    frame: 'multiset-mapset',
+    mapCode: IndoorBuildingCatalog.vecMapSetCode,
+    frame: IndoorBuildingCatalog.vecMapFrame,
   );
 
   @override

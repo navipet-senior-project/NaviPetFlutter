@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/app_state.dart';
+import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../screens/account_settings_screen.dart';
 import '../screens/change_email_screen.dart';
@@ -11,6 +12,7 @@ import '../screens/forgot_password_screen.dart';
 import '../screens/indoor_ar_launch_screen.dart';
 import '../screens/indoor_ar_spike_screen.dart';
 import '../screens/map_screen.dart';
+import '../screens/indoor_building_map_screen.dart';
 import '../screens/pet_customization_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/reset_password_screen.dart';
@@ -83,6 +85,10 @@ GoRouter createAppRouter(
     ),
     GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
     GoRoute(
+      path: '/buildings/vec',
+      builder: (context, state) => const IndoorBuildingMapScreen(),
+    ),
+    GoRoute(
       path: '/pet',
       builder: (context, state) => const PetCustomizationScreen(),
     ),
@@ -128,7 +134,12 @@ GoRouter createAppRouter(
     GoRoute(
       path: '/ar',
       builder: (context, state) =>
-          IndoorArLaunchScreen(launcher: AndroidIndoorArLauncher()),
+          IndoorArLaunchScreen(
+            launcher: AndroidIndoorArLauncher(),
+            request: state.extra is IndoorArRequest
+                ? state.extra as IndoorArRequest
+                : null,
+          ),
     ),
     // #41 transport spike; removed with the real launch screen (build step 3).
     if (kDebugMode)

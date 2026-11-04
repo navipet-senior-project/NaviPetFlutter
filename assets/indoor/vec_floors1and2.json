@@ -1,0 +1,357 @@
+{
+    "buildingId": "VEC",
+    "objects": [
+        {
+            "id": "VECelev2A",
+            "type": "elevator",
+            "floorId": "floor_2",
+            "position": {
+                "x": -2.121999979019165,
+                "y": 4.454999923706055,
+                "z": 17.339000701904298
+            },
+            "rotationY": 270.0
+        },
+        {
+            "id": "VECbathM1",
+            "type": "bathroom",
+            "floorId": "floor_1",
+            "position": {
+                "x": 1.899999976158142,
+                "y": 0.382999986410141,
+                "z": 13.770000457763672
+            },
+            "rotationY": 90.0
+        },
+        {
+            "id": "VECentr1B",
+            "type": "entrance",
+            "floorId": "floor_1",
+            "position": {
+                "x": -28.531999588012697,
+                "y": 0.5199999809265137,
+                "z": 23.066999435424806
+            },
+            "rotationY": 270.0
+        },
+        {
+            "id": "VECstairsF2B",
+            "type": "stairs",
+            "floorId": "floor_2",
+            "position": {
+                "x": -29.62105941772461,
+                "y": 4.4730000495910648,
+                "z": 21.350000381469728
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VEC120",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": -10.812700271606446,
+                "y": 0.41600000858306887,
+                "z": 21.23171615600586
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VECentr1A",
+            "type": "entrance",
+            "floorId": "floor_1",
+            "position": {
+                "x": 29.091999053955079,
+                "y": 0.5199999809265137,
+                "z": 22.760000228881837
+            },
+            "rotationY": 90.0
+        },
+        {
+            "id": "VECentr1C",
+            "type": "entrance",
+            "floorId": "floor_1",
+            "position": {
+                "x": -0.13899999856948853,
+                "y": 0.8149999976158142,
+                "z": -0.15600000321865083
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VECstairsF2A",
+            "type": "stairs",
+            "floorId": "floor_2",
+            "position": {
+                "x": 22.8700008392334,
+                "y": 4.480000019073486,
+                "z": 22.479999542236329
+            },
+            "rotationY": 90.0
+        },
+        {
+            "id": "VEC218",
+            "type": "door",
+            "floorId": "floor_2",
+            "position": {
+                "x": 18.604000091552736,
+                "y": 4.539999961853027,
+                "z": 24.179000854492189
+            },
+            "rotationY": 0.0
+        },
+        {
+            "id": "VEC217",
+            "type": "door",
+            "floorId": "floor_2",
+            "position": {
+                "x": 11.71500015258789,
+                "y": 4.539999961853027,
+                "z": 24.179000854492189
+            },
+            "rotationY": 0.0
+        },
+        {
+            "id": "VEC119",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": -8.056072235107422,
+                "y": 0.3930000066757202,
+                "z": 21.171762466430665
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VECelev2B",
+            "type": "elevator",
+            "floorId": "floor_2",
+            "position": {
+                "x": -2.13700008392334,
+                "y": 4.454999923706055,
+                "z": 19.85700035095215
+            },
+            "rotationY": 270.0
+        },
+        {
+            "id": "VEC220",
+            "type": "door",
+            "floorId": "floor_2",
+            "position": {
+                "x": -5.515999794006348,
+                "y": 4.539999961853027,
+                "z": 21.52899932861328
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VEC227",
+            "type": "door",
+            "floorId": "floor_2",
+            "position": {
+                "x": 18.736000061035158,
+                "y": 4.539999961853027,
+                "z": 21.31100082397461
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VEC224",
+            "type": "door",
+            "floorId": "floor_2",
+            "position": {
+                "x": 7.304999828338623,
+                "y": 4.539999961853027,
+                "z": 21.451000213623048
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VECbathF1",
+            "type": "bathroom",
+            "floorId": "floor_1",
+            "position": {
+                "x": 3.11964750289917,
+                "y": 0.382999986410141,
+                "z": 21.117673873901368
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VECbathM2",
+            "type": "bathroom",
+            "floorId": "floor_2",
+            "position": {
+                "x": -7.021999835968018,
+                "y": 4.539999961853027,
+                "z": 24.527999877929689
+            },
+            "rotationY": 0.0
+        },
+        {
+            "id": "VEC124",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": -24.538644790649415,
+                "y": 0.382999986410141,
+                "z": 24.47184944152832
+            },
+            "rotationY": 0.0
+        },
+        {
+            "id": "VEC127",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": -2.619999885559082,
+                "y": 0.3499999940395355,
+                "z": 29.266767501831056
+            },
+            "rotationY": 90.0
+        },
+        {
+            "id": "VECstairsF1B",
+            "type": "stairs",
+            "floorId": "floor_1",
+            "position": {
+                "x": -29.62105941772461,
+                "y": 0.3840000033378601,
+                "z": 19.367454528808595
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VEC121",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": -24.475400924682618,
+                "y": 0.39800000190734866,
+                "z": 21.402267456054689
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VECbathF2",
+            "type": "bathroom",
+            "floorId": "floor_2",
+            "position": {
+                "x": 3.2990000247955324,
+                "y": 4.539999961853027,
+                "z": 26.933000564575197
+            },
+            "rotationY": 90.0
+        },
+        {
+            "id": "VEC132",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": 19.23587417602539,
+                "y": 0.4320000112056732,
+                "z": 21.35729217529297
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VEC134",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": 13.865263938903809,
+                "y": 0.37700000405311587,
+                "z": 21.356000900268556
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VECstairsF1A",
+            "type": "stairs",
+            "floorId": "floor_1",
+            "position": {
+                "x": 25.228288650512697,
+                "y": 0.5199999809265137,
+                "z": 21.229999542236329
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VEC215",
+            "type": "door",
+            "floorId": "floor_2",
+            "position": {
+                "x": 5.28000020980835,
+                "y": 4.539999961853027,
+                "z": 28.579999923706056
+            },
+            "rotationY": 90.0
+        },
+        {
+            "id": "VEC202",
+            "type": "door",
+            "floorId": "floor_2",
+            "position": {
+                "x": -17.641000747680665,
+                "y": 4.539999961853027,
+                "z": 24.38800048828125
+            },
+            "rotationY": 0.0
+        },
+        {
+            "id": "VEC201",
+            "type": "door",
+            "floorId": "floor_2",
+            "position": {
+                "x": -26.784000396728517,
+                "y": 4.539999961853027,
+                "z": 24.38800048828125
+            },
+            "rotationY": 0.0
+        },
+        {
+            "id": "VEC128",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": 21.154672622680665,
+                "y": 0.3790000081062317,
+                "z": 24.226808547973634
+            },
+            "rotationY": 0.0
+        },
+        {
+            "id": "VEC136",
+            "type": "door",
+            "floorId": "floor_1",
+            "position": {
+                "x": 9.646143913269043,
+                "y": 0.4440000057220459,
+                "z": 21.417999267578126
+            },
+            "rotationY": 180.0
+        },
+        {
+            "id": "VECelev1A",
+            "type": "elevator",
+            "floorId": "floor_1",
+            "position": {
+                "x": -2.2730000019073488,
+                "y": 0.3540000021457672,
+                "z": 17.339000701904298
+            },
+            "rotationY": 270.0
+        },
+        {
+            "id": "VECelev1B",
+            "type": "elevator",
+            "floorId": "floor_1",
+            "position": {
+                "x": -2.2880001068115236,
+                "y": 0.3540000021457672,
+                "z": 19.85700035095215
+            },
+            "rotationY": 270.0
+        }
+    ]
+}

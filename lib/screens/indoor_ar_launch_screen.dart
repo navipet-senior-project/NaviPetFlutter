@@ -7,18 +7,20 @@ import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import 'indoor_ar_spike_screen.dart';
 
-/// Asks for the camera, opens the Unity AR camera and returns to the map.
+/// Asks for the camera, opens the Unity AR camera for a selected map door.
 /// Opened fresh by every AR tap, so every tap asks again.
 class IndoorArLaunchScreen extends StatefulWidget {
   const IndoorArLaunchScreen({
     super.key,
     required this.launcher,
+    this.request,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
     this.openSettings = openAppSettings,
   });
 
   final IndoorArLauncher launcher;
+  final IndoorArRequest? request;
   final Future<PermissionStatus> Function() cameraStatus;
   final Future<PermissionStatus> Function() requestCamera;
   final Future<bool> Function() openSettings;
@@ -88,9 +90,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _launch() async {
-    // shortcut: the Unity contract requires a door, so this sends a fixed
-    // valid one that the camera scene ignores; replaced by the door flow.
-    final result = await widget.launcher.launch(IndoorArSpikeScreen.vec119);
+    // The fixed door remains only for the debug route and older callers.
+    final request = widget.request ?? IndoorArSpikeScreen.vec119;
+    final result = await widget.launcher.launch(request);
     if (!mounted) return;
     _leave(_resultText(result));
   }
@@ -101,8 +103,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   String? _resultText(IndoorArResult result) => switch (result.status) {
-    IndoorArStatus.arrived ||
-    IndoorArStatus.localizationFailed ||
+    IndoorArStatus.arrived =>
+      'MultiSet localized this area. Room ${(widget.request ?? IndoorArSpikeScreen.vec119).room} is ${result.checkDistanceM!.toStringAsFixed(1)} m away${result.confidence == null ? '' : ' (confidence ${(result.confidence! * 100).round()}%)'}.',
+    IndoorArStatus.localizationFailed => 'Could not match this camera view to the VEC map. Try facing a well lit wall, door, or sign.',
     IndoorArStatus.cancelled => null,
     IndoorArStatus.unavailable => 'AR is not included in this build.',
     IndoorArStatus.error =>
@@ -141,8 +144,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
             )
           : _rationale
           ? _message(
-              'Allow camera access so NaviPet can show arrows over the floor '
-              'around you.',
+      'Allow camera access so NaviPet can scan this area and match it to the VEC indoor map.',
               action: 'Continue',
               onAction: _askForCamera,
               back: 'Not now',
