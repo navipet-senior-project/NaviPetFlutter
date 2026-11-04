@@ -4,6 +4,7 @@ import Foundation
 /// reports. Unity's own result JSON passes through untouched; Dart validates it.
 enum IndoorArResults {
   static let badRequest = "BAD_REQUEST"
+  static let busy = "BUSY"
   static let unityExited = "UNITY_EXITED"
 
   static func unavailable() -> String {

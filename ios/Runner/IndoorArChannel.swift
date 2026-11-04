@@ -29,9 +29,12 @@ final class IndoorArChannel {
       return
     }
     #if UNITY_AR_ENABLED
+    guard pending == nil else {
+      result(IndoorArResults.error(IndoorArResults.busy, durationMs: 0))
+      return
+    }
     guard let request = call.arguments as? String,
-      !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      pending == nil
+      !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else {
       result(IndoorArResults.error(IndoorArResults.badRequest, durationMs: 0))
       return
