@@ -132,7 +132,7 @@ GoRouter createAppRouter(
     GoRoute(
       path: '/ar',
       builder: (context, state) => IndoorArLaunchScreen(
-        launcher: AndroidIndoorArLauncher(),
+        launcher: NativeIndoorArLauncher(),
         destinationId: state.uri.queryParameters['destination'],
         gateway: context.read<NavigationFlowController>().searchGateway,
         tokenGateway: indoorArTokenGateway,
@@ -143,7 +143,7 @@ GoRouter createAppRouter(
       GoRoute(
         path: '/dev/indoor-ar-spike',
         builder: (context, state) =>
-            IndoorArSpikeScreen(launcher: AndroidIndoorArLauncher()),
+            IndoorArSpikeScreen(launcher: NativeIndoorArLauncher()),
       ),
   ],
 );

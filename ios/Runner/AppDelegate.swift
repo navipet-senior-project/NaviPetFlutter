@@ -12,5 +12,17 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    let channel = FlutterMethodChannel(
+      name: "navipet/indoor_ar",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "launch" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      // Unity's iOS transport is not available yet, even if an export exists.
+      result("{\"status\":\"unavailable\",\"localizationQueries\":0,\"durationMs\":0}")
+    }
   }
 }
