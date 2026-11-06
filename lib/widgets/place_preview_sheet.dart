@@ -107,25 +107,7 @@ class PlacePreviewSheet extends StatelessWidget {
                 ),
               ),
             ),
-            if (state.alreadyHere) ...[
-              const SizedBox(height: AppSpacing.lg),
-              const Row(
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    size: 18,
-                    color: AppColors.navy,
-                  ),
-                  SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      "You're already here.",
-                      style: TextStyle(color: AppColors.navy),
-                    ),
-                  ),
-                ],
-              ),
-            ] else if (!state.routable) ...[
+            if (!state.routable) ...[
               const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
@@ -144,22 +126,31 @@ class PlacePreviewSheet extends StatelessWidget {
                 ],
               ),
             ],
+            if (state.destination case final destination?) ...[
+              const SizedBox(height: AppSpacing.sm),
+              if (destination.footprint == null)
+                const Text(
+                  'Building outline unavailable. Arrival cannot be confirmed.',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              if (destination.entranceCoordinate == null)
+                const Text(
+                  'Directions use the map marker. A verified entrance is unavailable.',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+            ],
             const SizedBox(height: AppSpacing.xl),
             SizedBox(
               height: 48,
               child: FilledButton.icon(
-                onPressed: state.routable && !state.alreadyHere
-                    ? onDirections
-                    : null,
+                onPressed: state.routable ? onDirections : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.navy,
                   foregroundColor: Colors.white,
                   shape: const StadiumBorder(),
                 ),
                 icon: const Icon(Icons.directions_outlined),
-                label: Text(
-                  state.alreadyHere ? "You're already here" : 'Directions',
-                ),
+                label: const Text('Directions'),
               ),
             ),
           ],

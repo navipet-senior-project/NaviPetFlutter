@@ -2,6 +2,8 @@ import 'campus_place.dart';
 import 'navigation_models.dart';
 import 'travel_mode.dart';
 
+enum NavigationStatus { idle, preview, navigating, arrived }
+
 /// Where a route starts.
 sealed class RouteOrigin {
   const RouteOrigin();
@@ -66,6 +68,19 @@ class UnknownOrigin extends RouteOrigin {
 /// One state per thing the user can be doing. No boolean flags.
 sealed class NavigationFlowState {
   const NavigationFlowState();
+
+  NavigationStatus get status => switch (this) {
+    FlowActiveNavigation() ||
+    FlowIndoorHandoff() => NavigationStatus.navigating,
+    FlowArrived() => NavigationStatus.arrived,
+    FlowPlacePreview() ||
+    FlowConfiguringRoute() ||
+    FlowCalculatingRoute() ||
+    FlowRoutePreview() ||
+    FlowRouteSteps() => NavigationStatus.preview,
+    FlowError(:final previous) => previous.status,
+    _ => NavigationStatus.idle,
+  };
 }
 
 class FlowIdle extends NavigationFlowState {
@@ -102,7 +117,6 @@ class FlowPlacePreview extends NavigationFlowState {
     required this.place,
     required this.destination,
     this.previousQuery = '',
-    this.alreadyHere = false,
   });
 
   final CampusPlace place;
@@ -111,10 +125,6 @@ class FlowPlacePreview extends NavigationFlowState {
   final NaviDestination? destination;
 
   final String previousQuery;
-
-  /// True when the user's location falls inside the selected building's
-  /// server-provided footprint.
-  final bool alreadyHere;
 
   bool get routable => destination != null;
 }
@@ -231,8 +241,7 @@ class FlowArrived extends NavigationFlowState {
   final NavigationTripSummary summary;
 }
 
-/// Reserved for the Unity/Multiset handoff. Unreachable until an indoor
-/// navigation service is registered; nothing in this phase enters it.
+/// Outdoor building arrival for a room target; final room arrival belongs indoors.
 class FlowIndoorHandoff extends NavigationFlowState {
   const FlowIndoorHandoff({required this.destination});
 

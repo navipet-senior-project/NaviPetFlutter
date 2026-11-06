@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:navipet/data/app_state.dart';
+import 'package:navipet/data/campus_place.dart';
+import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/data/location_service.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/screens/map_screen.dart';
@@ -22,6 +24,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 // shared fakes fixes both problems.
 import 'support/flow_fakes.dart' as harness;
 
+final arrivalPlace = CampusPlace(
+  id: harness.horn.id,
+  type: harness.horn.type,
+  title: harness.horn.title,
+  subtitle: harness.horn.subtitle,
+  source: 'cache',
+  outdoorDestination: harness.hornCoordinate,
+  footprint: validFootprint({
+    'type': 'Polygon',
+    'coordinates': [
+      [
+        [-118.115, 33.7827],
+        [-118.114, 33.7827],
+        [-118.114, 33.7834],
+        [-118.115, 33.7834],
+        [-118.115, 33.7827],
+      ],
+    ],
+  }),
+);
+
 Widget host(NavigationFlowController controller) => MultiProvider(
   providers: [
     ChangeNotifierProvider(create: (_) => AppState()),
@@ -32,12 +55,20 @@ Widget host(NavigationFlowController controller) => MultiProvider(
 
 void main() {
   Future<void> driveToArrival(NavigationFlowController controller) async {
-    await controller.selectPlace(harness.horn);
+    await controller.selectPlace(arrivalPlace);
     await controller.requestDirections();
-    await controller.calculateRoute();
-    await controller.startRoute();
-    await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
-    await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+    await controller.calculateRoute(continueWithUncertain: true);
+    await controller.startRoute(continueWithUncertain: true);
+    await controller.onLiveLocation(
+      harness.hornCoordinate,
+      accuracyMeters: 5,
+      timestamp: DateTime.now(),
+    );
+    await controller.onLiveLocation(
+      harness.hornCoordinate,
+      accuracyMeters: 5,
+      timestamp: DateTime.now(),
+    );
   }
 
   final arButton = find.byType(ArModeIcon);
@@ -67,21 +98,29 @@ void main() {
     expect(arButton, findsNothing);
 
     controller.openSearch();
-    await controller.selectPlace(harness.horn);
+    await controller.selectPlace(arrivalPlace);
     await tester.pump();
     expect(arButton, findsNothing);
 
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
     await tester.pump();
     expect(arButton, findsNothing);
 
-    await controller.startRoute();
+    await controller.startRoute(continueWithUncertain: true);
     await tester.pump();
     expect(arButton, findsNothing);
 
-    await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
-    await controller.onLiveLocation(harness.hornCoordinate, accuracyMeters: 5);
+    await controller.onLiveLocation(
+      harness.hornCoordinate,
+      accuracyMeters: 5,
+      timestamp: DateTime.now(),
+    );
+    await controller.onLiveLocation(
+      harness.hornCoordinate,
+      accuracyMeters: 5,
+      timestamp: DateTime.now(),
+    );
     await tester.pump();
     expect(arButton, findsOneWidget);
     expect(find.text('AR'), findsOneWidget);
@@ -150,12 +189,12 @@ void main() {
     await tester.pump();
     expect(find.byType(SearchOverlay), findsOneWidget);
 
-    await controller.selectPlace(harness.horn);
+    await controller.selectPlace(arrivalPlace);
     await tester.pump();
     expect(find.byType(PlacePreviewSheet), findsOneWidget);
 
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
     await tester.pump();
     expect(find.byType(RoutePreviewSheet), findsOneWidget);
   });
@@ -165,9 +204,9 @@ void main() {
     await tester.pumpWidget(host(controller));
 
     controller.openSearch();
-    await controller.selectPlace(harness.horn);
+    await controller.selectPlace(arrivalPlace);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
     await tester.pump();
 
     controller.back();
@@ -200,9 +239,9 @@ void main() {
       await tester.pumpWidget(host(controller));
 
       controller.openSearch();
-      await controller.selectPlace(harness.horn);
+      await controller.selectPlace(arrivalPlace);
       await controller.requestDirections();
-      await controller.calculateRoute();
+      await controller.calculateRoute(continueWithUncertain: true);
       controller.showSteps();
       await tester.pump();
 
@@ -248,6 +287,11 @@ void main() {
       await tester.tap(find.text('Start route'));
       await tester.pump();
       await tester.pump();
+      expect(find.text('Confirm your location'), findsOneWidget);
+      expect(find.text("You're already here"), findsNothing);
+      await tester.tap(find.text('Continue with directions'));
+      await tester.pump();
+      await tester.pump();
       expect(find.byType(RoutePreviewSheet), findsOneWidget);
     },
   );
@@ -268,12 +312,12 @@ void main() {
       await tester.pumpWidget(host(controller));
 
       controller.openSearch();
-      await controller.selectPlace(harness.horn);
+      await controller.selectPlace(arrivalPlace);
       await controller.requestDirections();
       // selectPlace() already drew the place marker — clear that so the
       // assertion below only checks for the calculation's own reply.
       map.calls.clear();
-      final pending = controller.calculateRoute();
+      final pending = controller.calculateRoute(continueWithUncertain: true);
 
       // Simulate navigating away before the calculation resolves — the
       // same MapScreen.dispose() path NaviBottomNav's context.go triggers.

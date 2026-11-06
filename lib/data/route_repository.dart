@@ -37,7 +37,7 @@ class RouteRepository {
     try {
       route = await gateway.getRoute(
         origin: origin,
-        destination: destination.coordinate,
+        destination: destination.routingCoordinate,
         profile: mode.directionsProfile,
       );
     } on Object catch (error, stackTrace) {

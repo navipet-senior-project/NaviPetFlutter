@@ -38,8 +38,8 @@ Future<NavigationFlowController> startGuidance(
   final controller = harness.build(routes: gateway)..openSearch();
   await controller.selectPlace(harness.horn);
   await controller.requestDirections();
-  await controller.calculateRoute();
-  await controller.startRoute();
+  await controller.calculateRoute(continueWithUncertain: true);
+  await controller.startRoute(continueWithUncertain: true);
   return controller;
 }
 

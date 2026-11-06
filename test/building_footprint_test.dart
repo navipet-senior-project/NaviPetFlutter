@@ -23,13 +23,17 @@ NavigationCoordinate _offset(double north, [double east = 0]) =>
     );
 
 /// A 40 m square centered on the destination: walls 20 m from the center.
-final _square = [
+final _squareRing = [
   _offset(20, -20),
   _offset(20, 20),
   _offset(-20, 20),
   _offset(-20, -20),
   _offset(20, -20),
 ];
+
+final _square = BuildingFootprint([
+  [_squareRing],
+]);
 
 NavigationRoute _route() => NavigationRoute(
   coordinates: [_offset(80), harness.hornCoordinate],
@@ -46,18 +50,17 @@ NavigationRoute _route() => NavigationRoute(
   durationSeconds: 60,
 );
 
-CampusPlace _horn({List<NavigationCoordinate>? footprint, int? radius}) =>
-    CampusPlace(
-      id: harness.horn.id,
-      type: harness.horn.type,
-      title: harness.horn.title,
-      subtitle: harness.horn.subtitle,
-      source: harness.horn.source,
-      buildingCode: harness.horn.buildingCode,
-      outdoorDestination: harness.hornCoordinate,
-      arrivalRadiusMeters: radius,
-      footprint: footprint,
-    );
+CampusPlace _horn({BuildingFootprint? footprint, int? radius}) => CampusPlace(
+  id: harness.horn.id,
+  type: harness.horn.type,
+  title: harness.horn.title,
+  subtitle: harness.horn.subtitle,
+  source: harness.horn.source,
+  buildingCode: harness.horn.buildingCode,
+  outdoorDestination: harness.hornCoordinate,
+  arrivalRadiusMeters: radius,
+  footprint: footprint,
+);
 
 NavigationRoute _routeEnding(double north) => NavigationRoute(
   coordinates: [_offset(north + 80), _offset(north)],
@@ -75,7 +78,7 @@ NavigationRoute _routeEnding(double north) => NavigationRoute(
 );
 
 Future<NavigationFlowController> _guide({
-  List<NavigationCoordinate>? footprint,
+  BuildingFootprint? footprint,
   int? radius,
   NavigationRoute? route,
 }) async {
@@ -86,8 +89,8 @@ Future<NavigationFlowController> _guide({
     ..openSearch();
   await controller.selectPlace(place);
   await controller.requestDirections();
-  await controller.calculateRoute();
-  await controller.startRoute();
+  await controller.calculateRoute(continueWithUncertain: true);
+  await controller.startRoute(continueWithUncertain: true);
   return controller;
 }
 
@@ -97,11 +100,15 @@ Future<void> _twice(
   required double accuracy,
 }) async {
   for (var i = 0; i < 2; i++) {
-    await controller.onLiveLocation(_offset(north), accuracyMeters: accuracy);
+    await controller.onLiveLocation(
+      _offset(north),
+      accuracyMeters: accuracy,
+      timestamp: DateTime.now(),
+    );
   }
 }
 
-Map<String, Object> _geoJson(List<NavigationCoordinate> ring) =>
+Map<String, Object> _geoJson(BuildingFootprint ring) =>
     footprintToGeoJson(ring);
 
 void main() {
@@ -114,99 +121,48 @@ void main() {
   });
 
   group('arrival at a building footprint', () {
-    test('a 30 m accuracy fix inside the building arrives', () async {
+    test('two accurate fixes inside arrive once', () async {
       final controller = await _guide(footprint: _square);
-      await _twice(controller, 5, accuracy: 30);
+      await _twice(controller, 0, accuracy: 5);
+      expect(controller.state, isA<FlowArrived>());
+      final arrived = controller.state;
+      await _twice(controller, 0, accuracy: 5);
+      expect(identical(controller.state, arrived), isTrue);
+    });
+    test('30 m accuracy cannot confirm building arrival', () async {
+      final controller = await _guide(footprint: _square);
+      await _twice(controller, 0, accuracy: 30);
+      expect(controller.state, isA<FlowActiveNavigation>());
+    });
+    test('server radius never expands the occupied footprint', () async {
+      final controller = await _guide(footprint: _square, radius: 50);
+      await _twice(controller, 30, accuracy: 5);
+      expect(controller.state, isA<FlowActiveNavigation>());
+      await _twice(controller, 0, accuracy: 5);
       expect(controller.state, isA<FlowArrived>());
     });
-
-    test('a 30 m fix does not arrive at a point destination', () async {
-      final controller = await _guide();
-      await _twice(controller, 5, accuracy: 30);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-    });
-
-    test('a fix 15 to 60 m from the wall does not arrive', () async {
+    test(
+      'route end outside footprint never confirms building arrival',
+      () async {
+        final controller = await _guide(
+          footprint: _square,
+          route: _routeEnding(50),
+        );
+        await _twice(controller, 50, accuracy: 5);
+        expect(controller.state, isA<FlowActiveNavigation>());
+      },
+    );
+    test('wall and GPS overlap remain uncertain', () async {
       final controller = await _guide(footprint: _square);
-      final gap = distanceToFootprintMeters(_square, _offset(50));
-      expect(gap, greaterThanOrEqualTo(15));
-      expect(gap, lessThanOrEqualTo(60));
-      await _twice(controller, 50, accuracy: 5);
-      expect(controller.state, isNot(isA<FlowArrived>()));
+      await _twice(controller, 20, accuracy: 5);
+      expect(controller.state, isA<FlowActiveNavigation>());
+      await _twice(controller, 17, accuracy: 5);
+      expect(controller.state, isA<FlowActiveNavigation>());
     });
-
-    test('the route end does not arrive a footprint past the wall', () async {
-      const north = 50.0;
-      final controller = await _guide(
-        footprint: _square,
-        route: _routeEnding(north),
-      );
-      expect(
-        distanceToFootprintMeters(_square, _offset(north)),
-        greaterThan(10),
-      );
-      await _twice(controller, north, accuracy: 5);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-    });
-
-    test('server radii 25 and 50 are measured from the wall', () async {
-      final narrow = await _guide(footprint: _square, radius: 25);
-      expect(distanceToFootprintMeters(_square, _offset(50)), greaterThan(25));
-      await _twice(narrow, 50, accuracy: 5);
-      expect(narrow.state, isNot(isA<FlowArrived>()));
-      expect(distanceToFootprintMeters(_square, _offset(40)), lessThan(25));
-      await _twice(narrow, 40, accuracy: 5);
-      expect(narrow.state, isA<FlowArrived>());
-
-      final wide = await _guide(footprint: _square, radius: 50);
-      expect(distanceToFootprintMeters(_square, _offset(80)), greaterThan(50));
-      await _twice(wide, 80, accuracy: 5);
-      expect(wide.state, isNot(isA<FlowArrived>()));
-      expect(distanceToFootprintMeters(_square, _offset(60)), lessThan(50));
-      await _twice(wide, 60, accuracy: 5);
-      expect(wide.state, isA<FlowArrived>());
-    });
-
-    test('35 m needs two fixes and a 36 m jitter resets them', () async {
+    test('approach remains guidance, not arrival', () async {
       final controller = await _guide(footprint: _square);
-      await controller.onLiveLocation(_offset(0), accuracyMeters: 35);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-      await controller.onLiveLocation(_offset(0), accuracyMeters: 36);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-      await controller.onLiveLocation(_offset(0), accuracyMeters: 35);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-      await controller.onLiveLocation(_offset(0), accuracyMeters: 35);
-      expect(controller.state, isA<FlowArrived>());
-    });
-
-    test('an outside fix resets an inside count', () async {
-      final controller = await _guide(footprint: _square);
-      await controller.onLiveLocation(_offset(0), accuracyMeters: 5);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-      await controller.onLiveLocation(_offset(50), accuracyMeters: 5);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-      await controller.onLiveLocation(_offset(0), accuracyMeters: 5);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-    });
-
-    test('announces approach between the wall radius and 15 m', () async {
-      final controller = await _guide(footprint: _square);
-      await controller.onLiveLocation(_offset(32), accuracyMeters: 5);
+      await _twice(controller, 32, accuracy: 5);
       expect(controller.state, isA<FlowApproaching>());
-    });
-
-    test('the 10 m radius is measured from the wall', () async {
-      final controller = await _guide(footprint: _square);
-      await _twice(controller, 35, accuracy: 5);
-      expect(controller.state, isNot(isA<FlowArrived>()));
-      await _twice(controller, 28, accuracy: 5);
-      expect(controller.state, isA<FlowArrived>());
-    });
-
-    test('fixes worse than 35 m never arrive', () async {
-      final controller = await _guide(footprint: _square);
-      await _twice(controller, 0, accuracy: 36);
-      expect(controller.state, isNot(isA<FlowArrived>()));
     });
   });
 
@@ -226,9 +182,15 @@ void main() {
     test('reads the outer ring into the destination', () {
       final place = CampusPlace.fromJson(json(_geoJson(_square)));
       final footprint = place.toDestination().footprint!;
-      expect(footprint, hasLength(5));
-      expect(footprint.first.latitude, _square.first.latitude);
-      expect(footprint.first.longitude, _square.first.longitude);
+      expect(footprint.polygons.single.single, hasLength(5));
+      expect(
+        footprint.polygons.single.single.first.latitude,
+        _squareRing.first.latitude,
+      );
+      expect(
+        footprint.polygons.single.single.first.longitude,
+        _squareRing.first.longitude,
+      );
     });
 
     test('drops malformed footprints', () {
@@ -271,8 +233,11 @@ void main() {
       final store = SearchHistoryStore();
       await store.add(_horn(footprint: _square).toDestination());
       final [cached] = await store.load();
-      expect(cached.footprint, hasLength(5));
-      expect(cached.footprint!.last.latitude, _square.last.latitude);
+      expect(cached.footprint!.polygons.single.single, hasLength(5));
+      expect(
+        cached.footprint!.polygons.single.single.last.latitude,
+        _squareRing.last.latitude,
+      );
     });
   });
 
@@ -298,19 +263,19 @@ void main() {
     }
 
     test(
-      'shows already here and skips destination preview inside footprint',
+      'keeps selected building preview inside footprint until Start Route',
       () async {
         final (controller, map) = await selectAt(_offset(0));
         final state = controller.state as FlowPlacePreview;
-        expect(state.alreadyHere, isTrue);
-        expect(map.calls, isEmpty);
+        expect(state.routable, isTrue);
+        expect(map.calls, contains('showPlace:Horn Center'));
       },
     );
 
     test('shows the normal map destination outside footprint', () async {
       final (controller, map) = await selectAt(_offset(50));
       final state = controller.state as FlowPlacePreview;
-      expect(state.alreadyHere, isFalse);
+      expect(state.routable, isTrue);
       expect(map.calls, contains('showPlace:Horn Center'));
     });
   });

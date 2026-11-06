@@ -1,0 +1,44 @@
+appId: com.navipet.navipet
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Mock navigation verification"
+    timeout: 30000
+- tapOn: "Outside"
+- setLocation:
+    latitude: 33.78307046
+    longitude: -118.11456126
+- startRecording: navigation-outside
+- tapOn: "Where to?"
+- inputText: "business"
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn: ".*College of Business.*"
+- assertVisible: "Directions"
+- takeScreenshot: outside-footprint
+- tapOn: "Map type"
+- tapOn: ".*Satellite.*"
+- waitForAnimationToEnd:
+    timeout: 10000
+- assertVisible: "Directions"
+- assertNotVisible: "Map is refreshing.*"
+- takeScreenshot: outside-style-reloaded
+- tapOn: "Map type"
+- tapOn: ".*Standard.*"
+- waitForAnimationToEnd:
+    timeout: 10000
+- tapOn: "Directions"
+- tapOn: "Start route"
+- extendedWaitUntil:
+    visible: "State: preview; route requests: 1"
+    timeout: 15000
+- takeScreenshot: outside-route-preview
+- tapOn: "Start route"
+- extendedWaitUntil:
+    visible: "State: navigating; route requests: 1"
+    timeout: 15000
+- assertVisible: "Walk toward College of Business"
+- takeScreenshot: outside-navigation
+- stopRecording
