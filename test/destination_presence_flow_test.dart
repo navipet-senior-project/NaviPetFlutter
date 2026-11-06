@@ -94,7 +94,10 @@ void main() {
     expect(routes.calls, 1);
   });
   test('uncertain never requests route until explicit continue', () async {
-    final (controller, _, routes) = await configure(geometry: false);
+    final (controller, location, routes) = await configure();
+    location.reading = const LocationReading(
+      availability: LocationAvailability.unavailable,
+    );
     await controller.calculateRoute();
     expect(controller.awaitingPresenceChoice, isTrue);
     expect(controller.status, NavigationStatus.preview);
@@ -112,6 +115,52 @@ void main() {
     );
     expect(controller.state, isA<FlowActiveNavigation>());
   });
+  test(
+    'footprintless Start Route skips presence and routes normally',
+    () async {
+      final (controller, _, routes) = await configure(geometry: false);
+      await controller.calculateRoute();
+      expect(controller.awaitingPresenceChoice, isFalse);
+      expect(controller.state, isA<FlowRoutePreview>());
+      await controller.startRoute();
+      expect(controller.state, isA<FlowActiveNavigation>());
+      expect(routes.calls, 1);
+    },
+  );
+  test(
+    'expired preview sample is replaced by a polled fresh reading',
+    () async {
+      final location = harness.FakeLocationService()
+        ..reading = reading(outside, age: 30);
+      final controller = harness.build(location: location)..openSearch();
+      await controller.selectPlace(place());
+      await controller.requestDirections();
+      final first = location.queueReading();
+      final second = location.queueReading();
+      final start = controller.calculateRoute();
+      first.complete(reading(outside, age: 1));
+      second.complete(reading(outside));
+      await start;
+      expect(controller.awaitingPresenceChoice, isFalse);
+      expect(controller.state, isA<FlowRoutePreview>());
+    },
+  );
+  test(
+    'repeated cached timestamp is retried until a fresh fix votes',
+    () async {
+      final (controller, location, _) = await configure();
+      final cached = reading(outside, age: 1);
+      location.reading = cached;
+      final first = location.queueReading();
+      final second = location.queueReading();
+      final start = controller.calculateRoute();
+      first.complete(cached);
+      second.complete(reading(outside));
+      await start;
+      expect(controller.awaitingPresenceChoice, isFalse);
+      expect(controller.state, isA<FlowRoutePreview>());
+    },
+  );
   test('refresh of uncertain location can confirm direct arrival', () async {
     final (controller, location, routes) = await configure(
       point: harness.hornCoordinate,
@@ -204,7 +253,7 @@ void main() {
     },
   );
   test('continue is nonblocking while a location refresh is pending', () async {
-    final (controller, location, routes) = await configure(geometry: false);
+    final (controller, location, routes) = await configure();
     final delayed = location.queueReading();
     final refresh = controller.calculateRoute();
     expect(controller.checkingPresence, isTrue);

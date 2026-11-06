@@ -13,6 +13,8 @@ abstract final class ArrivalPolicy {
   static const consistentReadings = 2;
   static const boundaryHysteresisMeters = 2.0;
   static const approachMeters = 15.0;
+  static const startExtraReadings = 3;
+  static const startPollInterval = Duration(milliseconds: 500);
 }
 
 /// A wall/accuracy overlap never confirms presence. Replayed fixes never vote.

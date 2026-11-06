@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
 import 'campus_bounds.dart';
-import 'destination_presence.dart';
 import 'campus_place.dart';
 import 'campus_search_controller.dart';
 import 'campus_search_gateway.dart';
+import 'destination_presence.dart';
 import 'location_service.dart';
 import 'navi_map_controller.dart';
 import 'navigation_flow_state.dart';
@@ -37,6 +38,7 @@ class NavigationFlowController extends ChangeNotifier {
   static const placeSheetInset = 280.0;
   static const routeSheetInset = 320.0;
   static const approachRadius = ArrivalPolicy.approachMeters;
+  static const _minimumArrivalRadiusMeters = 200 * 0.3048;
 
   final DestinationPresenceTracker _presence = DestinationPresenceTracker();
   int? _presenceCheckGeneration;
@@ -710,6 +712,10 @@ class NavigationFlowController extends ChangeNotifier {
     NaviDestination destination, {
     required bool continueWithUncertain,
   }) async {
+    if (destination.footprint == null) {
+      _awaitingPresenceChoice = false;
+      return true;
+    }
     if (continueWithUncertain) {
       _awaitingPresenceChoice = false;
       if (destinationPresence == DestinationPresence.inside) {
@@ -722,13 +728,28 @@ class NavigationFlowController extends ChangeNotifier {
     _presenceCheckGeneration = generation;
     _awaitingPresenceChoice = true;
     notifyListeners();
-    LocationReading reading;
+    var presence = DestinationPresence.uncertain;
     try {
-      reading = await location.current().timeout(ArrivalPolicy.maximumAge);
+      await () async {
+        for (var attempt = 0; ; attempt++) {
+          final reading = await location.current();
+          if (generation != _generation) return;
+          presence = _presence.add(
+            destination.footprint,
+            reading,
+            DateTime.now(),
+          );
+          if (presence != DestinationPresence.uncertain ||
+              !reading.usable ||
+              attempt >= ArrivalPolicy.startExtraReadings) {
+            return;
+          }
+          await Future<void>.delayed(ArrivalPolicy.startPollInterval);
+          if (generation != _generation) return;
+        }
+      }().timeout(ArrivalPolicy.maximumAge);
     } on Object {
-      reading = const LocationReading(
-        availability: LocationAvailability.unavailable,
-      );
+      presence = DestinationPresence.uncertain;
     } finally {
       if (_presenceCheckGeneration == generation) {
         _presenceCheckGeneration = null;
@@ -736,7 +757,6 @@ class NavigationFlowController extends ChangeNotifier {
     }
     if (generation != _generation) return false;
     final now = DateTime.now();
-    final presence = _presence.add(destination.footprint, reading, now);
     if (presence == DestinationPresence.inside) {
       _awaitingPresenceChoice = false;
       await _completeOutdoor(destination, now);
@@ -840,6 +860,22 @@ class NavigationFlowController extends ChangeNotifier {
         reliable &&
         distanceToFootprintMeters(footprint, coordinate) <= approachRadius) {
       _approachAnnounced = true;
+    }
+    if (footprint == null && reliable) {
+      final radius = math.max(
+        destination.arrivalRadius.toDouble(),
+        _minimumArrivalRadiusMeters,
+      );
+      final routeEnd = projectOntoRoute(
+        current.plan.selected.coordinates,
+        coordinate,
+      );
+      if (distanceMeters(coordinate, destination.coordinate) <= radius ||
+          (routeEnd.remainingMeters <= radius &&
+              routeEnd.offRouteMeters <= 20)) {
+        await _completeOutdoor(destination, now);
+        return;
+      }
     }
 
     final points = current.plan.selected.coordinates;
