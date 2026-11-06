@@ -1,0 +1,35 @@
+appId: com.navipet.navipet
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Mock navigation verification"
+    timeout: 30000
+- tapOn: "Uncertain"
+- setLocation:
+    latitude: 33.7840655185087
+    longitude: -118.115895481442
+- startRecording: navigation-uncertain
+- tapOn: "Where to?"
+- inputText: "business"
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn: ".*College of Business.*"
+- assertVisible: "Directions"
+- tapOn: "Directions"
+- tapOn: "Start route"
+- extendedWaitUntil:
+    visible: "Confirm your location"
+    timeout: 15000
+- assertVisible: "State: preview; route requests: 0"
+- assertNotVisible: "Return to map"
+- takeScreenshot: uncertain-choice
+- tapOn: "Refresh location"
+- assertVisible: "Confirm your location"
+- tapOn: "Continue with directions"
+- extendedWaitUntil:
+    visible: "State: preview; route requests: 1"
+    timeout: 15000
+- takeScreenshot: uncertain-continued
+- stopRecording

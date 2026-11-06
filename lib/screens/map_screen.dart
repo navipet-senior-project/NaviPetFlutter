@@ -82,7 +82,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshLivePosition() async {
-    if (_flow.state is! FlowActiveNavigation) return;
     try {
       final position = await geo.Geolocator.getCurrentPosition(
         locationSettings: const geo.LocationSettings(
@@ -98,7 +97,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _passLivePosition(geo.Position position) async {
-    if (_flow.state is! FlowActiveNavigation) return;
     await _flow.onLiveLocation(
       NavigationCoordinate(
         latitude: position.latitude,
@@ -125,9 +123,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
     _map = mapboxMap;
-    // Created first so the building outline draws under routes and pins.
-    final footprints = await mapboxMap.annotations
-        .createPolygonAnnotationManager();
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
@@ -148,7 +143,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       routes: routes,
       markers: markers,
       arrowMarkers: arrowMarkers,
-      footprints: footprints,
     );
     if (_is3d) await _naviMap!.setPitch(65);
     await _flow.attachMap(_naviMap!);
@@ -157,6 +151,25 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     await _lastLocationReady;
     if (_flow.state is FlowIdle) await _centerOnBestKnownLocation();
     await _initializeLocation();
+  }
+
+  Future<void> _restoreMapStyle() async {
+    final controller = _naviMap;
+    if (!mounted || controller == null) return;
+    try {
+      await controller.restoreStyle();
+      if (!mounted || !identical(controller, _naviMap)) return;
+      await _flow.attachMap(controller);
+      await _applyRaisedBuildings();
+    } on Object catch (error) {
+      if (mounted) {
+        setState(
+          () => _locationMessage =
+              'Map is refreshing. Try changing the map view again.',
+        );
+      }
+      debugPrint('Map style restore failed: $error');
+    }
   }
 
   Future<void> _loadLastKnownLocation() async {
@@ -257,6 +270,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       }
     }
 
+    await _positionSubscription?.cancel();
+    if (!mounted) return;
     _positionSubscription =
         geo.Geolocator.getPositionStream(locationSettings: settings).listen(
           (position) {
@@ -412,6 +427,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 if (state is FlowActiveNavigation)
                   _activeNavigation(state, flow, padding),
                 if (state is FlowArrived) _arrivalActions(flow, padding),
+                if (state is FlowIndoorHandoff)
+                  _indoorHandoff(state, flow, padding),
+                if (flow.awaitingPresenceChoice) _presenceChoice(flow, padding),
                 if (state is FlowError) _error(state, flow),
               ],
             ),
@@ -435,6 +453,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       styleUri: _mapStyle,
       viewport: _initialMapViewport,
       onMapCreated: _onMapCreated,
+      onStyleLoadedListener: (_) => unawaited(_restoreMapStyle()),
     );
   }
 
@@ -912,6 +931,86 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final minutes = (route.durationSeconds * fraction / 60).ceil();
     return '$minutes min';
   }
+
+  Widget _presenceChoice(
+    NavigationFlowController flow,
+    EdgeInsets padding,
+  ) => Positioned(
+    left: 0,
+    right: 0,
+    bottom: 0,
+    child: Material(
+      color: AppColors.surface,
+      elevation: 10,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadius.lg),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Confirm your location',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'We cannot confirm whether you are inside the building. Refresh your location or continue with walking directions.',
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: flow.checkingPresence ? null : flow.refreshPresence,
+              child: Text(
+                flow.checkingPresence ? 'Refreshing…' : 'Refresh location',
+              ),
+            ),
+            FilledButton(
+              onPressed: flow.continueRoute,
+              child: const Text('Continue with directions'),
+            ),
+            TextButton(onPressed: flow.back, child: const Text('Back')),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _indoorHandoff(
+    FlowIndoorHandoff state,
+    NavigationFlowController flow,
+    EdgeInsets padding,
+  ) => Positioned(
+    left: 0,
+    right: 0,
+    bottom: 0,
+    child: Material(
+      color: AppColors.surface,
+      elevation: 8,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Building reached',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+            ),
+            Text('Continue indoors to ${state.destination.name}.'),
+            const Text(
+              'Indoor directions for this room are not available yet.',
+            ),
+            TextButton(
+              onPressed: flow.back,
+              child: const Text('Return to map'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   Widget _arrivalActions(NavigationFlowController flow, EdgeInsets padding) =>
       Positioned(

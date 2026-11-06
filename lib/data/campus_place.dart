@@ -34,6 +34,7 @@ class CampusPlace {
     this.outdoorDestination,
     this.arrivalRadiusMeters,
     this.footprint,
+    this.entranceCoordinate,
     this.indoorDestinationId,
     this.external = false,
     this.attribution,
@@ -69,6 +70,7 @@ class CampusPlace {
         navigationJson['arrivalRadiusMeters'],
       ),
       footprint: validFootprint(navigationJson['footprint']),
+      entranceCoordinate: validCoordinate(navigationJson['entrance']),
       indoorDestinationId: _optionalString(
         navigationJson['indoorDestinationId'],
       ),
@@ -93,7 +95,8 @@ class CampusPlace {
   final int? arrivalRadiusMeters;
 
   /// Building outline from the server; null when absent or malformed.
-  final List<NavigationCoordinate>? footprint;
+  final BuildingFootprint? footprint;
+  final NavigationCoordinate? entranceCoordinate;
   final String? indoorDestinationId;
   final bool external;
   final String? attribution;
@@ -139,6 +142,7 @@ class CampusPlace {
       isBuildingAlternative: isBuildingAlternative,
       arrivalRadiusMeters: arrivalRadiusMeters,
       footprint: footprint,
+      entranceCoordinate: entranceCoordinate,
     );
   }
 
