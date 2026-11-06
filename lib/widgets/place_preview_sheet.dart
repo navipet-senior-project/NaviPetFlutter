@@ -130,7 +130,7 @@ class PlacePreviewSheet extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               if (destination.footprint == null)
                 const Text(
-                  'Building outline unavailable. Arrival cannot be confirmed.',
+                  'Building outline unavailable. Arrival uses the map marker.',
                   style: TextStyle(color: AppColors.muted),
                 ),
               if (destination.entranceCoordinate == null)

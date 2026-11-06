@@ -287,11 +287,8 @@ void main() {
       await tester.tap(find.text('Start route'));
       await tester.pump();
       await tester.pump();
-      expect(find.text('Confirm your location'), findsOneWidget);
+      expect(find.text('Confirm your location'), findsNothing);
       expect(find.text("You're already here"), findsNothing);
-      await tester.tap(find.text('Continue with directions'));
-      await tester.pump();
-      await tester.pump();
       expect(find.byType(RoutePreviewSheet), findsOneWidget);
     },
   );
