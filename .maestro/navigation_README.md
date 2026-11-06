@@ -28,6 +28,9 @@ maestro test --udid <UUID> --test-output-dir /tmp/navipet-uncertain .maestro/nav
   zero route requests and no separate already-here UI.
 - Uncertain: 80 m GPS accuracy; refresh/continue choice without false arrival;
   explicit continuation requests the walking route.
+- Destinations without a footprint skip the presence check at Start Route and use
+  the marker-radius / route-end arrival fallback. These flows do not cover that path;
+  see `test/destination_presence_flow_test.dart` and `test/arrival_radius_test.dart`.
 
 The debug header exposes controller status and route-request count as observable
 assertions. Screenshots and recordings are saved by Maestro in the specified
