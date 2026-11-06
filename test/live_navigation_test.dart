@@ -153,7 +153,7 @@ void main() {
   });
 
   test(
-    'point-only destination does not falsely arrive on accurate fixes',
+    'point-only destination arrives on accurate fixes at the marker',
     () async {
       final gateway = harness.FakeRouteGateway()..result = farRoute();
       final controller = await startGuidance(gateway: gateway);
@@ -167,7 +167,7 @@ void main() {
         accuracyMeters: 5,
         timestamp: DateTime.now(),
       );
-      expect(controller.state, isA<FlowActiveNavigation>());
+      expect(controller.state, isA<FlowArrived>());
     },
   );
 
