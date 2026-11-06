@@ -1,5 +1,6 @@
-// Debug-only simulator target. All destinations, outlines and routes here are
-// synthetic fixtures, not authoritative campus data. Production uses main.dart.
+// Debug-only simulator target. Production uses main.dart.
+// Building outlines are OpenStreetMap test data, not backend footprints.
+// Outdoor points match campus_destinations. Routes and GPS policy are fixtures.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -20,31 +21,17 @@ import 'package:navipet/screens/map_screen.dart';
 import 'package:navipet/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
-const horn = NavigationCoordinate(
-  latitude: 33.78307046,
-  longitude: -118.11456126,
-);
-const business = NavigationCoordinate(latitude: 33.7848, longitude: -118.1154);
+import 'osm_test_footprints.dart';
+
 final mockBuilding = CampusPlace(
-  id: 'mock-cob',
+  id: 'osm-cob',
   type: CampusDestinationType.building,
   title: 'College of Business',
-  subtitle: 'Mock building for navigation verification',
+  subtitle: 'OSM outline for verification, not a backend footprint',
   source: 'cache',
   buildingCode: 'COB',
-  outdoorDestination: business,
-  footprint: validFootprint({
-    'type': 'Polygon',
-    'coordinates': [
-      [
-        [-118.1157, 33.7845],
-        [-118.1151, 33.7845],
-        [-118.1151, 33.7851],
-        [-118.1157, 33.7851],
-        [-118.1157, 33.7845],
-      ],
-    ],
-  }),
+  outdoorDestination: collegeOfBusinessOutdoor,
+  footprint: osmTestFootprint('College of Business'),
 );
 
 Future<void> main() async {
@@ -114,6 +101,10 @@ class _NavigationEvidenceAppState extends State<NavigationEvidenceApp> {
                     'Mock navigation verification',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
+                  const Text(
+                    'Outlines: OpenStreetMap, not backend',
+                    style: TextStyle(fontSize: 12),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -146,7 +137,11 @@ class MockLocation implements LocationService {
   @override
   Future<LocationReading> current() async => LocationReading(
     availability: LocationAvailability.available,
-    coordinate: scenario == 'Outside' ? horn : business,
+    coordinate: switch (scenario) {
+      'Outside' => hornCenterOutdoor,
+      'Inside' => insideCollegeOfBusiness,
+      _ => collegeOfBusinessOutdoor,
+    },
     timestamp: DateTime.now(),
     accuracyMeters: scenario == 'Uncertain' ? 80 : 5,
   );

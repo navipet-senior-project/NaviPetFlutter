@@ -1,9 +1,14 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:navipet/data/destination_presence.dart';
 import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/data/route_progress.dart';
 import 'package:navipet/data/campus_place.dart';
 import 'package:navipet/data/search_history_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../tool/osm_test_footprints.dart';
 
 const outer = [
   [0, 0],
@@ -78,6 +83,53 @@ void main() {
     expect(gap(0, 0.0005).abs(), lessThan(0.001));
     expect(gap(0, 0).abs(), lessThan(0.001));
   });
+  test(
+    'OpenStreetMap College of Business courtyard is outside the footprint',
+    () {
+      final footprint = osmTestFootprint('College of Business');
+      final rings = footprintToGeoJson(footprint)['coordinates'] as List;
+      expect(rings, hasLength(2));
+      expect(rings[0], hasLength(17));
+      expect(rings[1], hasLength(5));
+      final hole = footprint.polygons.single[1];
+      final unique = hole.take(hole.length - 1).toList();
+      final courtyard = NavigationCoordinate(
+        latitude:
+            unique.map((point) => point.latitude).reduce((a, b) => a + b) /
+            unique.length,
+        longitude:
+            unique.map((point) => point.longitude).reduce((a, b) => a + b) /
+            unique.length,
+      );
+      // Same entry margin as a 5 m fix in DestinationPresenceTracker.
+      const fixAccuracyMeters = 5.0;
+      final entryMargin =
+          math.max(fixAccuracyMeters, ArrivalPolicy.boundaryHysteresisMeters) +
+          ArrivalPolicy.boundaryHysteresisMeters;
+      expect(signedFootprintDistanceMeters(footprint, courtyard), lessThan(0));
+      expect(
+        signedFootprintDistanceMeters(footprint, insideCollegeOfBusiness),
+        greaterThan(entryMargin),
+      );
+      final pinGap = signedFootprintDistanceMeters(
+        footprint,
+        collegeOfBusinessOutdoor,
+      );
+      expect(pinGap, greaterThan(0));
+      expect(pinGap, lessThan(entryMargin));
+      expect(
+        signedFootprintDistanceMeters(footprint, hornCenterOutdoor),
+        lessThan(0),
+      );
+      expect(
+        signedFootprintDistanceMeters(
+          osmTestFootprint('Steve and Nini Horn Center'),
+          hornCenterOutdoor,
+        ),
+        greaterThan(0),
+      );
+    },
+  );
   test('single-part MultiPolygon and entrance survive recents cache', () async {
     SharedPreferences.setMockInitialValues({});
     final raw = {

@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/building_highlight.dart';
 import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/data/navi_map_controller.dart';
 import 'package:navipet/data/travel_mode.dart';
 
+import '../tool/osm_test_footprints.dart';
 import 'support/mapbox_fakes.dart';
 
 final footprint = validFootprint({
@@ -35,6 +38,22 @@ void main() {
       expect(style.layerAdds, 2);
       final fill = style.layers[BuildingHighlight.fillId]!['paint'] as Map;
       expect(fill['fill-opacity'], BuildingHighlight.opacity);
+    },
+  );
+  test(
+    'OSM footprint source keeps the outer ring and courtyard hole',
+    () async {
+      final style = FakeStyle();
+      final highlight = BuildingHighlight(style);
+      await highlight.show(osmTestFootprint('College of Business'));
+      final feature =
+          jsonDecode(style.sources[BuildingHighlight.sourceId]!) as Map;
+      final rings = (feature['geometry'] as Map)['coordinates'] as List;
+      expect(style.sources, hasLength(1));
+      expect(style.layers, hasLength(2));
+      expect(rings, hasLength(2));
+      expect(rings[0], hasLength(17));
+      expect(rings[1], hasLength(5));
     },
   );
   test(

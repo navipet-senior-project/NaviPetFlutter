@@ -7,8 +7,8 @@ appId: com.navipet.navipet
     timeout: 30000
 - tapOn: "Outside"
 - setLocation:
-    latitude: 33.78307046
-    longitude: -118.11456126
+    latitude: 33.7834442209959
+    longitude: -118.114132161883
 - startRecording: navigation-outside
 - tapOn: "Where to?"
 - inputText: "business"

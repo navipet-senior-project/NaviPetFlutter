@@ -2,8 +2,11 @@
 
 These flows run against a **debug-only mock target**, `tool/navigation_e2e.dart`.
 It uses the production MapScreen, navigation controller and Mapbox renderer.
-All building outlines, routes, GPS accuracy and search responses are synthetic
-verification fixtures. They do not establish real campus footprint/entrance coverage.
+College of Business and Horn Center outlines are OpenStreetMap test data
+(relation 6573042 with its courtyard hole, way 35568170), not backend
+footprints. The backend still has no footprints for these buildings. Outdoor
+points match campus_destinations. Routes, GPS accuracy and search responses
+are fixtures and do not establish campus entrance coverage.
 No backend account or credentials are needed. The native map uses the existing
 public Mapbox token from `.env`; do not print or copy `.env` into evidence.
 
@@ -22,12 +25,14 @@ maestro test --udid <UUID> --test-output-dir /tmp/navipet-inside .maestro/naviga
 maestro test --udid <UUID> --test-output-dir /tmp/navipet-uncertain .maestro/navigation_uncertain.yaml
 ```
 
-- Outside: mocked Horn Center origin to mocked College of Business target;
-  selected footprint, preview, and walking guidance; exactly one route request.
-- Inside: two fresh accurate readings; existing arrived state and Return to map;
-  zero route requests and no separate already-here UI.
-- Uncertain: 80 m GPS accuracy; refresh/continue choice without false arrival;
-  explicit continuation requests the walking route.
+- Outside: real Horn Center outdoor point to the College of Business outdoor
+  point; OSM footprint, preview, and walking guidance; exactly one route request.
+- Inside: two fresh accurate readings inside the OSM ring, clear of the
+  courtyard; existing arrived state and Return to map; zero route requests and
+  no separate already-here UI. The outdoor pin is too close to the courtyard
+  hole for a 5 m fix to count as inside.
+- Uncertain: 80 m GPS accuracy at the outdoor pin; refresh/continue choice
+  without false arrival; explicit continuation requests the walking route.
 - Destinations without a footprint skip the presence check at Start Route and use
   the marker-radius / route-end arrival fallback. These flows do not cover that path;
   see `test/destination_presence_flow_test.dart` and `test/arrival_radius_test.dart`.
