@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,8 +22,17 @@ class IndoorBuildingMapScreen extends StatefulWidget {
 
 class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   late final Future<_VecIndoorMap> _map = _loadMap();
+  final TransformationController _mapTransform = TransformationController();
+  bool _mapTransformInitialized = false;
+  Size _mapViewportSize = Size.zero;
   int _floor = 1;
   String _selectedRoom = '119';
+
+  @override
+  void dispose() {
+    _mapTransform.dispose();
+    super.dispose();
+  }
 
   Future<_VecIndoorMap> _loadMap() async {
     final raw = await rootBundle.loadString(
@@ -33,6 +43,21 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
       throw const FormatException('Indoor map building ID does not match VEC.');
     }
     return map;
+  }
+
+  void _zoomMap(double factor) {
+    final current = _mapTransform.value;
+    final currentScale = current.getMaxScaleOnAxis();
+    if (currentScale <= 0 || _mapViewportSize.isEmpty) return;
+    final nextScale = (currentScale * factor).clamp(.35, 4.0).toDouble();
+    final ratio = nextScale / currentScale;
+    final centerX = _mapViewportSize.width / 2;
+    final centerY = _mapViewportSize.height / 2;
+    final translateX = centerX + (current.entry(0, 3) - centerX) * ratio;
+    final translateY = centerY + (current.entry(1, 3) - centerY) * ratio;
+    _mapTransform.value = Matrix4.identity()
+      ..translate(translateX, translateY)
+      ..scale(nextScale);
   }
 
   @override
@@ -73,7 +98,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
             children: [
               _notice(
-                'Map points match the VEC floor 1 + 2 Unity export. The export contains room doors, entrances, stairs, elevators, and restrooms; it does not contain a traced walkable-route graph yet.',
+                'Tap a room marker or room number to select it. Pin positions come from the Unity scan; the scan does not include a walkable route or a complete building outline.',
                 const Color(0xFFEAF4FA),
                 const Color(0xFF28536A),
               ),
@@ -161,7 +186,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                     Row(
                       children: [
                         Text(
-                          'FLOOR $_floor',
+                          'UNITY LEVEL $_floor',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
@@ -170,7 +195,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                         ),
                         const Spacer(),
                         Text(
-                          '${objects.length} scanned map points',
+                          _floor == 1
+                              ? '${objects.length} Unity scan points'
+                              : '${objects.length} scanned map points',
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 11,
@@ -180,7 +207,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                     ),
                     const SizedBox(height: 12),
                     AspectRatio(
-                      aspectRatio: .78,
+                      aspectRatio: 1.2,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: const Color(0xFFE3E7ED),
@@ -188,21 +215,88 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(15),
-                          child: InteractiveViewer(
-                            minScale: 1,
-                            maxScale: 4,
-                            boundaryMargin: const EdgeInsets.all(80),
-                            child: SizedBox.expand(
-                              child: CustomPaint(
-                                painter: _FloorMapPainter(
-                                  objects,
-                                  selectedRoom: _selectedRoom,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final viewport = Size(
+                                constraints.maxWidth,
+                                constraints.maxHeight,
+                              );
+                              _mapViewportSize = viewport;
+                              final mapSize = Size(
+                                viewport.width * 1.5,
+                                viewport.height * 1.35,
+                              );
+                              if (!_mapTransformInitialized) {
+                                _mapTransformInitialized = true;
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (!mounted) return;
+                                  const initialScale = .75;
+                                  _mapTransform.value = Matrix4.identity()
+                                    ..translate(
+                                      (viewport.width - mapSize.width * initialScale) / 2,
+                                      (viewport.height - mapSize.height * initialScale) / 2,
+                                    )
+                                    ..scale(initialScale);
+                                });
+                              }
+                              return InteractiveViewer(
+                                constrained: false,
+                                transformationController: _mapTransform,
+                                minScale: .35,
+                                maxScale: 4,
+                                boundaryMargin: const EdgeInsets.all(500),
+                                child: SizedBox(
+                                  width: mapSize.width,
+                                  height: mapSize.height,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTapDown: (details) {
+                                      final room = _FloorMapPainter.hitTestRoom(
+                                        objects,
+                                        details.localPosition,
+                                        mapSize,
+                                      );
+                                      if (room != null) {
+                                        setState(() => _selectedRoom = room);
+                                      }
+                                    },
+                                    child: CustomPaint(
+                                      size: mapSize,
+                                      painter: _FloorMapPainter(
+                                        objects,
+                                        selectedRoom: _selectedRoom,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                child: const SizedBox.expand(),
-                              ),
-                            ),
+                              );
+                            },
                           ),
                         ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Zoom',
+                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                          IconButton(
+                            tooltip: 'Zoom out',
+                            onPressed: () => _zoomMap(.8),
+                            color: Colors.white,
+                            icon: const Icon(Icons.remove_circle_outline),
+                          ),
+                          IconButton(
+                            tooltip: 'Zoom in',
+                            onPressed: () => _zoomMap(1.25),
+                            color: Colors.white,
+                            icon: const Icon(Icons.add_circle_outline),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -217,12 +311,28 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                         _Legend(color: Color(0xFF8D83AA), label: 'Restroom'),
                       ],
                     ),
+                    if (_floor == 1) ...[
+                      const SizedBox(height: 9),
+                      const Text(
+                        'Filled rooms have Unity scan points. Outlined rooms come from the directory reference.',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Pinch to zoom, drag to pan. Use + or - on either floor.',
+                      style: TextStyle(color: Colors.white60, fontSize: 10),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
               const Text(
-                'Directory rooms on this floor',
+                'Room doors in this scan',
                 style: TextStyle(
                   color: AppColors.navy,
                   fontWeight: FontWeight.w800,
@@ -358,47 +468,79 @@ class _FloorMapPainter extends CustomPainter {
   static const _maxX = 34.0;
   static const _minZ = -5.0;
   static const _maxZ = 35.0;
+  // First-floor diagram layout follows the user's sketch. These are display
+  // coordinates only; AR continues to use the original Unity export values.
+  static const Map<String, Rect> _floorOneRooms = {
+    '124': Rect.fromLTWH(.10, .09, .19, .19),
+    '127': Rect.fromLTWH(.60, .10, .13, .18),
+    '128': Rect.fromLTWH(.74, .10, .14, .22),
+    '129': Rect.fromLTWH(.90, .10, .055, .10),
+    '130': Rect.fromLTWH(.90, .21, .055, .12),
+    '121': Rect.fromLTWH(.15, .59, .14, .16),
+    '120': Rect.fromLTWH(.29, .59, .08, .16),
+    '119': Rect.fromLTWH(.375, .59, .065, .16),
+    '118': Rect.fromLTWH(.445, .59, .055, .16),
+    '104': Rect.fromLTWH(.39, .82, .09, .11),
+    '136': Rect.fromLTWH(.695, .58, .07, .18),
+    '134': Rect.fromLTWH(.765, .62, .06, .25),
+    '132': Rect.fromLTWH(.825, .58, .07, .18),
+    '135': Rect.fromLTWH(.695, .78, .07, .14),
+    '133': Rect.fromLTWH(.825, .78, .07, .14),
+  };
+  static const List<Rect> _floorOneUnlabeledRooms = [
+    Rect.fromLTWH(.29, .09, .30, .19),
+    Rect.fromLTWH(.16, .76, .22, .17),
+  ];
+  static const Map<String, Rect> _floorTwoRooms = {
+    '201': Rect.fromLTWH(.05, .08, .13, .25),
+    '202': Rect.fromLTWH(.18, .08, .22, .25),
+    '215': Rect.fromLTWH(.75, .08, .06, .25),
+    '217': Rect.fromLTWH(.815, .08, .075, .25),
+    '218': Rect.fromLTWH(.895, .08, .06, .25),
+    '220': Rect.fromLTWH(.35, .57, .09, .37),
+    '224': Rect.fromLTWH(.68, .57, .16, .37),
+    '227': Rect.fromLTWH(.855, .57, .10, .37),
+  };
+  static const List<Rect> _floorTwoUnlabeledRooms = [
+    Rect.fromLTWH(.40, .08, .35, .10),
+    Rect.fromLTWH(.48, .20, .10, .14),
+    Rect.fromLTWH(.58, .20, .10, .14),
+    Rect.fromLTWH(.05, .57, .29, .37),
+  ];
+  static const Map<String, Offset> _floorOneFeatures = {
+    'VECentr1B': Offset(.06, .45),
+    'VECentr1A': Offset(.94, .45),
+    'VECentr1C': Offset(.60, .945),
+    'VECstairsF1B': Offset(.125, .66),
+    'VECstairsF1A': Offset(.965, .66),
+    'VECelev1A': Offset(.54, .64),
+    'VECelev1B': Offset(.54, .76),
+    'VECbathF1': Offset(.65, .64),
+    'VECbathM1': Offset(.65, .76),
+  };
+  static const Map<String, Offset> _floorTwoFeatures = {
+    'VECstairsF2B': Offset(.06, .45),
+    'VECstairsF2A': Offset(.94, .45),
+    'VECbathM2': Offset(.53, .27),
+    'VECbathF2': Offset(.63, .27),
+    'VECelev2A': Offset(.47, .65),
+    'VECelev2B': Offset(.47, .85),
+  };
 
   @override
   void paint(Canvas canvas, Size size) {
-    final building = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        size.width * .06,
-        size.height * .07,
-        size.width * .88,
-        size.height * .86,
-      ),
-      const Radius.circular(18),
-    );
-    canvas.drawRRect(building, Paint()..color = const Color(0xFFF7F7F4));
-    canvas.drawRRect(
-      building,
-      Paint()
-        ..color = const Color(0xFF48566B)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
-    );
+    canvas.drawColor(const Color(0xFFF7F7F4), BlendMode.src);
+    if (objects.any((object) => object.floor == 1)) {
+      _paintFloorOne(canvas, size);
+      return;
+    }
+    if (objects.any((object) => object.floor == 2)) {
+      _paintFloorTwo(canvas, size);
+      return;
+    }
 
-    // Unity's MapSet coordinates are used directly for room and facility
-    // marker placement. This corridor band is a visual guide, not route data.
-    final corridorY = _point(0, 22.0, size).dy;
-    canvas.drawLine(
-      Offset(size.width * .12, corridorY),
-      Offset(size.width * .88, corridorY),
-      Paint()
-        ..color = const Color(0xFFBEC8D8)
-        ..strokeWidth = 22
-        ..strokeCap = StrokeCap.round,
-    );
-    _drawText(
-      canvas,
-      'MAIN CORRIDOR',
-      Offset(size.width * .5, corridorY - 16),
-      9,
-      const Color(0xFF47556B),
-      bold: true,
-    );
-
+    // Draw all pins before labels so a later scan point can't cover an earlier
+    // room number. Coordinates remain the exact x/z values exported by Unity.
     for (final object in objects) {
       final point = _point(object.x, object.z, size);
       final color = switch (object.type) {
@@ -409,23 +551,47 @@ class _FloorMapPainter extends CustomPainter {
         'bathroom' => const Color(0xFF8D83AA),
         _ => const Color(0xFF8D98A8),
       };
+      final roomNumber = object.type == 'door' ? object.id.substring(3) : null;
+      final labelOffset = _labelOffset(roomNumber, object.type);
+      final labelPoint = point + labelOffset;
+      final markerRect = Rect.fromCenter(
+        center: labelPoint,
+        width: object.type == 'door' ? 38 : 30,
+        height: 25,
+      );
+      if (labelOffset.distance > 0) {
+        canvas.drawLine(
+          point,
+          labelPoint,
+          Paint()
+            ..color = const Color(0xFF8792A1)
+            ..strokeWidth = 1.2,
+        );
+        canvas.drawCircle(point, 3, Paint()..color = const Color(0xFF26344F));
+      }
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: point, width: 27, height: 21),
-          const Radius.circular(5),
-        ),
+        RRect.fromRectAndRadius(markerRect, const Radius.circular(5)),
         Paint()..color = color,
       );
       if (object.type == 'door' && object.id == 'VEC$selectedRoom') {
         canvas.drawCircle(
-          point,
-          20,
+          labelPoint,
+          22,
           Paint()
             ..color = const Color(0xFFF2B544)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2.5,
         );
       }
+    }
+
+    // Labels are a separate pass so every number stays on top of nearby pins.
+    for (final object in objects) {
+      final point = _point(object.x, object.z, size);
+      final labelPoint = point + _labelOffset(
+        object.type == 'door' ? object.id.substring(3) : null,
+        object.type,
+      );
       final label = object.type == 'door'
           ? object.id.substring(3)
           : switch (object.type) {
@@ -435,8 +601,268 @@ class _FloorMapPainter extends CustomPainter {
               'bathroom' => 'R',
               _ => '?',
             };
-      _drawText(canvas, label, point, 9, const Color(0xFF26344F), bold: true);
+      _drawText(canvas, label, labelPoint, 10, const Color(0xFF26344F), bold: true);
     }
+  }
+
+  void _paintFloorOne(Canvas canvas, Size size) {
+    _paintFloorPlan(
+      canvas,
+      size,
+      _floorOneRooms,
+      _floorOneFeatures,
+      _floorOneUnlabeledRooms,
+      horizontalShift: .015,
+      lowerEntranceCorridor: true,
+    );
+  }
+
+  void _paintFloorTwo(Canvas canvas, Size size) {
+    _paintFloorPlan(
+      canvas,
+      size,
+      _floorTwoRooms,
+      _floorTwoFeatures,
+      _floorTwoUnlabeledRooms,
+    );
+  }
+
+  void _paintFloorPlan(
+    Canvas canvas,
+    Size size,
+    Map<String, Rect> roomLayout,
+    Map<String, Offset> featureLayout,
+    List<Rect> unlabeledRooms, {
+    double horizontalShift = 0,
+    bool lowerEntranceCorridor = false,
+  }) {
+    final scannedRooms = objects
+        .where((object) => object.type == 'door')
+        .map((object) => object.id.substring(3))
+        .toSet();
+    final outer = Rect.fromLTWH(
+      size.width * .025,
+      size.height * .025,
+      size.width * .95,
+      size.height * .95,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(outer, Radius.circular(size.width * .025)),
+      Paint()..color = const Color(0xFFE2E6EC),
+    );
+    final building = outer.deflate(size.width * .018);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(building, Radius.circular(size.width * .022)),
+      Paint()..color = const Color(0xFFF7F7F4),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(building, Radius.circular(size.width * .022)),
+      Paint()
+        ..color = const Color(0xFF33445E)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * .004,
+    );
+
+    final corridor = Rect.fromLTWH(
+      building.left + size.width * .012,
+      size.height * .34,
+      building.width - size.width * .024,
+      size.height * .21,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(corridor, Radius.circular(size.width * .018)),
+      Paint()..color = const Color(0xFFD5DAE3),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(corridor, Radius.circular(size.width * .018)),
+      Paint()
+        ..color = const Color(0xFFBCC5D0)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * .002,
+    );
+    _drawText(
+      canvas,
+      'MAIN CORRIDOR',
+      Offset(size.width * .50, size.height * .445),
+      size.width * .022,
+      const Color(0xFF566171),
+      bold: true,
+    );
+
+    canvas.save();
+    canvas.translate(-size.width * horizontalShift, 0);
+    if (lowerEntranceCorridor) {
+      final left = size.width * .575;
+      final right = size.width * .625;
+      final bottom = size.height * .925;
+      canvas.drawRect(
+        Rect.fromLTRB(left, corridor.bottom - 2, right, bottom),
+        Paint()..color = const Color(0xFFD5DAE3),
+      );
+      final walls = Paint()
+        ..color = const Color(0xFFBCC5D0)
+        ..strokeWidth = size.width * .002;
+      canvas.drawLine(Offset(left, corridor.bottom), Offset(left, bottom), walls);
+      canvas.drawLine(Offset(right, corridor.bottom), Offset(right, bottom), walls);
+      canvas.drawLine(Offset(left, bottom), Offset(right, bottom), walls);
+    }
+
+    for (final normalizedRect in unlabeledRooms) {
+      final rect = Rect.fromLTWH(
+        normalizedRect.left * size.width,
+        normalizedRect.top * size.height,
+        normalizedRect.width * size.width,
+        normalizedRect.height * size.height,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(size.width * .006)),
+        Paint()..color = const Color(0xFFFAFAF7),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(size.width * .006)),
+        Paint()
+          ..color = const Color(0xFF8793A2)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = size.width * .0025,
+      );
+    }
+
+    for (final entry in roomLayout.entries) {
+      final normalizedRect = entry.value;
+      final rect = Rect.fromLTWH(
+        normalizedRect.left * size.width,
+        normalizedRect.top * size.height,
+        normalizedRect.width * size.width,
+        normalizedRect.height * size.height,
+      );
+      final isScanned = scannedRooms.contains(entry.key);
+      final isSelected = entry.key == selectedRoom && isScanned;
+      final radius = Radius.circular(size.width * .008);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, radius),
+        Paint()
+          ..color = isSelected
+              ? const Color(0xFFFFE8A8)
+              : isScanned
+              ? const Color(0xFFF2E7B9)
+              : const Color(0xFFFAFAF7),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, radius),
+        Paint()
+          ..color = isSelected
+              ? const Color(0xFFB98212)
+              : isScanned
+              ? const Color(0xFF9A895C)
+              : const Color(0xFF9AA4B1)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = isSelected
+              ? size.width * .005
+              : size.width * .0025,
+      );
+      _drawText(
+        canvas,
+        entry.key,
+        rect.center,
+        math.min(rect.width, rect.height) * .23,
+        const Color(0xFF26344F),
+        bold: true,
+      );
+    }
+
+    for (final object in objects.where((item) => item.type != 'door')) {
+      final position = featureLayout[object.id];
+      if (position == null) continue;
+      final center = Offset(position.dx * size.width, position.dy * size.height);
+      // The left floor-two access marker is an entrance in the user's plan,
+      // although the exported Unity marker is typed as stairs.
+      final displayType = object.floor == 2 && object.id == 'VECstairsF2B'
+          ? 'entrance'
+          : object.type;
+      final color = switch (displayType) {
+        'entrance' => const Color(0xFF5B9CB0),
+        'stairs' => const Color(0xFFBD6C76),
+        'elevator' => const Color(0xFF55958C),
+        'bathroom' => const Color(0xFF8D83AA),
+        _ => const Color(0xFF8D98A8),
+      };
+      final rect = Rect.fromCenter(
+        center: center,
+        width: size.width * .05,
+        height: size.height * .065,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(size.width * .008)),
+        Paint()..color = color,
+      );
+      final label = switch (displayType) {
+        'entrance' => 'E',
+        'stairs' => 'S',
+        'elevator' => 'L',
+        'bathroom' => 'R',
+        _ => '?',
+      };
+      _drawText(
+        canvas,
+        label,
+        center,
+        size.width * .027,
+        Colors.white,
+        bold: true,
+      );
+    }
+
+    canvas.restore();
+  }
+
+  static Offset _labelOffset(String? roomNumber, String type) {
+    if (type == 'door') {
+      return switch (roomNumber) {
+        '120' => const Offset(0, -18),
+        '119' => const Offset(0, 18),
+        '201' || '202' => const Offset(0, 17),
+        _ => Offset.zero,
+      };
+    }
+    return Offset.zero;
+  }
+
+  static String? hitTestRoom(List<_IndoorObject> objects, Offset position, Size size) {
+    if (objects.any((object) => object.floor == 1 || object.floor == 2)) {
+      final roomLayout = objects.any((object) => object.floor == 1)
+          ? _floorOneRooms
+          : _floorTwoRooms;
+      for (final object in objects.where((item) => item.type == 'door')) {
+        final room = object.id.substring(3);
+        final normalizedRect = roomLayout[room];
+        if (normalizedRect == null) continue;
+        final rect = Rect.fromLTWH(
+          normalizedRect.left * size.width,
+          normalizedRect.top * size.height,
+          normalizedRect.width * size.width,
+          normalizedRect.height * size.height,
+        );
+        if (rect.inflate(12).contains(position)) return room;
+      }
+      return null;
+    }
+    _IndoorObject? nearest;
+    var nearestDistance = 30.0;
+    for (final object in objects.where((item) => item.type == 'door')) {
+      final point = Offset(
+        size.width * (.09 + ((object.x - _minX) / (_maxX - _minX)) * .82),
+        size.height * (.09 + ((_maxZ - object.z) / (_maxZ - _minZ)) * .80),
+      );
+      final labelPoint = point + _labelOffset(object.id.substring(3), object.type);
+      final distance = (position - point).distance < (position - labelPoint).distance
+          ? (position - point).distance
+          : (position - labelPoint).distance;
+      if (distance < nearestDistance) {
+        nearest = object;
+        nearestDistance = distance;
+      }
+    }
+    return nearest?.id.substring(3);
   }
 
   Offset _point(double x, double z, Size size) => Offset(
