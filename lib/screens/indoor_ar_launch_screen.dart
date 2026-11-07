@@ -8,8 +8,10 @@ import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../data/indoor_ar_token_gateway.dart';
 
-/// Asks for the camera, opens the Unity AR camera and returns to the map.
-/// Opened fresh by every AR tap, so every tap asks again.
+// VEC MVP coverage assumption; extend when additional coverage is established.
+const vecMvpCoveredFloors = <String>['1', '2'];
+
+/// Asks for the floor and camera, then opens Unity AR and returns to the map.
 class IndoorArLaunchScreen extends StatefulWidget {
   const IndoorArLaunchScreen({
     super.key,
@@ -17,12 +19,14 @@ class IndoorArLaunchScreen extends StatefulWidget {
     required this.destinationId,
     required this.gateway,
     required this.tokenGateway,
+    this.suggestedFloor,
     this.now = DateTime.now,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
     this.openSettings = openAppSettings,
   });
 
+  final String? suggestedFloor;
   final IndoorArLauncher launcher;
   final String? destinationId;
   final CampusSearchGateway gateway;
@@ -60,10 +64,15 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   var _tokenFailed = false;
   var _rationale = false;
   var _blocked = false;
+  var _choosingFloor = false;
+  String? _currentFloor;
 
   @override
   void initState() {
     super.initState();
+    if (vecMvpCoveredFloors.contains(widget.suggestedFloor)) {
+      _currentFloor = widget.suggestedFloor;
+    }
     // After the first frame: leaving pops the route, which initState cannot do.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
@@ -105,6 +114,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       if (mounted) setState(() => _unavailable = true);
       return;
     }
+    setState(() => _choosingFloor = true);
+  }
+
+  Future<void> _confirmFloor() async {
+    setState(() => _choosingFloor = false);
     try {
       final camera = await widget.cameraStatus();
       if (!mounted) return;
@@ -156,7 +170,20 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       return;
     }
     if (!mounted) return;
-    final result = await widget.launcher.launch(_request!.withArToken(token));
+    final request = _request!;
+    final result = await widget.launcher.launch(
+      IndoorArRequest(
+        room: request.room,
+        doorKey: request.doorKey,
+        floor: request.floor,
+        position: request.position,
+        headingDeg: request.headingDeg,
+        mapCode: request.mapCode,
+        frame: request.frame,
+        currentFloor: _currentFloor,
+        arToken: token,
+      ),
+    );
     if (!mounted) return;
     _leave(_resultText(result));
   }
@@ -193,7 +220,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: _blocked || _rationale || _unavailable
+    appBar: _blocked || _rationale || _unavailable || _choosingFloor
         ? AppBar(title: const Text('AR mode'))
         : null,
     body: Center(
@@ -224,6 +251,37 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
               back: 'Not now',
               onBack: () => _leave(
                 'AR needs camera access. Tap the AR button to try again.',
+              ),
+            )
+          : _choosingFloor
+          ? Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Which floor are you on?'),
+                  RadioGroup<String>(
+                    groupValue: _currentFloor,
+                    onChanged: (value) => setState(() => _currentFloor = value),
+                    child: Column(
+                      children: [
+                        for (final floor in vecMvpCoveredFloors)
+                          RadioListTile<String>(
+                            title: Text('Floor $floor'),
+                            value: floor,
+                          ),
+                      ],
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: _currentFloor == null ? null : _confirmFloor,
+                    child: const Text('Start AR'),
+                  ),
+                  TextButton(
+                    onPressed: () => _leave(null),
+                    child: const Text('Back to map'),
+                  ),
+                ],
               ),
             )
           : const CircularProgressIndicator(),

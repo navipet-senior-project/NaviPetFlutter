@@ -68,6 +68,7 @@ class _Harness {
     String? destinationId = _destinationId,
     Future<http.Response> Function(http.Request)? fetch,
     Future<http.Response> Function(http.Request)? mint,
+    String? suggestedFloor,
   }) : fake = FakeIndoorArLauncher(result: result) {
     final activeLauncher = launcher ?? fake;
     router = GoRouter(
@@ -91,6 +92,7 @@ class _Harness {
           path: '/ar',
           builder: (context, state) => IndoorArLaunchScreen(
             launcher: activeLauncher,
+            suggestedFloor: suggestedFloor,
             destinationId: state.uri.queryParameters['destination'],
             gateway: HttpCampusSearchGateway(
               baseUrl: 'https://example.test',
@@ -141,9 +143,19 @@ class _Harness {
   var cameraRequests = 0;
   var settingsOpened = 0;
 
-  Future<void> tapAr(WidgetTester tester) async {
+  Future<void> tapAr(WidgetTester tester, {bool chooseFloor = true}) async {
     await tester.tap(find.text('map'));
     await tester.pumpAndSettle();
+    if (chooseFloor) await selectFloor(tester);
+  }
+
+  Future<void> selectFloor(WidgetTester tester) async {
+    if (find.text('Which floor are you on?').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Floor 1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start AR'));
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> tapArAndContinue(WidgetTester tester) async {
@@ -162,6 +174,42 @@ const _destinationId = '00000000-0000-4000-8000-000000000119';
 final _fixture = File('test/fixtures/vec119_place.json').readAsStringSync();
 
 void main() {
+  testWidgets('asks for current floor before launching', (tester) async {
+    final harness = _Harness(status: PermissionStatus.granted);
+    await harness.pump(tester);
+    await harness.tapAr(tester, chooseFloor: false);
+    expect(find.text('Which floor are you on?'), findsOneWidget);
+    expect(harness.fake.requests, isEmpty);
+    expect(find.text('Floor 3'), findsNothing);
+    await tester.tap(find.text('Floor 2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Floor 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start AR'));
+    await tester.pumpAndSettle();
+    expect(harness.fake.requests.single.currentFloor, '1');
+  });
+
+  testWidgets('suggested floor can be changed', (tester) async {
+    final harness = _Harness(
+      status: PermissionStatus.granted,
+      suggestedFloor: '2',
+    );
+    await harness.pump(tester);
+    await harness.tapAr(tester, chooseFloor: false);
+    expect(
+      tester
+          .widget<RadioGroup<String>>(find.byType(RadioGroup<String>))
+          .groupValue,
+      '2',
+    );
+    await tester.tap(find.text('Floor 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start AR'));
+    await tester.pumpAndSettle();
+    expect(harness.fake.requests.single.currentFloor, '1');
+  });
+
   testWidgets('selected destination uses fetched pose, never the spike door', (
     tester,
   ) async {
@@ -192,6 +240,7 @@ void main() {
       'frame': 'multiset-mapset',
       'doorKey': 'VEC120',
       'floor': '2',
+      'currentFloor': '1',
       'position': {'x': 1.0, 'y': 2.0, 'z': 3.0},
       'headingDeg': 90.0,
       'arToken': {
@@ -235,8 +284,12 @@ void main() {
         expect(harness.statusChecks, 0);
         await tester.tap(find.text('Retry'));
         await tester.pumpAndSettle();
+        await harness.selectFloor(tester);
         expect(harness.fetchedIds, [_destinationId, _destinationId]);
-        expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
+        expect(harness.fake.requests.single.toJson(), {
+          ...vec119Request().toJson(),
+          'currentFloor': '1',
+        });
         expect(find.text('map'), findsOneWidget);
       },
     );
@@ -263,7 +316,10 @@ void main() {
     await harness.tapAr(tester);
 
     expect(harness.cameraRequests, 0);
-    expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
+    expect(harness.fake.requests.single.toJson(), {
+      ...vec119Request().toJson(),
+      'currentFloor': '1',
+    });
     expect(find.text('map'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
   });
@@ -371,6 +427,7 @@ void main() {
 
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
+      await harness.selectFloor(tester);
       expect(harness.fake.requests.single.arToken?.token, 'test-token');
       expect(find.text('map'), findsOneWidget);
     });
@@ -412,7 +469,10 @@ void main() {
     await harness.tapArAndContinue(tester);
 
     expect(harness.cameraRequests, 1);
-    expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
+    expect(harness.fake.requests.single.toJson(), {
+      ...vec119Request().toJson(),
+      'currentFloor': '1',
+    });
     expect(find.text('map'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
   });

@@ -43,6 +43,7 @@ class IndoorArRequest {
     required this.mapCode,
     required this.frame,
     this.arToken,
+    this.currentFloor,
   }) {
     if (doorKey.isEmpty || floor.isEmpty || mapCode.isEmpty) {
       throw ArgumentError('doorKey, floor and mapCode must not be empty');
@@ -65,6 +66,7 @@ class IndoorArRequest {
   final String room;
   final String doorKey;
   final String floor;
+  final String? currentFloor;
   final IndoorArVector3 position;
   final double headingDeg;
   final String mapCode;
@@ -78,6 +80,7 @@ class IndoorArRequest {
     room: room,
     doorKey: doorKey,
     floor: floor,
+    currentFloor: currentFloor,
     position: position,
     headingDeg: headingDeg,
     mapCode: mapCode,
@@ -90,6 +93,7 @@ class IndoorArRequest {
     'room': room,
     'doorKey': doorKey,
     'floor': floor,
+    if (currentFloor != null) 'currentFloor': currentFloor,
     'position': position.toJson(),
     'headingDeg': headingDeg,
     'mapCode': mapCode,
