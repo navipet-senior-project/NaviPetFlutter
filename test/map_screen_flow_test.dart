@@ -72,6 +72,8 @@ void main() {
   }
 
   final arButton = find.byType(ArModeIcon);
+  // Lets the controller's stale-fix timer fire so none is pending at teardown.
+  const staleFix = Duration(seconds: 11);
 
   testWidgets('poor indoor fix offers Scan AR and opens the selected room', (
     tester,
@@ -126,6 +128,7 @@ void main() {
     await tester.tap(find.text('Scan AR'));
     await tester.pumpAndSettle();
     expect(find.text('destination vec119'), findsOneWidget);
+    await tester.pump(staleFix);
   });
 
   testWidgets('arrival shows no message and returns to the map', (
@@ -189,6 +192,7 @@ void main() {
       tester.getBottomLeft(arButton).dy,
       lessThan(tester.getTopLeft(find.byIcon(Icons.layers_outlined)).dy),
     );
+    await tester.pump(staleFix);
   });
 
   testWidgets('the AR button passes destination to /ar and survives return', (
@@ -236,6 +240,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(arButton, findsOneWidget);
+    await tester.pump(staleFix);
   });
 
   testWidgets('walks search to place preview to route preview', (tester) async {
