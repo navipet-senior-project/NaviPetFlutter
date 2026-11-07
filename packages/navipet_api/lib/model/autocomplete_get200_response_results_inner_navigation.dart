@@ -14,6 +14,8 @@ class AutocompleteGet200ResponseResultsInnerNavigation {
   /// Returns a new [AutocompleteGet200ResponseResultsInnerNavigation] instance.
   AutocompleteGet200ResponseResultsInnerNavigation({
     this.outdoorDestination,
+    this.arrivalRadiusMeters,
+    this.footprint,
     this.indoorDestinationId,
   });
 
@@ -25,6 +27,24 @@ class AutocompleteGet200ResponseResultsInnerNavigation {
   ///
   AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination?
       outdoorDestination;
+
+  /// Minimum value: 3
+  /// Maximum value: 50
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  int? arrivalRadiusMeters;
+
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  AutocompleteGet200ResponseResultsInnerNavigationFootprint? footprint;
 
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -39,17 +59,21 @@ class AutocompleteGet200ResponseResultsInnerNavigation {
       identical(this, other) ||
       other is AutocompleteGet200ResponseResultsInnerNavigation &&
           other.outdoorDestination == outdoorDestination &&
+          other.arrivalRadiusMeters == arrivalRadiusMeters &&
+          other.footprint == footprint &&
           other.indoorDestinationId == indoorDestinationId;
 
   @override
   int get hashCode =>
       // ignore: unnecessary_parenthesis
       (outdoorDestination == null ? 0 : outdoorDestination!.hashCode) +
+      (arrivalRadiusMeters == null ? 0 : arrivalRadiusMeters!.hashCode) +
+      (footprint == null ? 0 : footprint!.hashCode) +
       (indoorDestinationId == null ? 0 : indoorDestinationId!.hashCode);
 
   @override
   String toString() =>
-      'AutocompleteGet200ResponseResultsInnerNavigation[outdoorDestination=$outdoorDestination, indoorDestinationId=$indoorDestinationId]';
+      'AutocompleteGet200ResponseResultsInnerNavigation[outdoorDestination=$outdoorDestination, arrivalRadiusMeters=$arrivalRadiusMeters, footprint=$footprint, indoorDestinationId=$indoorDestinationId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -57,6 +81,16 @@ class AutocompleteGet200ResponseResultsInnerNavigation {
       json[r'outdoorDestination'] = this.outdoorDestination;
     } else {
       json[r'outdoorDestination'] = null;
+    }
+    if (this.arrivalRadiusMeters != null) {
+      json[r'arrivalRadiusMeters'] = this.arrivalRadiusMeters;
+    } else {
+      json[r'arrivalRadiusMeters'] = null;
+    }
+    if (this.footprint != null) {
+      json[r'footprint'] = this.footprint;
+    } else {
+      json[r'footprint'] = null;
     }
     if (this.indoorDestinationId != null) {
       json[r'indoorDestinationId'] = this.indoorDestinationId;
@@ -91,6 +125,10 @@ class AutocompleteGet200ResponseResultsInnerNavigation {
         outdoorDestination:
             AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination
                 .fromJson(json[r'outdoorDestination']),
+        arrivalRadiusMeters: mapValueOfType<int>(json, r'arrivalRadiusMeters'),
+        footprint:
+            AutocompleteGet200ResponseResultsInnerNavigationFootprint.fromJson(
+                json[r'footprint']),
         indoorDestinationId:
             mapValueOfType<String>(json, r'indoorDestinationId'),
       );
