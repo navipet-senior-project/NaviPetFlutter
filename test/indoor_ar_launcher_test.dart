@@ -11,7 +11,7 @@ import 'support/indoor_ar_fixtures.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel(NativeIndoorArLauncher.channelName);
+  const channel = MethodChannel(AndroidIndoorArLauncher.channelName);
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
@@ -24,8 +24,8 @@ void main() {
       return '{"status":"cancelled","localizationQueries":0,"durationMs":900}';
     });
 
-    final result = await NativeIndoorArLauncher(
-      isSupportedPlatform: true,
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
     ).launch(vec119Request());
 
     expect(received?.method, 'launch');
@@ -38,8 +38,8 @@ void main() {
   });
 
   test('returns unavailable when the host has no channel', () async {
-    final result = await NativeIndoorArLauncher(
-      isSupportedPlatform: true,
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
     ).launch(vec119Request());
 
     expect(result.status, IndoorArStatus.unavailable);
@@ -50,8 +50,8 @@ void main() {
       throw PlatformException(code: 'boom');
     });
 
-    final result = await NativeIndoorArLauncher(
-      isSupportedPlatform: true,
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
     ).launch(vec119Request());
 
     expect(result.status, IndoorArStatus.error);
@@ -61,8 +61,8 @@ void main() {
   test('maps a null reply to error BAD_RESULT', () async {
     messenger.setMockMethodCallHandler(channel, (call) async => null);
 
-    final result = await NativeIndoorArLauncher(
-      isSupportedPlatform: true,
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
     ).launch(vec119Request());
 
     expect(result.errorCode, 'BAD_RESULT');
@@ -71,8 +71,8 @@ void main() {
   test('maps a non-string reply to error BAD_RESULT', () async {
     messenger.setMockMethodCallHandler(channel, (call) async => 42);
 
-    final result = await NativeIndoorArLauncher(
-      isSupportedPlatform: true,
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
     ).launch(vec119Request());
 
     expect(result.errorCode, 'BAD_RESULT');
@@ -81,38 +81,11 @@ void main() {
   test('maps an unparseable reply to error BAD_RESULT', () async {
     messenger.setMockMethodCallHandler(channel, (call) async => 'garbage');
 
-    final result = await NativeIndoorArLauncher(
-      isSupportedPlatform: true,
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: true,
     ).launch(vec119Request());
 
     expect(result.errorCode, 'BAD_RESULT');
-  });
-
-  test('decodes the host-built iOS results', () async {
-    for (final (reply, status, code) in [
-      (
-        '{"status":"unavailable","localizationQueries":0,"durationMs":0}',
-        IndoorArStatus.unavailable,
-        null,
-      ),
-      (
-        '{"status":"error","errorCode":"UNITY_EXITED","localizationQueries":0,"durationMs":40}',
-        IndoorArStatus.error,
-        'UNITY_EXITED',
-      ),
-      (
-        '{"status":"error","errorCode":"BAD_REQUEST","localizationQueries":0,"durationMs":0}',
-        IndoorArStatus.error,
-        'BAD_REQUEST',
-      ),
-    ]) {
-      messenger.setMockMethodCallHandler(channel, (call) async => reply);
-      final result = await NativeIndoorArLauncher(
-        isSupportedPlatform: true,
-      ).launch(vec119Request());
-      expect(result.status, status);
-      expect(result.errorCode, code);
-    }
   });
 
   test('defaults to the current platform', () async {
@@ -125,34 +98,31 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     expect(
-      (await NativeIndoorArLauncher().launch(vec119Request())).status,
-      IndoorArStatus.cancelled,
+      (await AndroidIndoorArLauncher().launch(vec119Request())).status,
+      IndoorArStatus.unavailable,
     );
 
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     expect(
-      (await NativeIndoorArLauncher().launch(vec119Request())).status,
+      (await AndroidIndoorArLauncher().launch(vec119Request())).status,
       IndoorArStatus.cancelled,
     );
   });
 
-  test(
-    'returns unavailable on unsupported platforms without calling the host',
-    () async {
-      var called = false;
-      messenger.setMockMethodCallHandler(channel, (call) async {
-        called = true;
-        return null;
-      });
+  test('returns unavailable off Android without calling the host', () async {
+    var called = false;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      called = true;
+      return null;
+    });
 
-      final result = await NativeIndoorArLauncher(
-        isSupportedPlatform: false,
-      ).launch(vec119Request());
+    final result = await AndroidIndoorArLauncher(
+      isAndroid: false,
+    ).launch(vec119Request());
 
-      expect(result.status, IndoorArStatus.unavailable);
-      expect(called, isFalse);
-    },
-  );
+    expect(result.status, IndoorArStatus.unavailable);
+    expect(called, isFalse);
+  });
 
   test('fake launcher records requests and returns its result', () async {
     final fake = FakeIndoorArLauncher(

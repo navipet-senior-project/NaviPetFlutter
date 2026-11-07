@@ -84,6 +84,8 @@ Class | Method | HTTP request | Description
 *ClassesApi* | [**classesGet**](doc//ClassesApi.md#classesget) | **GET** /classes | List the authenticated user classes
 *ClassesApi* | [**classesPost**](doc//ClassesApi.md#classespost) | **POST** /classes | Add a class to the authenticated user schedule
 *HealthApi* | [**healthGet**](doc//HealthApi.md#healthget) | **GET** /health | Check API process liveness
+*ProfilesApi* | [**profilesMeAvatarPost**](doc//ProfilesApi.md#profilesmeavatarpost) | **POST** /profiles/me/avatar | Upload a temporary profile avatar
+*ProfilesApi* | [**profilesMeAvatarUploadIdDelete**](doc//ProfilesApi.md#profilesmeavataruploadiddelete) | **DELETE** /profiles/me/avatar/{uploadId} | Discard a temporary profile avatar upload
 *ProfilesApi* | [**profilesMeGet**](doc//ProfilesApi.md#profilesmeget) | **GET** /profiles/me | Get the authenticated user profile
 *ProfilesApi* | [**profilesMePatch**](doc//ProfilesApi.md#profilesmepatch) | **PATCH** /profiles/me | Update the authenticated user profile
 *RecentSearchesApi* | [**allRecentSearchesDelete**](doc//RecentSearchesApi.md#allrecentsearchesdelete) | **DELETE** /all-recent-searches | Clear all recent selected campus places
@@ -149,10 +151,7 @@ Class | Method | HTTP request | Description
  - [AutocompleteGet200Response](doc//AutocompleteGet200Response.md)
  - [AutocompleteGet200ResponseProximity](doc//AutocompleteGet200ResponseProximity.md)
  - [AutocompleteGet200ResponseResultsInner](doc//AutocompleteGet200ResponseResultsInner.md)
- - [AutocompleteGet200ResponseResultsInnerIndoor](doc//AutocompleteGet200ResponseResultsInnerIndoor.md)
- - [AutocompleteGet200ResponseResultsInnerIndoorPosition](doc//AutocompleteGet200ResponseResultsInnerIndoorPosition.md)
  - [AutocompleteGet200ResponseResultsInnerNavigation](doc//AutocompleteGet200ResponseResultsInnerNavigation.md)
- - [AutocompleteGet200ResponseResultsInnerNavigationFootprint](doc//AutocompleteGet200ResponseResultsInnerNavigationFootprint.md)
  - [AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination](doc//AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination.md)
  - [AutocompleteGet422Response](doc//AutocompleteGet422Response.md)
  - [AutocompleteGet502Response](doc//AutocompleteGet502Response.md)
@@ -189,15 +188,19 @@ Class | Method | HTTP request | Description
  - [ProfilesMeAccessibilityPatchRequestGuidance](doc//ProfilesMeAccessibilityPatchRequestGuidance.md)
  - [ProfilesMeAccessibilityPatchRequestMobility](doc//ProfilesMeAccessibilityPatchRequestMobility.md)
  - [ProfilesMeAccessibilityPatchRequestVisuals](doc//ProfilesMeAccessibilityPatchRequestVisuals.md)
+ - [ProfilesMeAvatarPost200Response](doc//ProfilesMeAvatarPost200Response.md)
+ - [ProfilesMeAvatarPost400Response](doc//ProfilesMeAvatarPost400Response.md)
+ - [ProfilesMeAvatarPost413Response](doc//ProfilesMeAvatarPost413Response.md)
+ - [ProfilesMeAvatarPost415Response](doc//ProfilesMeAvatarPost415Response.md)
+ - [ProfilesMeAvatarUploadIdDelete404Response](doc//ProfilesMeAvatarUploadIdDelete404Response.md)
+ - [ProfilesMeAvatarUploadIdDelete422Response](doc//ProfilesMeAvatarUploadIdDelete422Response.md)
+ - [ProfilesMeAvatarUploadIdDelete502Response](doc//ProfilesMeAvatarUploadIdDelete502Response.md)
+ - [ProfilesMeAvatarUploadIdDelete503Response](doc//ProfilesMeAvatarUploadIdDelete503Response.md)
  - [ProfilesMeGet200Response](doc//ProfilesMeGet200Response.md)
  - [ProfilesMeGet200ResponseProfile](doc//ProfilesMeGet200ResponseProfile.md)
  - [ProfilesMeGet404Response](doc//ProfilesMeGet404Response.md)
- - [ProfilesMeGet502Response](doc//ProfilesMeGet502Response.md)
- - [ProfilesMePatch400Response](doc//ProfilesMePatch400Response.md)
- - [ProfilesMePatch413Response](doc//ProfilesMePatch413Response.md)
- - [ProfilesMePatch415Response](doc//ProfilesMePatch415Response.md)
+ - [ProfilesMePatch404Response](doc//ProfilesMePatch404Response.md)
  - [ProfilesMePatch422Response](doc//ProfilesMePatch422Response.md)
- - [ProfilesMePatch503Response](doc//ProfilesMePatch503Response.md)
  - [ProfilesMePatchRequest](doc//ProfilesMePatchRequest.md)
  - [RecentSearchesGet200Response](doc//RecentSearchesGet200Response.md)
  - [RecentSearchesGet200ResponseRecentSearchesInner](doc//RecentSearchesGet200ResponseRecentSearchesInner.md)

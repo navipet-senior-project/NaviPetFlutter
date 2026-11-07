@@ -8,9 +8,9 @@ import 'support/indoor_ar_fixtures.dart';
 
 void main() {
   group('IndoorArRequest', () {
-    test('encodes bridge contract v2', () {
+    test('encodes bridge contract v1', () {
       expect(jsonDecode(jsonEncode(vec119Request().toJson())), {
-        'schemaVersion': 2,
+        'schemaVersion': 1,
         'room': '119',
         'doorKey': 'VEC119',
         'floor': '1',
@@ -18,28 +18,7 @@ void main() {
         'headingDeg': 185.36,
         'mapCode': 'MSET_XTBY7AM7ZK77',
         'frame': 'multiset-mapset',
-        'arToken': {
-          'token': 'test-token',
-          'expiresOn': '2026-01-01T00:30:00.000Z',
-        },
       });
-    });
-
-    test('omits arToken when none was minted', () {
-      final bare = IndoorArRequest(
-        room: '119',
-        doorKey: 'VEC119',
-        floor: '1',
-        position: const IndoorArVector3(0, 0, 0),
-        headingDeg: 0,
-        mapCode: 'M',
-        frame: 'multiset-mapset',
-      );
-      expect(bare.toJson().containsKey('arToken'), isFalse);
-    });
-
-    test('a token never shows in toString', () {
-      expect(testArToken.toString(), isNot(contains('test-token')));
     });
 
     test('rejects a heading outside [0, 360)', () {

@@ -664,15 +664,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     heroTag: 'ar-mode',
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.navy,
-                    onPressed: () => context.push(
-                      Uri(
-                        path: '/ar',
-                        queryParameters: {
-                          if (state.destination.id != null)
-                            'destination': state.destination.id!,
-                        },
-                      ).toString(),
-                    ),
+                    onPressed: () => context.push('/ar'),
                     child: const FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Column(

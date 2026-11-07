@@ -10,14 +10,8 @@ includes:
 - Mapbox destination autocomplete and walking directions.
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
-- Existing Pet, Checklist, and Account screens. On Android (and on iOS when a
-  prebuilt UnityFramework is present, see `docs/ios-testing.md`), the arrival AR
-  button loads the selected place and sends its backend door pose, plus a
-  short-lived MultiSet token fetched from the backend (`POST /indoor/ar-token`),
-  to Unity. The MultiSet secret never ships in the app. Rooms without a valid
-  indoor pose show an unavailable message with Retry; token failures show a
-  separate retry message.
-  Unity AR still requires verification on a physical phone.
+- Existing Pet, Checklist, Account, and prototype AR screens. The 3D/Multiset
+  integration is intentionally deferred and is not exposed from the map.
 
 ## Project structure
 
@@ -365,5 +359,5 @@ the pinned Flutter/Mapbox versions in this repository.
 
 - The Dart client lives in `packages/navipet_api` and is generated from `openapi/navipet-api.json` (the backend's OpenAPI spec).
 - Regenerate with `tool/generate_api_client.sh --fetch` to re-download the spec and regenerate. Requires Java and Node.js (`npx`).
-- Before generating, `tool/normalize_openapi.jq` collapses TypeBox literal unions (`anyOf` of single-value enums, `anyOf` with `null`) into plain enums and `nullable` fields. It also converts homogeneous coordinate tuples into fixed-length arrays supported by the `dart` generator. The committed spec stays unmodified.
+- Before generating, `tool/normalize_openapi.jq` collapses TypeBox literal unions (`anyOf` of single-value enums, `anyOf` with `null`) into plain enums and `nullable` fields, which the `dart` generator cannot model otherwise. The committed spec stays unmodified.
 - Never hand-edit generated files. Change the spec or the script instead, then regenerate.

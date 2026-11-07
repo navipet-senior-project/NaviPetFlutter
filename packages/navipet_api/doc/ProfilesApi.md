@@ -9,9 +9,109 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
+[**profilesMeAvatarPost**](ProfilesApi.md#profilesmeavatarpost) | **POST** /profiles/me/avatar | Upload a temporary profile avatar
+[**profilesMeAvatarUploadIdDelete**](ProfilesApi.md#profilesmeavataruploadiddelete) | **DELETE** /profiles/me/avatar/{uploadId} | Discard a temporary profile avatar upload
 [**profilesMeGet**](ProfilesApi.md#profilesmeget) | **GET** /profiles/me | Get the authenticated user profile
 [**profilesMePatch**](ProfilesApi.md#profilesmepatch) | **PATCH** /profiles/me | Update the authenticated user profile
 
+
+# **profilesMeAvatarPost**
+> ProfilesMeAvatarPost200Response profilesMeAvatarPost(avatar)
+
+Upload a temporary profile avatar
+
+Uploads one image as a temporary avatar. It is not the saved profile avatar until it is committed.  Requires `Authorization: Bearer <access_token>`.  Send `multipart/form-data` with the file in a field named `avatar`.  Accepted formats are JPEG, PNG, and WebP, up to 5 MB.  ---  **To keep it:** send the returned `uploadId` as `avatarUploadId` in `PATCH /profiles/me`.  ---  **To discard it:** call `DELETE /profiles/me/avatar/{uploadId}`.  ---  The returned `avatarUrl` is a preview link that expires after about one hour.
+
+### Example
+```dart
+import 'package:navipet_api/api.dart';
+// TODO Configure HTTP Bearer authorization: bearerAuth
+// Case 1. Use String Token
+//defaultApiClient.getAuthentication<HttpBearerAuth>('bearerAuth').setAccessToken('YOUR_ACCESS_TOKEN');
+// Case 2. Use Function which generate token.
+// String yourTokenGeneratorFunction() { ... }
+//defaultApiClient.getAuthentication<HttpBearerAuth>('bearerAuth').setAccessToken(yourTokenGeneratorFunction);
+
+final api_instance = ProfilesApi();
+final avatar = BINARY_DATA_HERE; // MultipartFile | Avatar image file.
+
+try {
+    final result = api_instance.profilesMeAvatarPost(avatar);
+    print(result);
+} catch (e) {
+    print('Exception when calling ProfilesApi->profilesMeAvatarPost: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **avatar** | **MultipartFile**| Avatar image file. | 
+
+### Return type
+
+[**ProfilesMeAvatarPost200Response**](ProfilesMeAvatarPost200Response.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: multipart/form-data
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **profilesMeAvatarUploadIdDelete**
+> Object profilesMeAvatarUploadIdDelete(uploadId)
+
+Discard a temporary profile avatar upload
+
+Discards a temporary avatar upload, for when the user cancels their profile changes.  Requires `Authorization: Bearer <access_token>`.  `uploadId` is the value returned by `POST /profiles/me/avatar`.  Do not call this after that `uploadId` has been committed through `PATCH /profiles/me`.  An upload that does not exist for this user returns 404.
+
+### Example
+```dart
+import 'package:navipet_api/api.dart';
+// TODO Configure HTTP Bearer authorization: bearerAuth
+// Case 1. Use String Token
+//defaultApiClient.getAuthentication<HttpBearerAuth>('bearerAuth').setAccessToken('YOUR_ACCESS_TOKEN');
+// Case 2. Use Function which generate token.
+// String yourTokenGeneratorFunction() { ... }
+//defaultApiClient.getAuthentication<HttpBearerAuth>('bearerAuth').setAccessToken(yourTokenGeneratorFunction);
+
+final api_instance = ProfilesApi();
+final uploadId = 38400000-8cf0-11bd-b23e-10b96e4ef00d; // String | 
+
+try {
+    final result = api_instance.profilesMeAvatarUploadIdDelete(uploadId);
+    print(result);
+} catch (e) {
+    print('Exception when calling ProfilesApi->profilesMeAvatarUploadIdDelete: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **uploadId** | **String**|  | 
+
+### Return type
+
+[**Object**](Object.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **profilesMeGet**
 > ProfilesMeGet200Response profilesMeGet()
@@ -63,7 +163,7 @@ This endpoint does not need any parameter.
 
 Update the authenticated user profile
 
-Updates the profile of the authenticated user and returns the saved profile.  Requires `Authorization: Bearer <access_token>`.  Send at least one field. Omitted fields keep their current values. Use JSON when changing text fields only. Use multipart form data when including an avatar file; send text fields as ordinary form fields and the image in a field named `avatar`.  `displayName` is trimmed and cannot be blank. To change the email, use `POST /auth/change-email`; email is deliberately not editable through this endpoint.  Avatar images must be JPEG, PNG, or WebP and no larger than 5 MB. The server stores a newly selected avatar only when this request saves successfully.  The returned `avatarUrl` is a temporary signed URL that expires after about one hour.  In Swagger UI, delete the fields you do not want to change from the example body before executing.
+Updates the profile of the authenticated user and returns the saved profile.  Requires `Authorization: Bearer <access_token>`.  Send at least one field. Omitted fields keep their current values.  `displayName` is trimmed and cannot be blank. To change the email, use `POST /auth/change-email`; email is deliberately not editable through this endpoint.  ---  To save a new avatar, first call `POST /profiles/me/avatar`, then send its `uploadId` here as `avatarUploadId`.  ---  The returned `avatarUrl` is a temporary signed URL that expires after about one hour.  In Swagger UI, delete the fields you do not want to change from the example body before executing.
 
 ### Example
 ```dart
@@ -102,7 +202,7 @@ Name | Type | Description  | Notes
 
 ### HTTP request headers
 
- - **Content-Type**: application/json, multipart/form-data
+ - **Content-Type**: application/json
  - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
