@@ -54,6 +54,7 @@ abstract interface class NaviMapController {
     required String label,
     required double bottomInset,
     NaviDestination? destination,
+    bool fitFootprint = true,
   });
 
   Future<void> showRoute(
@@ -130,6 +131,7 @@ class MapboxNaviMapController implements NaviMapController {
     required String label,
     required double bottomInset,
     NaviDestination? destination,
+    bool fitFootprint = true,
   }) async {
     await _clearAnnotations();
     await _leaveGuidance();
@@ -139,7 +141,7 @@ class MapboxNaviMapController implements NaviMapController {
       await _markers.create(_marker(coordinate, label));
     }
     final footprint = destination?.footprint;
-    if (footprint != null) {
+    if (footprint != null && fitFootprint) {
       final camera = await _map.cameraForCoordinatesPadding(
         footprint.coordinates.map(_point).toList(),
         routeCameraOptions(bottomInset: bottomInset, pitch: _pitch),
@@ -147,8 +149,13 @@ class MapboxNaviMapController implements NaviMapController {
         18,
         null,
       );
-      await _map.easeTo(camera, MapAnimationOptions(duration: 600));
-      return;
+      // Malformed or oversized server geometry can make Mapbox fit the entire
+      // world. Keep the footprint highlight, but fall back to the known place
+      // pin unless the calculated camera remains building-level.
+      if (camera.zoom != null && camera.zoom! >= 14) {
+        await _map.easeTo(camera, MapAnimationOptions(duration: 600));
+        return;
+      }
     }
     await _map.easeTo(
       CameraOptions(
