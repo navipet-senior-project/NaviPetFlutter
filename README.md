@@ -207,6 +207,27 @@ flutter run
 The first build can take several minutes. The app will request location access
 when the map opens; precise location is needed for route guidance and rerouting.
 
+### Android terminal commands
+
+With an emulator running or a phone connected, list targets and select the ID
+shown by Flutter. `adb devices` shows Android device serials.
+
+```bash
+flutter devices
+adb devices
+flutter run -d <flutter-device-id>
+```
+
+Alternatively, build and install the debug APK. Use the serial from `adb devices`
+when more than one Android target is connected:
+
+```bash
+flutter build apk --debug
+adb -s <android-serial> install -r build/app/outputs/flutter-apk/app-debug.apk
+adb -s <android-serial> shell am start -n com.navipet.navipet/.MainActivity
+adb -s <android-serial> logcat
+```
+
 ## Run on an iPhone
 
 iPhone builds require **macOS and Xcode**. They cannot be compiled or installed
@@ -280,6 +301,39 @@ preview, but a physical iPhone is better for testing live GPS navigation.
 A free Apple ID can be used for development testing, although its signing has
 more restrictions. App Store or TestFlight distribution requires membership in
 the Apple Developer Program.
+
+### iOS terminal commands
+
+After completing the signing and device preparation above, list the phone with
+Flutter and CoreDevice. Their identifiers can differ.
+
+```bash
+flutter devices
+xcrun devicectl list devices
+flutter run -d <flutter-device-id>
+```
+
+To build and install separately, use the CoreDevice identifier and the bundle
+identifier configured in Xcode:
+
+```bash
+flutter build ios --debug
+xcrun devicectl device install app --device <coredevice-id> build/ios/iphoneos/Runner.app
+xcrun devicectl device process launch --device <coredevice-id> <bundle-id>
+```
+
+For a simulator, choose an available device ID and build its separate app bundle:
+
+```bash
+xcrun simctl list devices available
+xcrun simctl boot <simulator-id>
+flutter build ios --debug --simulator
+xcrun simctl install <simulator-id> build/ios/iphonesimulator/Runner.app
+xcrun simctl launch <simulator-id> <bundle-id>
+```
+
+Skip the boot command if the simulator is already running. The default bundle ID
+is `com.navipet.navipet`; use your locally configured ID if you changed it.
 
 ## Unity AR without installing Unity
 
