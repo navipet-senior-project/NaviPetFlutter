@@ -11,8 +11,9 @@ includes:
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
 - Existing Pet, Checklist, and Account screens. After arrival, the map's AR
-  button can open Unity indoor AR. That needs a private library the captain
-  hands you; this repository does not contain one. See
+  button can open Unity indoor AR. That needs a private library the project
+  maintainer who gave you access to this repository hands you; this repository
+  does not contain one. See
   [Unity AR without installing Unity](#unity-ar-without-installing-unity).
 
 ## Project structure
@@ -287,23 +288,24 @@ library is in this repository, and neither
 [NaviPetFlutter](https://github.com/navipet-senior-project/NaviPetFlutter) nor
 [NaviPetUnity](https://github.com/navipet-senior-project/NaviPetUnity) publishes
 one as a GitHub release. The Android AAR and the iOS `UnityFramework` can hold
-MultiSet credentials, so they stay out of git. Ask the captain for a private
+MultiSet credentials, so they stay out of git. Ask the project maintainer who gave you
+access to this repository (see [Collaborators](#collaborators)) for a private
 copy. Do not commit that copy, and do not post it anywhere public.
 
 Without that private copy, follow [Run on Android](#run-on-android) or
 [Run on an iPhone](#run-on-an-iphone). Leave `android/unity-ar/` absent. The
 rest of the app still builds. On Android the arrival AR button then reports
-"AR is not included in this build." On this branch, iOS never loads Unity: the
+"AR is not included in this build." On the main branch at the time of writing, iOS never loads Unity: the
 same button reports "AR mode isn't available on this device."
 
 ### Android
 
-This branch already consumes a private Android library. Gradle in
+The main branch at the time of writing already consumes a private Android library. Gradle in
 `android/app/build.gradle.kts` turns Unity on only when
 `android/unity-ar/unityLibrary-release.aar` is a file. `android/.gitignore`
 ignores the whole `android/unity-ar/` directory.
 
-1. Get the `android/unity-ar/` directory from the captain in private. Keep
+1. Get the `android/unity-ar/` directory from the project maintainer who gave you access to this repository, in private. Keep
    every file in it, including `unityLibrary-release.aar`, any other `.aar`
    files, and `maven-deps.txt` when that file is present.
 2. Place that directory at `android/unity-ar/` in your checkout. Confirm git
@@ -314,17 +316,17 @@ ignores the whole `android/unity-ar/` directory.
    `arm64-v8a`.
 4. Build and install with the steps in [Physical Android phone](#physical-android-phone).
 
-On this branch the arrival AR button (`/ar`) opens that library with a fixed
+On the main branch at the time of writing, the arrival AR button (`/ar`) opens that library with a fixed
 door pose. It does not send the selected room's door, and it does not fetch a
 MultiSet token. Those two behaviors, and the release-build keep rules in
 `android/app/proguard-unity.pro`, are in the still-open pull request
 [https://github.com/navipet-senior-project/NaviPetFlutter/pull/59](https://github.com/navipet-senior-project/NaviPetFlutter/pull/59).
-A debug `flutter run` on this branch does not need that pull request. A
+A debug `flutter run` on the main branch at the time of writing does not need that pull request. A
 release build that must keep the Unity classes does.
 
 ### iPhone
 
-This branch has no iOS Unity embed and does not gitignore an iOS Unity
+The main branch at the time of writing has no iOS Unity embed and does not gitignore an iOS Unity
 framework. Do not add `ios/unity-ar/` or a `UnityFramework` until
 [https://github.com/navipet-senior-project/NaviPetFlutter/pull/59](https://github.com/navipet-senior-project/NaviPetFlutter/pull/59)
 is merged. Until then, boot the iPhone with [Run on an iPhone](#run-on-an-iphone)
@@ -332,7 +334,7 @@ and expect AR to stay unavailable.
 
 After that pull request is merged, use these steps. They depend on that merge:
 
-1. Get `UnityFramework.framework` from the captain in private.
+1. Get `UnityFramework.framework` from the project maintainer who gave you access to this repository, in private.
 2. Copy it to `ios/unity-ar/UnityFramework.framework`.
 3. Copy `ios/UnityAr.xcconfig.template` (added by that pull request) to
    `ios/unity-ar/UnityAr.xcconfig`. That file is what turns the iOS Unity
@@ -344,7 +346,8 @@ After that pull request is merged, use these steps. They depend on that merge:
    Personal Team. Do not commit a team id or a bundle-identifier change.
 
 That iOS bridge is not yet proven against a real `UnityFramework` on a phone.
-The Android path above is the one this branch can boot.
+The Android path above is the one the main branch at the time of writing can boot.
+The notes about pull request 59 are removed or updated when that pull request merges.
 
 ## Navigation behavior
 
@@ -413,7 +416,7 @@ asset. No real keys are used in CI.
 | No iPhones or simulators are listed | Open Xcode, install an iOS runtime in **Xcode > Settings > Platforms**, then run `open -a Simulator` and `flutter devices`. |
 | Xcode reports a signing error | Select a development team under **Runner > Signing & Capabilities** and use a unique bundle identifier. Do not commit the team id or that bundle-identifier edit. |
 | Android says "AR is not included in this build." | No private `android/unity-ar/unityLibrary-release.aar` is present. The rest of the app still runs. See [Unity AR without installing Unity](#unity-ar-without-installing-unity). |
-| iPhone says "AR mode isn't available on this device." | This branch has no iOS Unity embed. Boot without AR, or wait until [https://github.com/navipet-senior-project/NaviPetFlutter/pull/59](https://github.com/navipet-senior-project/NaviPetFlutter/pull/59) is merged and you have placed the private framework. |
+| iPhone says "AR mode isn't available on this device." | The main branch at the time of writing has no iOS Unity embed. Boot without AR, or wait until [https://github.com/navipet-senior-project/NaviPetFlutter/pull/59](https://github.com/navipet-senior-project/NaviPetFlutter/pull/59) is merged and you have placed the private framework. |
 | iOS reports resource-fork/Finder metadata errors | Move the repository out of an iCloud-synced Desktop or Documents folder, then run `flutter clean` and try again. |
 
 The Kotlin Gradle Plugin warning currently emitted by Mapbox/Flutter TTS is a
