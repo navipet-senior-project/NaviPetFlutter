@@ -1,0 +1,20 @@
+{
+  "place": {
+    "id": "00000000-0000-4000-8000-000000000119",
+    "type": "room",
+    "title": "VEC 119",
+    "subtitle": "Vivian Engineering Center · Floor 1",
+    "source": "csulb",
+    "buildingCode": "VEC",
+    "roomNumber": "119",
+    "floorNumber": "1",
+    "indoor": {
+      "mapCode": "MSET_XTBY7AM7ZK77",
+      "frame": "multiset-mapset",
+      "doorKey": "VEC119",
+      "floor": "1",
+      "position": {"x": -5.7651, "y": -1.8186, "z": 22.6689},
+      "headingDeg": 185.36
+    }
+  }
+}

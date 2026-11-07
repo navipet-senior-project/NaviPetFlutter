@@ -24,4 +24,15 @@ def collapse_nullable:
   then ((.anyOf | map(select(null_member | not))[0]) + del(.anyOf) + {nullable: true})
   else . end;
 
-walk(merge_string_enums | collapse_nullable)
+# OpenAPI 3.0 requires one items schema. TypeBox emits homogeneous coordinate
+# tuples; preserve their fixed length while using the shared number schema.
+def collapse_homogeneous_tuple:
+  if type == "object" and .type? == "array"
+     and (.items? | type == "array") and (.items | length > 0)
+     and (.items | .[0] as $first | all(. == $first))
+  then (.items | length) as $count
+    | (if .additionalItems? == false then .maxItems = $count else . end)
+    | .items = .items[0] | del(.additionalItems)
+  else . end;
+
+walk(merge_string_enums | collapse_nullable | collapse_homogeneous_tuple)

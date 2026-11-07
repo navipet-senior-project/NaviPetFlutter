@@ -1,7 +1,7 @@
 package com.navipet.navipet
 
 /**
- * Bridge contract v1 results the host builds itself, for outcomes Unity never
+ * Bridge contract v2 results the host builds itself, for outcomes Unity never
  * reports. Unity's own result JSON passes through untouched; Dart validates it.
  */
 object IndoorArResults {
