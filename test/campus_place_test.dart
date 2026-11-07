@@ -1,7 +1,58 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/campus_place.dart';
 
+Map<String, dynamic> _vec119() =>
+    (jsonDecode(File('test/fixtures/vec119_place.json').readAsStringSync())
+            as Map<String, dynamic>)['place']
+        as Map<String, dynamic>;
+
 void main() {
+  test('parses VEC 119 backend door without converting its pose', () {
+    final pose = CampusPlace.fromJson(_vec119()).indoor!;
+    expect(pose.mapCode, 'MSET_XTBY7AM7ZK77');
+    expect(pose.frame, 'multiset-mapset');
+    expect(pose.doorKey, 'VEC119');
+    expect(pose.floor, '1');
+    expect(pose.position.toJson(), {'x': -5.7651, 'y': -1.8186, 'z': 22.6689});
+    expect(pose.headingDeg, 185.36);
+  });
+
+  test('missing indoor remains optional', () {
+    final json = _vec119()..remove('indoor');
+    expect(CampusPlace.fromJson(json).indoor, isNull);
+  });
+
+  test('malformed indoor poses never become a default door', () {
+    for (final field in [
+      'mapCode',
+      'frame',
+      'doorKey',
+      'floor',
+      'position',
+      'headingDeg',
+    ]) {
+      final json = _vec119();
+      (json['indoor'] as Map<String, dynamic>).remove(field);
+      expect(CampusPlace.fromJson(json).indoor, isNull, reason: field);
+    }
+    for (final bad in [-1, 360, double.nan, double.infinity, '90', null]) {
+      final json = _vec119();
+      json['indoor']['headingDeg'] = bad;
+      expect(CampusPlace.fromJson(json).indoor, isNull, reason: '$bad');
+    }
+    for (final bad in [double.nan, double.infinity, '1', null]) {
+      final json = _vec119();
+      json['indoor']['position']['x'] = bad;
+      expect(CampusPlace.fromJson(json).indoor, isNull, reason: '$bad');
+    }
+    final json = _vec119();
+    json['indoor']['frame'] = 'unknown-frame';
+    expect(CampusPlace.fromJson(json).indoor, isNull);
+  });
+
   test('parses room metadata and converts only the verified outdoor point', () {
     final place = CampusPlace.fromJson({
       'id': '00000000-0000-4000-8000-000000000001',

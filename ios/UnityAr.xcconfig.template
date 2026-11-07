@@ -1,0 +1,5 @@
+// Copy to ios/unity-ar/UnityAr.xcconfig next to UnityFramework.framework to
+// turn indoor AR on. Without that file the app builds with AR unavailable.
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) UNITY_AR_ENABLED
+FRAMEWORK_SEARCH_PATHS = $(inherited) $(PROJECT_DIR)/unity-ar
+OTHER_LDFLAGS = $(inherited) -framework UnityFramework

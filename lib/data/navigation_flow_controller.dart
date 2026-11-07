@@ -43,11 +43,59 @@ class NavigationFlowController extends ChangeNotifier {
   final DestinationPresenceTracker _presence = DestinationPresenceTracker();
   int? _presenceCheckGeneration;
   bool _awaitingPresenceChoice = false;
+  LocationReading? _arLocationValue;
+  Timer? _arStaleTimer;
+  LocationReading? get _arLocation => _arLocationValue;
+  set _arLocation(LocationReading? reading) {
+    _arLocationValue = reading;
+    _arStaleTimer?.cancel();
+    _arStaleTimer = null;
+    final timestamp = reading?.timestamp;
+    if (timestamp == null) return;
+    final remaining = timestamp
+        .add(ArrivalPolicy.maximumAge)
+        .difference(DateTime.now());
+    if (remaining.isNegative) return;
+    _arStaleTimer = Timer(remaining + const Duration(milliseconds: 50), () {
+      _arStaleTimer = null;
+      notifyListeners();
+    });
+  }
+
+  bool get canScanAr {
+    final destination = _destination;
+    final reading = _arLocation;
+    final point = reading?.coordinate;
+    final timestamp = reading?.timestamp;
+    final accuracy = reading?.accuracyMeters;
+    final now = DateTime.now();
+    return destination?.hasIndoorNavigation == true &&
+        destination?.id?.trim().isNotEmpty == true &&
+        destination?.footprint != null &&
+        reading?.usable == true &&
+        reading?.isApproximate == false &&
+        point != null &&
+        point.latitude.isFinite &&
+        point.longitude.isFinite &&
+        point.latitude.abs() <= 90 &&
+        point.longitude.abs() <= 180 &&
+        timestamp != null &&
+        !timestamp.isAfter(now) &&
+        now.difference(timestamp) <= ArrivalPolicy.maximumAge &&
+        accuracy != null &&
+        accuracy.isFinite &&
+        accuracy >= 0 &&
+        distanceToFootprintMeters(destination!.footprint!, point) <=
+            ArrivalPolicy.boundaryHysteresisMeters;
+  }
+
   bool get awaitingPresenceChoice => _awaitingPresenceChoice;
   bool get checkingPresence => _presenceCheckGeneration == _generation;
   DestinationPresence get destinationPresence =>
       _presence.valueAt(DateTime.now());
   NavigationStatus get status => _state.status;
+
+  NaviDestination? get destination => _destination;
 
   NaviDestination? get _destination => switch (_state) {
     FlowPlacePreview(:final destination) => destination,
@@ -757,6 +805,7 @@ class NavigationFlowController extends ChangeNotifier {
         for (var attempt = 0; ; attempt++) {
           final reading = await location.current();
           if (generation != _generation) return;
+          _arLocation = reading;
           presence = _presence.add(
             destination.footprint,
             reading,
@@ -847,16 +896,14 @@ class NavigationFlowController extends ChangeNotifier {
       return;
     }
     final now = DateTime.now();
-    final presence = _presence.add(
-      destination.footprint,
-      LocationReading(
-        availability: LocationAvailability.available,
-        coordinate: coordinate,
-        accuracyMeters: accuracyMeters,
-        timestamp: timestamp,
-      ),
-      now,
+    final reading = LocationReading(
+      availability: LocationAvailability.available,
+      coordinate: coordinate,
+      accuracyMeters: accuracyMeters,
+      timestamp: timestamp,
     );
+    _arLocation = reading;
+    final presence = _presence.add(destination.footprint, reading, now);
     final current = _state;
     if (current is! FlowActiveNavigation) {
       notifyListeners();
@@ -1230,7 +1277,10 @@ class NavigationFlowController extends ChangeNotifier {
     final previousDestination = _destination;
     _state = next;
     final destination = _destination;
-    if (!identical(previousDestination, destination)) _presence.reset();
+    if (!identical(previousDestination, destination)) {
+      _presence.reset();
+      _arLocation = null;
+    }
     _awaitingPresenceChoice = false;
     notifyListeners();
   }
@@ -1273,6 +1323,7 @@ class NavigationFlowController extends ChangeNotifier {
   void dispose() {
     // A reroute still in flight must not write to a disposed controller.
     _generation++;
+    _arStaleTimer?.cancel();
     search.removeListener(notifyListeners);
     super.dispose();
   }

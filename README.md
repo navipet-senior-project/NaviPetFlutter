@@ -10,11 +10,17 @@ includes:
 - Mapbox destination autocomplete and walking directions.
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
-- Existing Pet, Checklist, and Account screens. After arrival, the map's AR
-  button can open Unity indoor AR. That needs a private library the project
-  maintainer who gave you access to this repository hands you; this repository
-  does not contain one. See
-  [Unity AR without installing Unity](#unity-ar-without-installing-unity).
+- Existing Pet, Checklist, and Account screens. On Android (and on iOS when a
+  prebuilt UnityFramework is present, see `docs/ios-testing.md`), the Scan AR
+  button appears during navigation to a place with indoor AR once a fresh
+  location fix is at or within 2 m of the building footprint, regardless of GPS
+  accuracy. It hides when the fix goes stale (10 s) or is clearly outside. It
+  loads the selected place and sends its backend door pose, plus a
+  short-lived MultiSet token fetched from the backend (`POST /indoor/ar-token`),
+  to Unity. The MultiSet secret never ships in the app. Rooms without a valid
+  indoor pose show an unavailable message with Retry; token failures show a
+  separate retry message.
+  Unity AR still requires verification on a physical phone.
 
 ## Project structure
 
@@ -348,13 +354,12 @@ copy. Do not commit that copy, and do not post it anywhere public.
 
 Without that private copy, follow [Run on Android](#run-on-android) or
 [Run on an iPhone](#run-on-an-iphone). Leave `android/unity-ar/` absent. The
-rest of the app still builds. On Android the arrival AR button then reports
-"AR is not included in this build." On the main branch at the time of writing, iOS never loads Unity: the
-same button reports "AR mode isn't available on this device."
+rest of the app still builds. Without the library, Scan AR reports that AR is
+unavailable on the device.
 
 ### Android
 
-The main branch at the time of writing already consumes a private Android library. Gradle in
+Gradle in
 `android/app/build.gradle.kts` turns Unity on only when
 `android/unity-ar/unityLibrary-release.aar` is a file. `android/.gitignore`
 ignores the whole `android/unity-ar/` directory.
@@ -370,38 +375,20 @@ ignores the whole `android/unity-ar/` directory.
    `arm64-v8a`.
 4. Build and install with the steps in [Physical Android phone](#physical-android-phone).
 
-On the main branch at the time of writing, the arrival AR button (`/ar`) opens that library with a fixed
-door pose. It does not send the selected room's door, and it does not fetch a
-MultiSet token. Those two behaviors, and the release-build keep rules in
-`android/app/proguard-unity.pro`, are in the still-open pull request
-[https://github.com/navipet-senior-project/NaviPetFlutter/pull/59](https://github.com/navipet-senior-project/NaviPetFlutter/pull/59).
-A debug `flutter run` on the main branch at the time of writing does not need that pull request. A
-release build that must keep the Unity classes does.
-
 ### iPhone
-
-The main branch at the time of writing has no iOS Unity embed and does not gitignore an iOS Unity
-framework. Do not add `ios/unity-ar/` or a `UnityFramework` until
-[https://github.com/navipet-senior-project/NaviPetFlutter/pull/59](https://github.com/navipet-senior-project/NaviPetFlutter/pull/59)
-is merged. Until then, boot the iPhone with [Run on an iPhone](#run-on-an-iphone)
-and expect AR to stay unavailable.
-
-After that pull request is merged, use these steps. They depend on that merge:
 
 1. Get `UnityFramework.framework` from the project maintainer who gave you access to this repository, in private.
 2. Copy it to `ios/unity-ar/UnityFramework.framework`.
-3. Copy `ios/UnityAr.xcconfig.template` (added by that pull request) to
+3. Copy `ios/UnityAr.xcconfig.template` to
    `ios/unity-ar/UnityAr.xcconfig`. That file is what turns the iOS Unity
    bridge on. Deleting `ios/unity-ar/UnityAr.xcconfig` turns it back off.
-4. The pull request gitignores `/ios/unity-ar/`. Confirm with
+4. Git ignores `/ios/unity-ar/`. Confirm with
    `git check-ignore -v ios/unity-ar/UnityFramework.framework` before you
    commit anything else. Do not commit the framework.
 5. Sign and run with [Physical iPhone](#physical-iphone). Use your free
    Personal Team. Do not commit a team id or a bundle-identifier change.
 
 That iOS bridge is not yet proven against a real `UnityFramework` on a phone.
-The Android path above is the one the main branch at the time of writing can boot.
-The notes about pull request 59 are removed or updated when that pull request merges.
 
 ## Navigation behavior
 
@@ -470,7 +457,7 @@ asset. No real keys are used in CI.
 | No iPhones or simulators are listed | Open Xcode, install an iOS runtime in **Xcode > Settings > Platforms**, then run `open -a Simulator` and `flutter devices`. |
 | Xcode reports a signing error | Select a development team under **Runner > Signing & Capabilities** and use a unique bundle identifier. Do not commit the team id or that bundle-identifier edit. |
 | Android says "AR is not included in this build." | No private `android/unity-ar/unityLibrary-release.aar` is present. The rest of the app still runs. See [Unity AR without installing Unity](#unity-ar-without-installing-unity). |
-| iPhone says "AR mode isn't available on this device." | The main branch at the time of writing has no iOS Unity embed. Boot without AR, or wait until [https://github.com/navipet-senior-project/NaviPetFlutter/pull/59](https://github.com/navipet-senior-project/NaviPetFlutter/pull/59) is merged and you have placed the private framework. |
+| iPhone says "AR mode isn't available on this device." | The private framework or its configuration is missing. See [Unity AR without installing Unity](#unity-ar-without-installing-unity). |
 | iOS reports resource-fork/Finder metadata errors | Move the repository out of an iCloud-synced Desktop or Documents folder, then run `flutter clean` and try again. |
 
 The Kotlin Gradle Plugin warning currently emitted by Mapbox/Flutter TTS is a
@@ -489,5 +476,5 @@ the pinned Flutter/Mapbox versions in this repository.
 
 - The Dart client lives in `packages/navipet_api` and is generated from `openapi/navipet-api.json` (the backend's OpenAPI spec).
 - Regenerate with `tool/generate_api_client.sh --fetch` to re-download the spec and regenerate. Requires Java and Node.js (`npx`).
-- Before generating, `tool/normalize_openapi.jq` collapses TypeBox literal unions (`anyOf` of single-value enums, `anyOf` with `null`) into plain enums and `nullable` fields, which the `dart` generator cannot model otherwise. The committed spec stays unmodified.
+- Before generating, `tool/normalize_openapi.jq` collapses TypeBox literal unions (`anyOf` of single-value enums, `anyOf` with `null`) into plain enums and `nullable` fields. It also converts homogeneous coordinate tuples into fixed-length arrays supported by the `dart` generator. The committed spec stays unmodified.
 - Never hand-edit generated files. Change the spec or the script instead, then regenerate.
