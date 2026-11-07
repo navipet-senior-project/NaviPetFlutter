@@ -39,6 +39,7 @@ class SearchHistoryStore {
           json['arrivalRadiusMeters'],
         ),
         footprint: validFootprint(json['footprint']),
+        entranceCoordinate: validCoordinate(json['entrance']),
       );
     }).toList();
   }
@@ -71,6 +72,11 @@ class SearchHistoryStore {
               if (item.isBuildingAlternative) 'isBuildingAlternative': true,
               if (item.arrivalRadiusMeters != null)
                 'arrivalRadiusMeters': item.arrivalRadiusMeters,
+              if (item.entranceCoordinate case final entrance?)
+                'entrance': {
+                  'latitude': entrance.latitude,
+                  'longitude': entrance.longitude,
+                },
               if (item.footprint != null)
                 'footprint': footprintToGeoJson(item.footprint!),
             }),

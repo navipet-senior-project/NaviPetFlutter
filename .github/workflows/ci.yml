@@ -20,6 +20,37 @@ env:
   FLUTTER_VERSION: 3.47.0
 
 jobs:
+  ios-static-checks:
+    name: ios-static-checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check plist syntax and permission descriptions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+
+          for path in Path('ios').rglob('*.plist'):
+              with path.open('rb') as file:
+                  plistlib.load(file)
+              print(f'Valid plist: {path}')
+
+          with Path('ios/Runner/Info.plist').open('rb') as file:
+              info = plistlib.load(file)
+          for key in ('NSLocationWhenInUseUsageDescription', 'NSMotionUsageDescription', 'NSPhotoLibraryUsageDescription'):
+              value = info.get(key)
+              if not isinstance(value, str) or not value.strip():
+                  raise SystemExit(f'Missing or empty usage description: {key}')
+              print(f'Present: {key}')
+          PY
+
+      - name: Check Podfile syntax
+        run: ruby -c ios/Podfile
+
   analyze-and-test:
     name: analyze-and-test
     runs-on: ubuntu-24.04

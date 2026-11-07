@@ -126,6 +126,19 @@ class PlacePreviewSheet extends StatelessWidget {
                 ],
               ),
             ],
+            if (state.destination case final destination?) ...[
+              const SizedBox(height: AppSpacing.sm),
+              if (destination.footprint == null)
+                const Text(
+                  'Building outline unavailable. Arrival uses the map marker.',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              if (destination.entranceCoordinate == null)
+                const Text(
+                  'Directions use the map marker. A verified entrance is unavailable.',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+            ],
             const SizedBox(height: AppSpacing.xl),
             SizedBox(
               height: 48,
