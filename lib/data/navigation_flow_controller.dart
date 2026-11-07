@@ -52,8 +52,9 @@ class NavigationFlowController extends ChangeNotifier {
     _arStaleTimer = null;
     final timestamp = reading?.timestamp;
     if (timestamp == null) return;
-    final remaining =
-        timestamp.add(ArrivalPolicy.maximumAge).difference(DateTime.now());
+    final remaining = timestamp
+        .add(ArrivalPolicy.maximumAge)
+        .difference(DateTime.now());
     if (remaining.isNegative) return;
     _arStaleTimer = Timer(remaining + const Duration(milliseconds: 50), () {
       _arStaleTimer = null;
