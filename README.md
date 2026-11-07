@@ -11,8 +11,11 @@ includes:
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
 - Existing Pet, Checklist, and Account screens. On Android (and on iOS when a
-  prebuilt UnityFramework is present, see `docs/ios-testing.md`), the arrival AR
-  button loads the selected place and sends its backend door pose, plus a
+  prebuilt UnityFramework is present, see `docs/ios-testing.md`), the Scan AR
+  button appears during navigation to a place with indoor AR once a fresh
+  location fix is at or within 2 m of the building footprint, regardless of GPS
+  accuracy. It hides when the fix goes stale (10 s) or is clearly outside. It
+  loads the selected place and sends its backend door pose, plus a
   short-lived MultiSet token fetched from the backend (`POST /indoor/ar-token`),
   to Unity. The MultiSet secret never ships in the app. Rooms without a valid
   indoor pose show an unavailable message with Retry; token failures show a
