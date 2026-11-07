@@ -17,7 +17,7 @@ fi
 
 # Generate from a normalized copy; the committed spec stays byte-identical to
 # what the backend serves. See tool/normalize_openapi.jq.
-normalized="$(mktemp -t navipet-openapi).json"
+normalized="$(mktemp -t navipet-openapi.XXXXXX).json"
 trap 'rm -f "${tmp:-}" "$normalized"' EXIT
 jq -f tool/normalize_openapi.jq "$SPEC" > "$normalized"
 

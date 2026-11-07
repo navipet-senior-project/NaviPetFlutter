@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
+import '../data/indoor_ar_token_gateway.dart';
+import '../data/navigation_flow_controller.dart';
 import '../screens/account_settings_screen.dart';
 import '../screens/change_email_screen.dart';
 import '../screens/checklist_screen.dart';
@@ -28,6 +31,7 @@ import '../screens/verify_email_screen.dart';
 GoRouter createAppRouter(
   AppState appState, {
   String? initialLocation,
+  IndoorArTokenGateway? indoorArTokenGateway,
 }) => GoRouter(
   initialLocation:
       initialLocation ?? (appState.isAuthenticated ? '/map' : '/signin'),
@@ -133,20 +137,19 @@ GoRouter createAppRouter(
     ),
     GoRoute(
       path: '/ar',
-      builder: (context, state) =>
-          IndoorArLaunchScreen(
-            launcher: AndroidIndoorArLauncher(),
-            request: state.extra is IndoorArRequest
-                ? state.extra as IndoorArRequest
-                : null,
-          ),
+      builder: (context, state) => IndoorArLaunchScreen(
+        launcher: NativeIndoorArLauncher(),
+        destinationId: state.uri.queryParameters['destination'],
+        gateway: context.read<NavigationFlowController>().searchGateway,
+        tokenGateway: indoorArTokenGateway,
+      ),
     ),
     // #41 transport spike; removed with the real launch screen (build step 3).
     if (kDebugMode)
       GoRoute(
         path: '/dev/indoor-ar-spike',
         builder: (context, state) =>
-            IndoorArSpikeScreen(launcher: AndroidIndoorArLauncher()),
+            IndoorArSpikeScreen(launcher: NativeIndoorArLauncher()),
       ),
   ],
 );

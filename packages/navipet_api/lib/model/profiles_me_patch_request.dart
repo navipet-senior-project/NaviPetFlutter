@@ -15,7 +15,7 @@ class ProfilesMePatchRequest {
   ProfilesMePatchRequest({
     this.displayName,
     this.role,
-    this.avatarUploadId,
+    this.avatar,
   });
 
   ///
@@ -28,14 +28,14 @@ class ProfilesMePatchRequest {
 
   ProfilesMePatchRequestRoleEnum? role;
 
-  /// The uploadId returned by POST /profiles/me/avatar. Supplying it commits that temporary avatar when the profile is saved.
+  /// Optional JPEG, PNG, or WebP file, up to 5 MB.
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  String? avatarUploadId;
+  MultipartFile? avatar;
 
   @override
   bool operator ==(Object other) =>
@@ -43,18 +43,18 @@ class ProfilesMePatchRequest {
       other is ProfilesMePatchRequest &&
           other.displayName == displayName &&
           other.role == role &&
-          other.avatarUploadId == avatarUploadId;
+          other.avatar == avatar;
 
   @override
   int get hashCode =>
       // ignore: unnecessary_parenthesis
       (displayName == null ? 0 : displayName!.hashCode) +
       (role == null ? 0 : role!.hashCode) +
-      (avatarUploadId == null ? 0 : avatarUploadId!.hashCode);
+      (avatar == null ? 0 : avatar!.hashCode);
 
   @override
   String toString() =>
-      'ProfilesMePatchRequest[displayName=$displayName, role=$role, avatarUploadId=$avatarUploadId]';
+      'ProfilesMePatchRequest[displayName=$displayName, role=$role, avatar=$avatar]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -68,10 +68,10 @@ class ProfilesMePatchRequest {
     } else {
       json[r'role'] = null;
     }
-    if (this.avatarUploadId != null) {
-      json[r'avatarUploadId'] = this.avatarUploadId;
+    if (this.avatar != null) {
+      json[r'avatar'] = this.avatar;
     } else {
-      json[r'avatarUploadId'] = null;
+      json[r'avatar'] = null;
     }
     return json;
   }
@@ -99,7 +99,7 @@ class ProfilesMePatchRequest {
       return ProfilesMePatchRequest(
         displayName: mapValueOfType<String>(json, r'displayName'),
         role: ProfilesMePatchRequestRoleEnum.fromJson(json[r'role']),
-        avatarUploadId: mapValueOfType<String>(json, r'avatarUploadId'),
+        avatar: null, // No support for decoding binary content from JSON
       );
     }
     return null;

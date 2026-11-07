@@ -3,24 +3,37 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../data/campus_search_gateway.dart';
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
-import 'indoor_ar_spike_screen.dart';
+import '../data/indoor_ar_token_gateway.dart';
 
-/// Asks for the camera, opens the Unity AR camera for a selected map door.
-/// Opened fresh by every AR tap, so every tap asks again.
+// VEC MVP coverage assumption; extend when additional coverage is established.
+const vecMvpCoveredFloors = <String>['1', '2'];
+
+/// Asks for the floor and camera, then opens Unity AR and returns to the map.
 class IndoorArLaunchScreen extends StatefulWidget {
   const IndoorArLaunchScreen({
     super.key,
     required this.launcher,
-    this.request,
+    required this.destinationId,
+    required this.gateway,
+    required this.tokenGateway,
+    this.suggestedFloor,
+    this.now = DateTime.now,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
     this.openSettings = openAppSettings,
   });
 
+  final String? suggestedFloor;
   final IndoorArLauncher launcher;
-  final IndoorArRequest? request;
+  final String? destinationId;
+  final CampusSearchGateway gateway;
+
+  /// Null when the app has no backend session to ask; AR is then unavailable.
+  final IndoorArTokenGateway? tokenGateway;
+  final DateTime Function() now;
   final Future<PermissionStatus> Function() cameraStatus;
   final Future<PermissionStatus> Function() requestCamera;
   final Future<bool> Function() openSettings;
@@ -35,6 +48,8 @@ class IndoorArLaunchScreen extends StatefulWidget {
 }
 
 class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
+  /// A token this close to expiry could lapse before Unity localises.
+  static const _tokenMargin = Duration(minutes: 1);
   static const _cameraOff =
       'Camera access is off. Turn it on in Settings to use AR directions.';
   static const _errorText = {
@@ -44,21 +59,66 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     'BAD_RESULT': 'AR returned an unreadable result.',
   };
 
+  IndoorArRequest? _request;
+  var _unavailable = false;
+  var _tokenFailed = false;
   var _rationale = false;
   var _blocked = false;
+  var _choosingFloor = false;
+  String? _currentFloor;
 
   @override
   void initState() {
     super.initState();
+    if (vecMvpCoveredFloors.contains(widget.suggestedFloor)) {
+      _currentFloor = widget.suggestedFloor;
+    }
     // After the first frame: leaving pops the route, which initState cannot do.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
   Future<void> _start() async {
-    if (defaultTargetPlatform != TargetPlatform.android) {
+    if (!mounted) return;
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
       _leave("AR mode isn't available on this device.");
       return;
     }
+    setState(() {
+      _unavailable = false;
+      _tokenFailed = false;
+    });
+    try {
+      final id = widget.destinationId;
+      if (id == null || id.trim().isEmpty) {
+        setState(() => _unavailable = true);
+        return;
+      }
+      final place = await widget.gateway.place(id);
+      if (!mounted) return;
+      final indoor = place.indoor;
+      if (indoor == null) {
+        setState(() => _unavailable = true);
+        return;
+      }
+      _request = IndoorArRequest(
+        room: place.roomNumber ?? place.title,
+        doorKey: indoor.doorKey,
+        floor: indoor.floor,
+        position: indoor.position,
+        headingDeg: indoor.headingDeg,
+        mapCode: indoor.mapCode,
+        frame: indoor.frame,
+      );
+    } catch (_) {
+      if (mounted) setState(() => _unavailable = true);
+      return;
+    }
+    setState(() => _choosingFloor = true);
+  }
+
+  Future<void> _confirmFloor() async {
+    setState(() => _choosingFloor = false);
     try {
       final camera = await widget.cameraStatus();
       if (!mounted) return;
@@ -90,9 +150,40 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _launch() async {
-    // The fixed door remains only for the debug route and older callers.
-    final request = widget.request ?? IndoorArSpikeScreen.vec119;
-    final result = await widget.launcher.launch(request);
+    // Minted now, after the camera step, so it is as fresh as possible and a
+    // refused permission never spends one of the 5-per-minute requests.
+    final IndoorArToken token;
+    try {
+      final gateway = widget.tokenGateway;
+      if (gateway == null) throw const IndoorArTokenException(0);
+      token = await gateway.fetch();
+      if (!token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
+        throw const IndoorArTokenException(0);
+      }
+    } on IndoorArTokenException {
+      if (mounted) {
+        setState(() {
+          _unavailable = true;
+          _tokenFailed = true;
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
+    final request = _request!;
+    final result = await widget.launcher.launch(
+      IndoorArRequest(
+        room: request.room,
+        doorKey: request.doorKey,
+        floor: request.floor,
+        position: request.position,
+        headingDeg: request.headingDeg,
+        mapCode: request.mapCode,
+        frame: request.frame,
+        currentFloor: _currentFloor,
+        arToken: token,
+      ),
+    );
     if (!mounted) return;
     _leave(_resultText(result));
   }
@@ -130,11 +221,21 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: _blocked || _rationale
+    appBar: _blocked || _rationale || _unavailable || _choosingFloor
         ? AppBar(title: const Text('AR mode'))
         : null,
     body: Center(
-      child: _blocked
+      child: _unavailable
+          ? _message(
+              _tokenFailed
+                  ? "Couldn't start AR. Check your connection and try again."
+                  : "Indoor AR isn't available for this room",
+              action: 'Retry',
+              onAction: _start,
+              back: 'Back to map',
+              onBack: () => _leave(null),
+            )
+          : _blocked
           ? _message(
               _cameraOff,
               action: 'Open settings',
@@ -150,6 +251,37 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
               back: 'Not now',
               onBack: () => _leave(
                 'AR needs camera access. Tap the AR button to try again.',
+              ),
+            )
+          : _choosingFloor
+          ? Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Which floor are you on?'),
+                  RadioGroup<String>(
+                    groupValue: _currentFloor,
+                    onChanged: (value) => setState(() => _currentFloor = value),
+                    child: Column(
+                      children: [
+                        for (final floor in vecMvpCoveredFloors)
+                          RadioListTile<String>(
+                            title: Text('Floor $floor'),
+                            value: floor,
+                          ),
+                      ],
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: _currentFloor == null ? null : _confirmFloor,
+                    child: const Text('Start AR'),
+                  ),
+                  TextButton(
+                    onPressed: () => _leave(null),
+                    child: const Text('Back to map'),
+                  ),
+                ],
               ),
             )
           : const CircularProgressIndicator(),

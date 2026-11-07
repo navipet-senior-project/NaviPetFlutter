@@ -1,5 +1,7 @@
+import 'indoor_door_pose.dart';
 import 'navigation_models.dart';
 
+export 'indoor_door_pose.dart';
 export 'navigation_models.dart' show CampusDestinationType;
 
 enum CampusSearchFailure { offline, api, unauthorized }
@@ -34,7 +36,9 @@ class CampusPlace {
     this.outdoorDestination,
     this.arrivalRadiusMeters,
     this.footprint,
+    this.entranceCoordinate,
     this.indoorDestinationId,
+    this.indoor,
     this.external = false,
     this.attribution,
     this.distanceMeters,
@@ -69,9 +73,11 @@ class CampusPlace {
         navigationJson['arrivalRadiusMeters'],
       ),
       footprint: validFootprint(navigationJson['footprint']),
+      entranceCoordinate: validCoordinate(navigationJson['entrance']),
       indoorDestinationId: _optionalString(
         navigationJson['indoorDestinationId'],
       ),
+      indoor: IndoorDoorPose.tryParse(json['indoor']),
       external: json['external'] == true,
       attribution: _optionalString(json['attribution']),
       distanceMeters: (json['distanceMeters'] as num?)?.round(),
@@ -93,8 +99,10 @@ class CampusPlace {
   final int? arrivalRadiusMeters;
 
   /// Building outline from the server; null when absent or malformed.
-  final List<NavigationCoordinate>? footprint;
+  final BuildingFootprint? footprint;
+  final NavigationCoordinate? entranceCoordinate;
   final String? indoorDestinationId;
+  final IndoorDoorPose? indoor;
   final bool external;
   final String? attribution;
   final int? distanceMeters;
@@ -139,6 +147,7 @@ class CampusPlace {
       isBuildingAlternative: isBuildingAlternative,
       arrivalRadiusMeters: arrivalRadiusMeters,
       footprint: footprint,
+      entranceCoordinate: entranceCoordinate,
     );
   }
 

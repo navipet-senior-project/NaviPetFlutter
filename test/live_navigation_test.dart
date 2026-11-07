@@ -68,8 +68,8 @@ Future<NavigationFlowController> startGuidance({
   final controller = harness.build(routes: gateway, map: map)..openSearch();
   await controller.selectPlace(harness.horn);
   await controller.requestDirections();
-  await controller.calculateRoute();
-  await controller.startRoute();
+  await controller.calculateRoute(continueWithUncertain: true);
+  await controller.startRoute(continueWithUncertain: true);
   return controller;
 }
 
@@ -152,59 +152,24 @@ void main() {
     expect(gateway.calls, 2);
   });
 
-  test('one accurate arrival fix shows the trip summary', () async {
-    final gateway = harness.FakeRouteGateway()..result = farRoute();
-    final map = harness.RecordingMap();
-    final controller = await startGuidance(gateway: gateway, map: map);
-    await controller.onLiveLocation(farMiddle, accuracyMeters: 5);
-    final nearDestination = NavigationCoordinate(
-      latitude: end.latitude + 0.0005,
-      longitude: end.longitude,
-    );
-    await controller.onLiveLocation(nearDestination, accuracyMeters: 5);
-    final arrived = controller.state as FlowArrived;
-    expect(arrived.destination.name, 'Horn Center');
-    expect(arrived.summary.distanceMeters, greaterThan(0));
-    expect(map.calls.last, 'clear');
-    await controller.dismissArrival();
-    expect(controller.state, isA<FlowIdle>());
-  });
-
-  test('one inaccurate fix does not end guidance', () async {
-    final gateway = harness.FakeRouteGateway()..result = farRoute();
-    final controller = await startGuidance(gateway: gateway);
-    await controller.onLiveLocation(farMiddle, accuracyMeters: 5);
-    final nearDestination = NavigationCoordinate(
-      latitude: end.latitude + 0.0005,
-      longitude: end.longitude,
-    );
-    await controller.onLiveLocation(nearDestination, accuracyMeters: 40);
-    expect(controller.state, isA<FlowActiveNavigation>());
-    await controller.onLiveLocation(end, accuracyMeters: 5);
-    expect(controller.state, isA<FlowArrived>());
-  });
-
-  test('navigation ends within 200 ft after one accurate fix', () async {
-    final gateway = harness.FakeRouteGateway()..result = route();
-    final controller = await startGuidance(gateway: gateway);
-    final outsideRadius = NavigationCoordinate(
-      latitude: end.latitude + 0.001,
-      longitude: end.longitude,
-    );
-    final insideRadius = NavigationCoordinate(
-      latitude: end.latitude + 0.0005,
-      longitude: end.longitude,
-    );
-
-    expect(distanceMeters(end, outsideRadius), greaterThan(200 * 0.3048));
-    expect(distanceMeters(end, insideRadius), lessThan(200 * 0.3048));
-
-    await controller.onLiveLocation(outsideRadius, accuracyMeters: 5);
-    expect(controller.state, isA<FlowActiveNavigation>());
-
-    await controller.onLiveLocation(insideRadius, accuracyMeters: 5);
-    expect(controller.state, isA<FlowArrived>());
-  });
+  test(
+    'point-only destination arrives on accurate fixes at the marker',
+    () async {
+      final gateway = harness.FakeRouteGateway()..result = farRoute();
+      final controller = await startGuidance(gateway: gateway);
+      await controller.onLiveLocation(
+        end,
+        accuracyMeters: 5,
+        timestamp: DateTime.now(),
+      );
+      await controller.onLiveLocation(
+        end,
+        accuracyMeters: 5,
+        timestamp: DateTime.now(),
+      );
+      expect(controller.state, isA<FlowArrived>());
+    },
+  );
 
   test('late reroute cannot restore a manually ended trip', () async {
     final gateway = harness.FakeRouteGateway()..result = route();
