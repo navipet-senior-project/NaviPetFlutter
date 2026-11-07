@@ -43,7 +43,24 @@ class NavigationFlowController extends ChangeNotifier {
   final DestinationPresenceTracker _presence = DestinationPresenceTracker();
   int? _presenceCheckGeneration;
   bool _awaitingPresenceChoice = false;
-  LocationReading? _arLocation;
+  LocationReading? _arLocationValue;
+  Timer? _arStaleTimer;
+  LocationReading? get _arLocation => _arLocationValue;
+  set _arLocation(LocationReading? reading) {
+    _arLocationValue = reading;
+    _arStaleTimer?.cancel();
+    _arStaleTimer = null;
+    final timestamp = reading?.timestamp;
+    if (timestamp == null) return;
+    final remaining =
+        timestamp.add(ArrivalPolicy.maximumAge).difference(DateTime.now());
+    if (remaining.isNegative) return;
+    _arStaleTimer = Timer(remaining + const Duration(milliseconds: 50), () {
+      _arStaleTimer = null;
+      notifyListeners();
+    });
+  }
+
   bool get canScanAr {
     final destination = _destination;
     final reading = _arLocation;
@@ -1305,6 +1322,7 @@ class NavigationFlowController extends ChangeNotifier {
   void dispose() {
     // A reroute still in flight must not write to a disposed controller.
     _generation++;
+    _arStaleTimer?.cancel();
     search.removeListener(notifyListeners);
     super.dispose();
   }

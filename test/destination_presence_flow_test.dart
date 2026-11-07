@@ -102,6 +102,27 @@ void main() {
     );
     expect(controller.canScanAr, isFalse);
   });
+  test('Scan AR hides and notifies when the last fix goes stale', () async {
+    final (controller, location, _) = await configure(room: true);
+    location.reading = reading(outside);
+    await controller.calculateRoute();
+    await controller.startRoute();
+    var notified = 0;
+    controller.addListener(() => notified++);
+    final fix = DateTime.now().subtract(
+      ArrivalPolicy.maximumAge - const Duration(milliseconds: 100),
+    );
+    await controller.onLiveLocation(
+      harness.hornCoordinate,
+      accuracyMeters: 35,
+      timestamp: fix,
+    );
+    expect(controller.canScanAr, isTrue);
+    final before = notified;
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(notified, greaterThan(before));
+    expect(controller.canScanAr, isFalse);
+  });
   test('outside follows walking preview and navigation', () async {
     final (controller, location, routes) = await configure();
     location.reading = reading(outside);
