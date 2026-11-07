@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-/// Bridge contract v2 between the app and the Unity AR runtime.
+/// Bridge contract v1 between the app and the Unity AR runtime.
 ///
 /// Every pose is in the MultiSet MapSet frame (left-handed, +Y up, metres,
 /// origin at the Floor 1 2 map root), the same frame as the backend's door
@@ -15,23 +15,6 @@ class IndoorArVector3 {
   Map<String, Object?> toJson() => {'x': x, 'y': y, 'z': z};
 }
 
-/// A short-lived MultiSet token the backend minted for one AR session. Held in
-/// memory only; [toString] hides the secret so it cannot reach a log by accident.
-class IndoorArToken {
-  const IndoorArToken({required this.token, required this.expiresOn});
-
-  final String token;
-  final DateTime expiresOn;
-
-  Map<String, Object?> toJson() => {
-    'token': token,
-    'expiresOn': expiresOn.toUtc().toIso8601String(),
-  };
-
-  @override
-  String toString() => 'IndoorArToken(expiresOn: $expiresOn)';
-}
-
 /// One AR session's destination: a single door.
 class IndoorArRequest {
   IndoorArRequest({
@@ -42,7 +25,6 @@ class IndoorArRequest {
     required this.headingDeg,
     required this.mapCode,
     required this.frame,
-    this.arToken,
   }) {
     if (doorKey.isEmpty || floor.isEmpty || mapCode.isEmpty) {
       throw ArgumentError('doorKey, floor and mapCode must not be empty');
@@ -60,7 +42,7 @@ class IndoorArRequest {
     }
   }
 
-  static const schemaVersion = 2;
+  static const schemaVersion = 1;
 
   final String room;
   final String doorKey;
@@ -69,21 +51,6 @@ class IndoorArRequest {
   final double headingDeg;
   final String mapCode;
   final String frame;
-
-  /// Set on every real launch (v2). Null only for debug launches that need no
-  /// localisation, such as the transport spike.
-  final IndoorArToken? arToken;
-
-  IndoorArRequest withArToken(IndoorArToken token) => IndoorArRequest(
-    room: room,
-    doorKey: doorKey,
-    floor: floor,
-    position: position,
-    headingDeg: headingDeg,
-    mapCode: mapCode,
-    frame: frame,
-    arToken: token,
-  );
 
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
@@ -94,7 +61,6 @@ class IndoorArRequest {
     'headingDeg': headingDeg,
     'mapCode': mapCode,
     'frame': frame,
-    if (arToken != null) 'arToken': arToken!.toJson(),
   };
 }
 

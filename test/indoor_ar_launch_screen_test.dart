@@ -1,21 +1,11 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'package:navipet/data/auth_token_provider.dart';
-import 'package:navipet/data/campus_search_gateway.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:navipet/data/indoor_ar_contract.dart';
 import 'package:navipet/data/indoor_ar_launcher.dart';
-import 'package:navipet/data/indoor_ar_token_gateway.dart';
 import 'package:navipet/screens/indoor_ar_launch_screen.dart';
-
-import 'support/indoor_ar_fixtures.dart';
-
+import 'package:navipet/screens/indoor_ar_spike_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 const _rationale =
@@ -42,21 +32,6 @@ class _ThrowingLauncher implements IndoorArLauncher {
       Future.error(StateError('launch failed'));
 }
 
-class _Session implements AuthTokenProvider {
-  var refreshes = 0;
-
-  @override
-  Future<String?> token({bool forceRefresh = false}) async {
-    if (forceRefresh) refreshes++;
-    return forceRefresh ? 'session-2' : 'session-1';
-  }
-}
-
-final _mintedBody = jsonEncode({
-  'token': 'test-token',
-  'expiresOn': '2026-01-01T00:30:00.000Z',
-});
-
 /// The map stands in as a page with an AR tap target, so each tap opens the
 /// screen fresh, as it does in the app.
 class _Harness {
@@ -65,9 +40,6 @@ class _Harness {
     this.status = PermissionStatus.denied,
     this.camera = PermissionStatus.granted,
     IndoorArLauncher? launcher,
-    String? destinationId = _destinationId,
-    Future<http.Response> Function(http.Request)? fetch,
-    Future<http.Response> Function(http.Request)? mint,
   }) : fake = FakeIndoorArLauncher(result: result) {
     final activeLauncher = launcher ?? fake;
     router = GoRouter(
@@ -77,12 +49,7 @@ class _Harness {
           path: '/map',
           builder: (context, state) => Scaffold(
             body: TextButton(
-              onPressed: () => context.push(
-                Uri(
-                  path: '/ar',
-                  queryParameters: {'destination': ?destinationId},
-                ).toString(),
-              ),
+              onPressed: () => context.push('/ar'),
               child: const Text('map'),
             ),
           ),
@@ -91,27 +58,6 @@ class _Harness {
           path: '/ar',
           builder: (context, state) => IndoorArLaunchScreen(
             launcher: activeLauncher,
-            destinationId: state.uri.queryParameters['destination'],
-            gateway: HttpCampusSearchGateway(
-              baseUrl: 'https://example.test',
-              client: MockClient((request) async {
-                fetchedIds.add(request.url.pathSegments.last);
-                return fetch != null
-                    ? await fetch(request)
-                    : http.Response(_fixture, 200);
-              }),
-            ),
-            tokenGateway: HttpIndoorArTokenGateway(
-              baseUrl: 'https://example.test',
-              auth: session,
-              client: MockClient((request) async {
-                mintRequests.add(request);
-                return mint != null
-                    ? await mint(request)
-                    : http.Response(_mintedBody, 200);
-              }),
-            ),
-            now: () => DateTime.utc(2026, 1, 1),
             cameraStatus: () async {
               statusChecks++;
               return status;
@@ -130,9 +76,6 @@ class _Harness {
     );
   }
 
-  final fetchedIds = <String>[];
-  final mintRequests = <http.Request>[];
-  final session = _Session();
   final FakeIndoorArLauncher fake;
   late final GoRouter router;
   PermissionStatus status;
@@ -158,223 +101,17 @@ class _Harness {
   }
 }
 
-const _destinationId = '00000000-0000-4000-8000-000000000119';
-final _fixture = File('test/fixtures/vec119_place.json').readAsStringSync();
-
 void main() {
-  testWidgets('selected destination uses fetched pose, never the spike door', (
-    tester,
-  ) async {
-    final json = jsonDecode(_fixture) as Map<String, dynamic>;
-    final place = json['place'] as Map<String, dynamic>;
-    place['id'] = 'another-room';
-    place['roomNumber'] = '120';
-    place['indoor'] = {
-      'mapCode': 'another-map',
-      'frame': 'multiset-mapset',
-      'doorKey': 'VEC120',
-      'floor': '2',
-      'position': {'x': 1, 'y': 2, 'z': 3},
-      'headingDeg': 90,
-    };
-    final harness = _Harness(
-      status: PermissionStatus.granted,
-      destinationId: 'another-room',
-      fetch: (_) async => http.Response(jsonEncode(json), 200),
-    );
-    await harness.pump(tester);
-    await harness.tapAr(tester);
-    expect(harness.fetchedIds, ['another-room']);
-    expect(harness.fake.requests.single.toJson(), {
-      'schemaVersion': 2,
-      'room': '120',
-      'mapCode': 'another-map',
-      'frame': 'multiset-mapset',
-      'doorKey': 'VEC120',
-      'floor': '2',
-      'position': {'x': 1.0, 'y': 2.0, 'z': 3.0},
-      'headingDeg': 90.0,
-      'arToken': {
-        'token': 'test-token',
-        'expiresOn': '2026-01-01T00:30:00.000Z',
-      },
-    });
-  });
-
-  for (final failure in [
-    'missing indoor',
-    'fetch failure',
-    'malformed indoor',
-  ]) {
-    testWidgets(
-      '$failure offers retry without launching or asking for camera',
-      (tester) async {
-        var attempts = 0;
-        final harness = _Harness(
-          status: PermissionStatus.granted,
-          fetch: (_) async {
-            if (++attempts > 1) return http.Response(_fixture, 200);
-            if (failure == 'fetch failure') {
-              throw const SocketException('offline');
-            }
-            final json = jsonDecode(_fixture) as Map<String, dynamic>;
-            final place = json['place'] as Map<String, dynamic>;
-            place['indoor'] = failure == 'missing indoor'
-                ? null
-                : {'doorKey': 'broken'};
-            return http.Response(jsonEncode(json), 200);
-          },
-        );
-        await harness.pump(tester);
-        await harness.tapAr(tester);
-        expect(
-          find.text("Indoor AR isn't available for this room"),
-          findsOneWidget,
-        );
-        expect(harness.fake.requests, isEmpty);
-        expect(harness.statusChecks, 0);
-        await tester.tap(find.text('Retry'));
-        await tester.pumpAndSettle();
-        expect(harness.fetchedIds, [_destinationId, _destinationId]);
-        expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
-        expect(find.text('map'), findsOneWidget);
-      },
-    );
-  }
-
-  testWidgets('missing destination never fetches or launches', (tester) async {
-    final harness = _Harness(destinationId: null);
-    await harness.pump(tester);
-    await harness.tapAr(tester);
-    expect(
-      find.text("Indoor AR isn't available for this room"),
-      findsOneWidget,
-    );
-    expect(harness.fetchedIds, isEmpty);
-    expect(harness.fake.requests, isEmpty);
-    await tester.tap(find.text('Back to map'));
-    await tester.pumpAndSettle();
-    expect(find.text('map'), findsOneWidget);
-  });
-
   testWidgets('a granted camera launches straight away', (tester) async {
     final harness = _Harness(status: PermissionStatus.granted);
     await harness.pump(tester);
     await harness.tapAr(tester);
 
     expect(harness.cameraRequests, 0);
-    expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
+    expect(harness.fake.requests, [IndoorArSpikeScreen.vec119]);
     expect(find.text('map'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
   });
-
-  testWidgets('mints one token over authenticated POST and hands it to Unity', (
-    tester,
-  ) async {
-    final harness = _Harness(status: PermissionStatus.granted);
-    await harness.pump(tester);
-    await harness.tapAr(tester);
-
-    final mint = harness.mintRequests.single;
-    expect(mint.method, 'POST');
-    expect(mint.url.toString(), 'https://example.test/indoor/ar-token');
-    expect(mint.headers['Authorization'], 'Bearer session-1');
-    expect(harness.fake.requests.single.arToken?.token, 'test-token');
-  });
-
-  testWidgets('a refused camera never spends a token request', (tester) async {
-    final harness = _Harness(camera: PermissionStatus.denied);
-    await harness.pump(tester);
-    await harness.tapArAndContinue(tester);
-
-    expect(harness.mintRequests, isEmpty);
-  });
-
-  testWidgets('one 401 refreshes the session and retries once', (tester) async {
-    var calls = 0;
-    final harness = _Harness(
-      status: PermissionStatus.granted,
-      mint: (_) async => ++calls == 1
-          ? http.Response('', 401)
-          : http.Response(_mintedBody, 200),
-    );
-    await harness.pump(tester);
-    await harness.tapAr(tester);
-
-    expect(harness.session.refreshes, 1);
-    expect(
-      harness.mintRequests.last.headers['Authorization'],
-      'Bearer session-2',
-    );
-    expect(harness.fake.requests, hasLength(1));
-  });
-
-  // The 401 case fails twice per fetch: the original call and its one refresh.
-  for (final (name, failures, mint)
-      in <(String, int, Future<http.Response> Function(http.Request))>[
-        ('401', 2, (_) async => http.Response('', 401)),
-        ('429', 1, (_) async => http.Response('', 429)),
-        (
-          '503',
-          1,
-          (_) async =>
-              http.Response('{"error":{"code":"INDOOR_AR_UNAVAILABLE"}}', 503),
-        ),
-        (
-          'network failure',
-          1,
-          (_) async => throw const SocketException('offline'),
-        ),
-        ('malformed body', 1, (_) async => http.Response('{"token":""}', 200)),
-        (
-          'expired token',
-          1,
-          (_) async => http.Response(
-            jsonEncode({
-              'token': 'test-token',
-              'expiresOn': '2025-12-31T23:59:00.000Z',
-            }),
-            200,
-          ),
-        ),
-        (
-          'token about to expire',
-          1,
-          (_) async => http.Response(
-            jsonEncode({
-              'token': 'test-token',
-              'expiresOn': '2026-01-01T00:00:30.000Z',
-            }),
-            200,
-          ),
-        ),
-      ]) {
-    testWidgets('token $name shows a retryable state and never launches', (
-      tester,
-    ) async {
-      var attempts = 0;
-      final harness = _Harness(
-        status: PermissionStatus.granted,
-        mint: (request) async => ++attempts > failures
-            ? http.Response(_mintedBody, 200)
-            : mint(request),
-      );
-      await harness.pump(tester);
-      await harness.tapAr(tester);
-
-      expect(
-        find.text("Couldn't start AR. Check your connection and try again."),
-        findsOneWidget,
-      );
-      expect(harness.fake.requests, isEmpty);
-      expect(find.text('map'), findsNothing);
-
-      await tester.tap(find.text('Retry'));
-      await tester.pumpAndSettle();
-      expect(harness.fake.requests.single.arToken?.token, 'test-token');
-      expect(find.text('map'), findsOneWidget);
-    });
-  }
 
   testWidgets('the rationale shows before the system prompt', (tester) async {
     final harness = _Harness();
@@ -412,7 +149,7 @@ void main() {
     await harness.tapArAndContinue(tester);
 
     expect(harness.cameraRequests, 1);
-    expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
+    expect(harness.fake.requests, [IndoorArSpikeScreen.vec119]);
     expect(find.text('map'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
   });
@@ -552,21 +289,8 @@ void main() {
     expect(find.text('map'), findsOneWidget);
   });
 
-  testWidgets('on iOS it checks the camera and launches', (tester) async {
+  testWidgets('off Android it does not check the camera', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    final harness = _Harness(status: PermissionStatus.granted);
-    await harness.pump(tester);
-    await harness.tapAr(tester);
-
-    expect(harness.statusChecks, 1);
-    expect(harness.fake.requests, hasLength(1));
-    debugDefaultTargetPlatformOverride = null;
-  });
-
-  testWidgets('on other platforms it does not check the camera', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final harness = _Harness();
     await harness.pump(tester);
     await harness.tapAr(tester);

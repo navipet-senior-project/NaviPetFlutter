@@ -66,6 +66,3 @@ app.*.map.json
 Thumbs.db
 # Widget Preview related
 .widget_preview/
-
-# Prebuilt Unity AR framework for iOS (see docs/ios-testing.md)
-/ios/unity-ar/
