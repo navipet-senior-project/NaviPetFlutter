@@ -1,4 +1,10 @@
 /// A floor hint only. The caller must still ask the user to confirm the floor.
+///
+/// Not consumed yet. Follow-ups, after the parallel floor prompt PR lands:
+/// feed the suggested floor into the prompt, and call [FloorPrior.confirmFloor]
+/// and [FloorPrior.trackingLost] from the indoor AR flow.
+/// Barometer is deferred; its thresholds are unverified on real devices and
+/// need a phone test before anything relies on them.
 enum FloorPriorConfidence { confirmed, tracked }
 
 class FloorSuggestion {
