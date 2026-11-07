@@ -174,7 +174,7 @@ void main() {
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
 
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
     final state = controller.state as FlowRoutePreview;
     expect(state.plan.selected.durationSeconds, 180);
@@ -187,7 +187,7 @@ void main() {
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
 
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
     final state = controller.state as FlowError;
     expect(state.retryable, isTrue);
@@ -199,7 +199,7 @@ void main() {
     final controller = harness.build(routes: routes)..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
     routes.error = null;
     await controller.retry();
@@ -213,7 +213,7 @@ void main() {
     final controller = harness.build(routes: routes)..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
     await controller.setMode(TravelMode.walking);
 
@@ -225,7 +225,7 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
     final plan = (controller.state as FlowRoutePreview).plan;
 
     controller.showSteps();
@@ -240,9 +240,9 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
-    await controller.startRoute();
+    await controller.startRoute(continueWithUncertain: true);
     expect(controller.state, isA<FlowActiveNavigation>());
   });
 
@@ -251,8 +251,8 @@ void main() {
     final controller = harness.build(map: map)..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
-    await controller.startRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
+    await controller.startRoute(continueWithUncertain: true);
 
     await controller.endRoute();
 
@@ -276,9 +276,9 @@ void main() {
         ),
       ),
     );
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
-    await controller.startRoute();
+    await controller.startRoute(continueWithUncertain: true);
 
     expect(controller.state, isA<FlowRoutePreview>());
   });
@@ -289,7 +289,7 @@ void main() {
       final controller = harness.build()..openSearch();
       await controller.selectPlace(harness.horn);
       await controller.requestDirections();
-      final pending = controller.calculateRoute();
+      final pending = controller.calculateRoute(continueWithUncertain: true);
       await controller.selectPlace(harness.unmapped);
       await pending;
 
@@ -301,8 +301,8 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
-    await controller.startRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
+    await controller.startRoute(continueWithUncertain: true);
 
     expect(controller.state, isNot(isA<FlowIndoorHandoff>()));
   });
@@ -335,7 +335,7 @@ void main() {
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
 
-    final pending = controller.calculateRoute();
+    final pending = controller.calculateRoute(continueWithUncertain: true);
     await controller.selectPlace(harness.unmapped);
     routes.unblock();
     await pending;
@@ -352,7 +352,7 @@ void main() {
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
 
-    final pending = controller.calculateRoute();
+    final pending = controller.calculateRoute(continueWithUncertain: true);
     await controller.selectPlace(harness.unmapped);
     routes.unblock();
     await pending;
@@ -420,7 +420,7 @@ void main() {
     final controller = harness.build(map: map)..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
     map.calls.clear();
 
     controller.back();
@@ -437,7 +437,7 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
     final plan = (controller.state as FlowRoutePreview).plan;
     controller.showSteps();
 
@@ -451,8 +451,8 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
-    await controller.startRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
+    await controller.startRoute(continueWithUncertain: true);
 
     controller.back();
 
@@ -464,7 +464,7 @@ void main() {
     final controller = harness.build(routes: routes)..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
     await controller.setMode(TravelMode.accessible);
 
@@ -564,7 +564,7 @@ void main() {
     final controller = harness.build(map: map)..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
     map.calls.clear();
     map.blockShowPlace();
@@ -579,7 +579,7 @@ void main() {
     // the real bug where a slow-but-earlier map call overwrites a
     // fast-but-later one.
     await controller.requestDirections();
-    final calculating = controller.calculateRoute();
+    final calculating = controller.calculateRoute(continueWithUncertain: true);
 
     // showRoute must not have run yet: it is queued behind the blocked
     // showPlace, not racing it.
@@ -616,7 +616,7 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
     final newMap = harness.RecordingMap();
     await controller.attachMap(newMap);
@@ -628,7 +628,7 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
     controller.showSteps();
 
     final newMap = harness.RecordingMap();
@@ -641,8 +641,8 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
-    await controller.startRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
+    await controller.startRoute(continueWithUncertain: true);
 
     final newMap = harness.RecordingMap();
     await controller.attachMap(newMap);
@@ -676,7 +676,7 @@ void main() {
       final controller = harness.build(map: map)..openSearch();
       await controller.selectPlace(harness.horn);
       await controller.requestDirections();
-      await controller.calculateRoute();
+      await controller.calculateRoute(continueWithUncertain: true);
       map.calls.clear();
 
       controller.detachMap();
@@ -697,7 +697,7 @@ void main() {
       final controller = harness.build(map: oldMap)..openSearch();
       await controller.selectPlace(harness.horn);
       await controller.requestDirections();
-      await controller.calculateRoute();
+      await controller.calculateRoute(continueWithUncertain: true);
       oldMap.calls.clear();
       controller.detachMap();
 
@@ -720,7 +720,7 @@ void main() {
     final controller = harness.build(map: map)..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
     map.calls.clear();
 
     controller.resetForNewIdentity();
@@ -761,7 +761,7 @@ void main() {
       final controller = harness.build(routes: routes)..openSearch();
       await controller.selectPlace(harness.horn);
       await controller.requestDirections();
-      final pending = controller.calculateRoute();
+      final pending = controller.calculateRoute(continueWithUncertain: true);
 
       controller.resetForNewIdentity();
       routes.unblock();
@@ -777,7 +777,7 @@ void main() {
     final controller = harness.build()..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
 
     await controller.handleAppResumed();
 
@@ -803,8 +803,8 @@ void main() {
     final controller = harness.build(location: location)..openSearch();
     await controller.selectPlace(harness.horn);
     await controller.requestDirections();
-    await controller.calculateRoute();
-    await controller.startRoute();
+    await controller.calculateRoute(continueWithUncertain: true);
+    await controller.startRoute(continueWithUncertain: true);
 
     location.reading = const LocationReading(
       availability: LocationAvailability.unavailable,
@@ -841,8 +841,8 @@ void main() {
       final controller = harness.build(location: location)..openSearch();
       await controller.selectPlace(harness.horn);
       await controller.requestDirections();
-      await controller.calculateRoute();
-      await controller.startRoute();
+      await controller.calculateRoute(continueWithUncertain: true);
+      await controller.startRoute(continueWithUncertain: true);
 
       location.reading = const LocationReading(
         availability: LocationAvailability.approximate,

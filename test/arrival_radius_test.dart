@@ -53,8 +53,8 @@ Future<NavigationFlowController> _guide({
     ..openSearch();
   await controller.selectPlace(place);
   await controller.requestDirections();
-  await controller.calculateRoute();
-  await controller.startRoute();
+  await controller.calculateRoute(continueWithUncertain: true);
+  await controller.startRoute(continueWithUncertain: true);
   return controller;
 }
 
@@ -65,72 +65,48 @@ Future<void> _fix(
 }) => controller.onLiveLocation(_north(meters), accuracyMeters: accuracy);
 
 void main() {
-  group('arrival radius', () {
-    test(
-      'the default 200 ft radius ends guidance on one accurate fix',
-      () async {
-        final controller = await _guide();
-
-        expect(_arrivalRadiusMeters, closeTo(60.96, 0.01));
-        await _fix(controller, 62);
-        expect(controller.state, isA<FlowActiveNavigation>());
-
-        await _fix(controller, 60);
-        expect(controller.state, isA<FlowArrived>());
-      },
-    );
-
-    test('a smaller server radius cannot shrink the 200 ft minimum', () async {
-      final controller = await _guide(radius: 25);
-      await _fix(controller, 62);
-      expect(controller.state, isA<FlowActiveNavigation>());
-      await _fix(controller, 60);
-      expect(controller.state, isA<FlowArrived>());
-    });
-
-    test('GPS accuracy must be 20 m or better', () async {
-      final controller = await _guide(radius: 50);
-      await _fix(controller, 50, accuracy: 21);
-      expect(controller.state, isA<FlowActiveNavigation>());
-      await _fix(controller, 50, accuracy: 20);
-      expect(controller.state, isA<FlowArrived>());
-    });
-
-    test(
-      'route remaining distance handles a destination-point offset',
-      () async {
-        final controller = await _guide(route: _route(endpointMeters: 110));
-        expect(
-          distanceMeters(harness.hornCoordinate, _north(110)),
-          greaterThan(_arrivalRadiusMeters),
-        );
-
-        await _fix(controller, 110);
-        expect(controller.state, isA<FlowArrived>());
-      },
-    );
-
-    test('a 100 m server radius falls back to the 200 ft floor', () async {
-      final controller = await _guide(radius: 100);
+  test('default 200 ft radius arrives on one accurate fix', () async {
+    final controller = await _guide();
+    expect(_arrivalRadiusMeters, closeTo(60.96, 0.01));
+    await _fix(controller, 62);
+    expect(controller.state, isA<FlowActiveNavigation>());
+    await _fix(controller, 60);
+    expect(controller.state, isA<FlowArrived>());
+  });
+  test('smaller or larger server radius uses the 200 ft floor', () async {
+    for (final radius in [25, 100]) {
+      final controller = await _guide(radius: radius);
       await _fix(controller, 90);
       expect(controller.state, isA<FlowActiveNavigation>());
       await _fix(controller, 60);
       expect(controller.state, isA<FlowArrived>());
-    });
-
-    test(
-      'off-route projection cannot trigger arrival past the radius',
-      () async {
-        final controller = await _guide();
-        await controller.onLiveLocation(
-          NavigationCoordinate(
-            latitude: harness.hornCoordinate.latitude,
-            longitude: harness.hornCoordinate.longitude + 0.002,
-          ),
-          accuracyMeters: 5,
-        );
-        expect(controller.state, isA<FlowActiveNavigation>());
-      },
+    }
+  });
+  test('GPS accuracy must be 20 m or better', () async {
+    final controller = await _guide(radius: 50);
+    await _fix(controller, 50, accuracy: 21);
+    expect(controller.state, isA<FlowActiveNavigation>());
+    await _fix(controller, 50, accuracy: 20);
+    expect(controller.state, isA<FlowArrived>());
+  });
+  test('route-end offset arrives for a footprintless destination', () async {
+    final controller = await _guide(route: _route(endpointMeters: 110));
+    expect(
+      distanceMeters(harness.hornCoordinate, _north(110)),
+      greaterThan(_arrivalRadiusMeters),
     );
+    await _fix(controller, 110);
+    expect(controller.state, isA<FlowArrived>());
+  });
+  test('off-route projection cannot arrive past the radius', () async {
+    final controller = await _guide();
+    await controller.onLiveLocation(
+      NavigationCoordinate(
+        latitude: harness.hornCoordinate.latitude,
+        longitude: harness.hornCoordinate.longitude + 0.002,
+      ),
+      accuracyMeters: 5,
+    );
+    expect(controller.state, isA<FlowActiveNavigation>());
   });
 }

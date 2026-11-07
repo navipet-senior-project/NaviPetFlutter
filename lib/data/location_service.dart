@@ -16,11 +16,13 @@ class LocationReading {
     required this.availability,
     this.coordinate,
     this.timestamp,
+    this.accuracyMeters,
   });
 
   final LocationAvailability availability;
   final NavigationCoordinate? coordinate;
   final DateTime? timestamp;
+  final double? accuracyMeters;
 
   /// True when this reading can be used as a route origin.
   bool get usable =>
@@ -83,6 +85,7 @@ class GeolocatorLocationService implements LocationService {
         availability: LocationAvailability.available,
         coordinate: coordinate,
         timestamp: position.timestamp,
+        accuracyMeters: position.accuracy,
       );
     } on Object {
       return _fallback(LocationAvailability.unavailable);
