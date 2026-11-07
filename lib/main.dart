@@ -13,6 +13,7 @@ import 'data/app_state.dart';
 import 'data/auth_token_provider.dart';
 import 'data/campus_search_controller.dart';
 import 'data/campus_search_gateway.dart';
+import 'data/indoor_ar_token_gateway.dart';
 import 'data/location_service.dart';
 import 'data/mapbox_config.dart';
 import 'data/mapbox_navigation_service.dart';
@@ -103,6 +104,12 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
 
   late final _router = createAppRouter(
     widget.appState,
+    indoorArTokenGateway: widget.authTokenProvider == null
+        ? null
+        : HttpIndoorArTokenGateway(
+            baseUrl: AppConfig.backendBaseUrl,
+            auth: widget.authTokenProvider!,
+          ),
     initialLocation: kDebugMode && _devStartRoute.isNotEmpty
         ? _devStartRoute
         : null,

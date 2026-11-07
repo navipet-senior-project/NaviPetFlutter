@@ -12,6 +12,10 @@ import io.flutter.plugin.common.MethodChannel
  * Starts the Unity AR activity for one request and answers the Dart call with
  * the result JSON once Unity finishes. Always replies with a result string,
  * never a platform error.
+ *
+ * The request JSON (bridge contract v2) carries a short-lived `arToken` object
+ * ({token, expiresOn}); it rides to Unity inside the one request extra
+ * unchanged. Never log the request.
  */
 class IndoorArChannel(
     private val activity: Activity,
