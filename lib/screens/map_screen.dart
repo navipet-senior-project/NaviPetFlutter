@@ -921,6 +921,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
+                  if (flow.canScanAr)
+                    TextButton(
+                      onPressed: () => _scanAr(state.destination),
+                      child: const Text('Scan AR'),
+                    ),
                   TextButton(
                     onPressed: flow.back,
                     child: const Text('Overview'),
@@ -987,6 +992,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               'We cannot confirm whether you are inside the building. Refresh your location or continue with walking directions.',
             ),
             const SizedBox(height: 16),
+            if (flow.canScanAr)
+              FilledButton(
+                onPressed: () => _scanAr(flow.destination!),
+                child: const Text('Scan AR'),
+              ),
             OutlinedButton(
               onPressed: flow.checkingPresence ? null : flow.refreshPresence,
               child: Text(
@@ -1026,9 +1036,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
             ),
             Text('Continue indoors to ${state.destination.name}.'),
-            const Text(
-              'Indoor directions for this room are not available yet.',
-            ),
+            if (state.destination.hasIndoorNavigation &&
+                state.destination.id?.trim().isNotEmpty == true)
+              FilledButton(
+                onPressed: () => _scanAr(state.destination),
+                child: const Text('Scan AR'),
+              )
+            else
+              const Text(
+                'Indoor directions for this room are not available yet.',
+              ),
             TextButton(
               onPressed: flow.back,
               child: const Text('Return to map'),
@@ -1038,6 +1055,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       ),
     ),
   );
+
+  void _scanAr(NaviDestination destination) {
+    context.push(
+      Uri(
+        path: '/ar',
+        queryParameters: {'destination': destination.id},
+      ).toString(),
+    );
+  }
 
   Widget _arrivalActions(NavigationFlowController flow, EdgeInsets padding) =>
       Positioned(
