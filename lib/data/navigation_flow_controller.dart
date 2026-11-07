@@ -196,6 +196,16 @@ class NavigationFlowController extends ChangeNotifier {
             destination: destination,
           ),
         );
+      case FlowError(previous: FlowConfiguringRoute(:final destination)):
+        await _queueMap(
+          () => _map.showPlace(
+            destination.coordinate,
+            label: destination.name,
+            bottomInset: placeSheetInset,
+            destination: destination,
+            fitFootprint: false,
+          ),
+        );
       case FlowIdle():
       case FlowSearching():
       case FlowConfiguringRoute():
@@ -585,7 +595,20 @@ class NavigationFlowController extends ChangeNotifier {
       );
     } on RouteFailure catch (error) {
       if (generation != _generation) return;
-      _set(FlowError(message: error.message, previous: current));
+      final errorState = FlowError(message: error.message, previous: current);
+      _set(errorState);
+      unawaited(
+        _queueMap(
+          () => _map.showPlace(
+            current.destination.coordinate,
+            label: current.destination.name,
+            bottomInset: placeSheetInset,
+            destination: current.destination,
+            fitFootprint: false,
+          ),
+          stillCurrent: () => identical(_state, errorState),
+        ).catchError((_) {}),
+      );
     }
   }
 
@@ -1271,6 +1294,7 @@ class _NoOpMapController implements NaviMapController {
     required String label,
     required double bottomInset,
     NaviDestination? destination,
+    bool fitFootprint = true,
   }) async {}
 
   @override
