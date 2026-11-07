@@ -242,6 +242,7 @@ class RecordingMap implements NaviMapController {
     required String label,
     required double bottomInset,
     NaviDestination? destination,
+    bool fitFootprint = true,
   }) async {
     final gate = _blockedShowPlace;
     if (gate != null) await gate.future;

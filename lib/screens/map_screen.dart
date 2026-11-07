@@ -350,7 +350,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             body: Stack(
               children: [
                 _mapWidget(),
-                if (state is FlowIdle) _searchBar(context, padding),
+                if (state is FlowIdle || state is FlowError)
+                  _searchBar(context, padding),
                 if (locationMessage != null && state is! FlowSearching)
                   _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
@@ -782,6 +783,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             ListTile(
               leading: const Icon(Icons.place_outlined, color: AppColors.navy),
               title: Text(state.destination.name),
+              trailing: TextButton(
+                onPressed: flow.openSearch,
+                child: const Text('Change'),
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             TravelModeSelector(selected: state.mode, onChanged: flow.setMode),
@@ -820,11 +825,25 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(child: Text(state.message)),
-            if (state.retryable)
-              TextButton(onPressed: flow.retry, child: const Text('Retry')),
+            Text(state.message),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: flow.openSearch,
+                  icon: const Icon(Icons.search),
+                  label: const Text('Choose another destination'),
+                ),
+                if (state.retryable)
+                  TextButton(onPressed: flow.retry, child: const Text('Retry')),
+              ],
+            ),
           ],
         ),
       ),
