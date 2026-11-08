@@ -196,7 +196,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   String? _resultText(IndoorArResult result) => switch (result.status) {
     IndoorArStatus.arrived =>
       'MultiSet localized this area. Room ${(widget.request ?? IndoorArSpikeScreen.vec119).room} is ${result.checkDistanceM!.toStringAsFixed(1)} m away${result.confidence == null ? '' : ' (confidence ${(result.confidence! * 100).round()}%)'}.',
-    IndoorArStatus.localizationFailed => 'Could not match this camera view to the VEC map. Try facing a well lit wall, door, or sign.',
+    IndoorArStatus.localizationFailed =>
+      'Could not match this camera view to the VEC map. Try facing a well lit wall, door, or sign.',
     IndoorArStatus.cancelled => null,
     IndoorArStatus.unavailable => 'AR is not included in this build.',
     IndoorArStatus.error =>
@@ -245,7 +246,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
             )
           : _rationale
           ? _message(
-      'Allow camera access so NaviPet can scan this area and match it to the VEC indoor map.',
+              'Allow camera access so NaviPet can scan this area and match it to the VEC indoor map.',
               action: 'Continue',
               onAction: _askForCamera,
               back: 'Not now',

@@ -112,12 +112,20 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
               FilledButton.icon(
                 onPressed: () {
                   final matches = objects
-                      .where((item) => item.type == 'door' && item.id == 'VEC$_selectedRoom')
+                      .where(
+                        (item) =>
+                            item.type == 'door' &&
+                            item.id == 'VEC$_selectedRoom',
+                      )
                       .toList(growable: false);
                   final door = matches.isEmpty ? null : matches.first;
                   if (door == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Choose a room on this floor to verify your location.')),
+                      const SnackBar(
+                        content: Text(
+                          'Choose a room on this floor to verify your location.',
+                        ),
+                      ),
                     );
                     return;
                   }
@@ -228,13 +236,19 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                               );
                               if (!_mapTransformInitialized) {
                                 _mapTransformInitialized = true;
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
                                   if (!mounted) return;
                                   const initialScale = .75;
                                   _mapTransform.value = Matrix4.identity()
                                     ..translate(
-                                      (viewport.width - mapSize.width * initialScale) / 2,
-                                      (viewport.height - mapSize.height * initialScale) / 2,
+                                      (viewport.width -
+                                              mapSize.width * initialScale) /
+                                          2,
+                                      (viewport.height -
+                                              mapSize.height * initialScale) /
+                                          2,
                                     )
                                     ..scale(initialScale);
                                 });
@@ -282,7 +296,10 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                         children: [
                           const Text(
                             'Zoom',
-                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
                           ),
                           IconButton(
                             tooltip: 'Zoom out',
@@ -588,10 +605,12 @@ class _FloorMapPainter extends CustomPainter {
     // Labels are a separate pass so every number stays on top of nearby pins.
     for (final object in objects) {
       final point = _point(object.x, object.z, size);
-      final labelPoint = point + _labelOffset(
-        object.type == 'door' ? object.id.substring(3) : null,
-        object.type,
-      );
+      final labelPoint =
+          point +
+          _labelOffset(
+            object.type == 'door' ? object.id.substring(3) : null,
+            object.type,
+          );
       final label = object.type == 'door'
           ? object.id.substring(3)
           : switch (object.type) {
@@ -601,7 +620,14 @@ class _FloorMapPainter extends CustomPainter {
               'bathroom' => 'R',
               _ => '?',
             };
-      _drawText(canvas, label, labelPoint, 10, const Color(0xFF26344F), bold: true);
+      _drawText(
+        canvas,
+        label,
+        labelPoint,
+        10,
+        const Color(0xFF26344F),
+        bold: true,
+      );
     }
   }
 
@@ -702,8 +728,16 @@ class _FloorMapPainter extends CustomPainter {
       final walls = Paint()
         ..color = const Color(0xFFBCC5D0)
         ..strokeWidth = size.width * .002;
-      canvas.drawLine(Offset(left, corridor.bottom), Offset(left, bottom), walls);
-      canvas.drawLine(Offset(right, corridor.bottom), Offset(right, bottom), walls);
+      canvas.drawLine(
+        Offset(left, corridor.bottom),
+        Offset(left, bottom),
+        walls,
+      );
+      canvas.drawLine(
+        Offset(right, corridor.bottom),
+        Offset(right, bottom),
+        walls,
+      );
       canvas.drawLine(Offset(left, bottom), Offset(right, bottom), walls);
     }
 
@@ -756,9 +790,7 @@ class _FloorMapPainter extends CustomPainter {
               ? const Color(0xFF9A895C)
               : const Color(0xFF9AA4B1)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = isSelected
-              ? size.width * .005
-              : size.width * .0025,
+          ..strokeWidth = isSelected ? size.width * .005 : size.width * .0025,
       );
       _drawText(
         canvas,
@@ -773,7 +805,10 @@ class _FloorMapPainter extends CustomPainter {
     for (final object in objects.where((item) => item.type != 'door')) {
       final position = featureLayout[object.id];
       if (position == null) continue;
-      final center = Offset(position.dx * size.width, position.dy * size.height);
+      final center = Offset(
+        position.dx * size.width,
+        position.dy * size.height,
+      );
       // The left floor-two access marker is an entrance in the user's plan,
       // although the exported Unity marker is typed as stairs.
       final displayType = object.floor == 2 && object.id == 'VECstairsF2B'
@@ -827,7 +862,11 @@ class _FloorMapPainter extends CustomPainter {
     return Offset.zero;
   }
 
-  static String? hitTestRoom(List<_IndoorObject> objects, Offset position, Size size) {
+  static String? hitTestRoom(
+    List<_IndoorObject> objects,
+    Offset position,
+    Size size,
+  ) {
     if (objects.any((object) => object.floor == 1 || object.floor == 2)) {
       final roomLayout = objects.any((object) => object.floor == 1)
           ? _floorOneRooms
@@ -853,8 +892,10 @@ class _FloorMapPainter extends CustomPainter {
         size.width * (.09 + ((object.x - _minX) / (_maxX - _minX)) * .82),
         size.height * (.09 + ((_maxZ - object.z) / (_maxZ - _minZ)) * .80),
       );
-      final labelPoint = point + _labelOffset(object.id.substring(3), object.type);
-      final distance = (position - point).distance < (position - labelPoint).distance
+      final labelPoint =
+          point + _labelOffset(object.id.substring(3), object.type);
+      final distance =
+          (position - point).distance < (position - labelPoint).distance
           ? (position - point).distance
           : (position - labelPoint).distance;
       if (distance < nearestDistance) {
@@ -898,7 +939,8 @@ class _FloorMapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _FloorMapPainter oldDelegate) =>
-      oldDelegate.objects != objects || oldDelegate.selectedRoom != selectedRoom;
+      oldDelegate.objects != objects ||
+      oldDelegate.selectedRoom != selectedRoom;
 }
 
 class _Legend extends StatelessWidget {
