@@ -56,8 +56,8 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     final translateX = centerX + (current.entry(0, 3) - centerX) * ratio;
     final translateY = centerY + (current.entry(1, 3) - centerY) * ratio;
     _mapTransform.value = Matrix4.identity()
-      ..translate(translateX, translateY)
-      ..scale(nextScale);
+      ..translateByDouble(translateX, translateY, 0, 1)
+      ..scaleByDouble(nextScale, nextScale, nextScale, 1);
   }
 
   @override
@@ -242,15 +242,22 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                                   if (!mounted) return;
                                   const initialScale = .75;
                                   _mapTransform.value = Matrix4.identity()
-                                    ..translate(
+                                    ..translateByDouble(
                                       (viewport.width -
                                               mapSize.width * initialScale) /
                                           2,
                                       (viewport.height -
                                               mapSize.height * initialScale) /
                                           2,
+                                      0,
+                                      1,
                                     )
-                                    ..scale(initialScale);
+                                    ..scaleByDouble(
+                                      initialScale,
+                                      initialScale,
+                                      initialScale,
+                                      1,
+                                    );
                                 });
                               }
                               return InteractiveViewer(

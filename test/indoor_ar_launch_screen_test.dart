@@ -19,7 +19,7 @@ import 'support/indoor_ar_fixtures.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 const _rationale =
-    'Allow camera access so NaviPet can show arrows over the floor around you.';
+    'Allow camera access so NaviPet can scan this area and match it to the VEC indoor map.';
 const _cameraOff =
     'Camera access is off. Turn it on in Settings to use AR directions.';
 
@@ -229,6 +229,12 @@ void main() {
       status: PermissionStatus.granted,
       destinationId: 'another-room',
       fetch: (_) async => http.Response(jsonEncode(json), 200),
+      result: const IndoorArResult(
+        status: IndoorArStatus.arrived,
+        checkDistanceM: 0.5,
+        localizationQueries: 1,
+        durationMs: 1,
+      ),
     );
     await harness.pump(tester);
     await harness.tapAr(tester);
@@ -248,6 +254,10 @@ void main() {
         'expiresOn': '2026-01-01T00:30:00.000Z',
       },
     });
+    expect(
+      find.text('MultiSet localized this area. Room 120 is 0.5 m away.'),
+      findsOneWidget,
+    );
   });
 
   for (final failure in [

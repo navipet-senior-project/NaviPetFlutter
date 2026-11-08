@@ -487,50 +487,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _vecIndoorMapShortcut() => Positioned(
-    left: 16,
-    bottom: 16,
-    child: Material(
-      elevation: 4,
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => unawaited(_openVecIndoorMap()),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.apartment, color: AppColors.navy, size: 20),
-              SizedBox(width: 8),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Vivian Engineering Center',
-                    style: TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    'Open indoor map · VEC',
-                    style: TextStyle(color: AppColors.muted, fontSize: 10),
-                  ),
-                ],
-              ),
-              SizedBox(width: 5),
-              Icon(Icons.chevron_right, color: AppColors.muted, size: 18),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-
   Future<void> _openVecIndoorMap() async {
     if (!mounted || _openingVecIndoorMap || _indoorBuildingMarkers == null) {
       return;
