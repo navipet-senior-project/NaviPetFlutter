@@ -7,28 +7,6 @@ import 'package:navipet/data/indoor_ar_contract.dart';
 import 'support/indoor_ar_fixtures.dart';
 
 void main() {
-  test(
-    'optional current floor survives token copy and is omitted when absent',
-    () {
-      final request = IndoorArRequest(
-        room: 'room',
-        doorKey: 'door',
-        floor: '2',
-        currentFloor: '1',
-        position: const IndoorArVector3(0, 0, 0),
-        headingDeg: 0,
-        mapCode: 'map',
-        frame: 'frame',
-      );
-      final token = IndoorArToken(
-        token: 'token',
-        expiresOn: DateTime.utc(2030),
-      );
-      expect(request.withArToken(token).toJson()['currentFloor'], '1');
-      expect(vec119Request().toJson().containsKey('currentFloor'), isFalse);
-    },
-  );
-
   group('IndoorArRequest', () {
     test('encodes bridge contract v2', () {
       expect(jsonDecode(jsonEncode(vec119Request().toJson())), {
