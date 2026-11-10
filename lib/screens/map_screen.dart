@@ -13,9 +13,13 @@ import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
+import '../data/indoor_floor_coverage.dart';
 import '../theme/app_theme.dart';
+import '../data/elbee_gateway.dart';
 import '../widgets/ar_mode_icon.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/elbee_sheet.dart';
+import '../widgets/indoor_handoff_sheet.dart';
 import '../widgets/place_preview_sheet.dart';
 import '../widgets/account_button.dart';
 import '../widgets/route_preview_sheet.dart';
@@ -379,8 +383,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             body: Stack(
               children: [
                 _mapWidget(),
-                if (state is FlowIdle || state is FlowError)
+                if (state is FlowIdle || state is FlowError) ...[
                   _searchBar(context, padding),
+                  _elbeeButton(padding),
+                ],
                 if (locationMessage != null && state is! FlowSearching)
                   _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
@@ -694,7 +700,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (state is FlowArrived) ...[
+          if (state is FlowArrived &&
+              indoorScanCovered(
+                state.destination.buildingCode,
+                state.destination.floorNumber,
+              )) ...[
             MergeSemantics(
               child: Semantics(
                 label: 'AR mode',
@@ -1055,6 +1065,52 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     ),
   );
 
+  Widget _elbeeButton(EdgeInsets padding) => Positioned(
+    left: 16,
+    top: padding.top + 72,
+    child: Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: TextButton(onPressed: _openElbee, child: const Text('Ask Elbee')),
+    ),
+  );
+
+  Future<void> _openElbee() async {
+    final gateway = context.read<ElbeeGateway>();
+    final flow = _flow;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => ElbeeSheet(
+        gateway: gateway,
+        onOpenPlace: (placeId) async {
+          Navigator.of(sheetContext).pop();
+          try {
+            final place = await flow.searchGateway.place(placeId);
+            if (!mounted) return;
+            if (!place.isLocal) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Elbee can only open verified CSULB campus places.',
+                  ),
+                ),
+              );
+              return;
+            }
+            await flow.selectPlace(place);
+            await flow.requestDirections();
+          } catch (error) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open that place: $error')),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   Widget _indoorHandoff(
     FlowIndoorHandoff state,
     NavigationFlowController flow,
@@ -1063,37 +1119,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     left: 0,
     right: 0,
     bottom: 0,
-    child: Material(
-      color: AppColors.surface,
-      elevation: 8,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Building reached',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
-            ),
-            Text('Continue indoors to ${state.destination.name}.'),
-            if (state.destination.hasIndoorNavigation &&
-                state.destination.id?.trim().isNotEmpty == true)
-              FilledButton(
-                onPressed: () => _scanAr(state.destination),
-                child: const Text('Scan AR'),
-              )
-            else
-              const Text(
-                'Indoor directions for this room are not available yet.',
-              ),
-            TextButton(
-              onPressed: flow.back,
-              child: const Text('Return to map'),
-            ),
-          ],
-        ),
-      ),
+    child: IndoorHandoffSheet(
+      destination: state.destination,
+      padding: padding,
+      onScan: () => _scanAr(state.destination),
+      onBack: flow.back,
     ),
   );
 

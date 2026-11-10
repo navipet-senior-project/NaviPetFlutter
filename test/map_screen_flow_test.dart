@@ -3,11 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:navipet/data/app_state.dart';
 import 'package:navipet/data/campus_place.dart';
+import 'package:navipet/data/elbee_gateway.dart';
+import 'package:navipet/data/elbee_reply.dart';
 import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/data/location_service.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/screens/map_screen.dart';
 import 'package:navipet/widgets/ar_mode_icon.dart';
+import 'package:navipet/widgets/elbee_sheet.dart';
 import 'package:navipet/widgets/place_preview_sheet.dart';
 import 'package:navipet/widgets/route_preview_sheet.dart';
 import 'package:navipet/widgets/search_bar_field.dart';
@@ -30,6 +33,8 @@ final arrivalPlace = CampusPlace(
   title: harness.horn.title,
   subtitle: harness.horn.subtitle,
   source: 'cache',
+  buildingCode: 'VEC',
+  floorNumber: '1',
   outdoorDestination: harness.hornCoordinate,
   footprint: validFootprint({
     'type': 'Polygon',
@@ -45,13 +50,26 @@ final arrivalPlace = CampusPlace(
   }),
 );
 
-Widget host(NavigationFlowController controller) => MultiProvider(
-  providers: [
-    ChangeNotifierProvider(create: (_) => AppState()),
-    ChangeNotifierProvider.value(value: controller),
-  ],
-  child: MaterialApp(home: MapScreen(controller: controller)),
-);
+Widget host(NavigationFlowController controller, {ElbeeGateway? elbee}) =>
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppState()),
+        ChangeNotifierProvider.value(value: controller),
+        if (elbee != null) Provider<ElbeeGateway>.value(value: elbee),
+      ],
+      child: MaterialApp(home: MapScreen(controller: controller)),
+    );
+
+class _Elbee implements ElbeeGateway {
+  @override
+  Future<ElbeeReply> ask(
+    String question, {
+    required bool scheduleConsent,
+  }) async => const ElbeeReply(
+    status: ElbeeStatus.ok,
+    cards: [ElbeeCard(title: 'Place', placeId: 'external-place')],
+  );
+}
 
 void main() {
   Future<void> driveToArrival(NavigationFlowController controller) async {
@@ -82,12 +100,14 @@ void main() {
     final room = CampusPlace(
       id: 'vec119',
       type: CampusDestinationType.room,
+      buildingCode: 'VEC',
       title: 'VEC 119',
       subtitle: 'Test',
       source: 'cache',
       outdoorDestination: harness.hornCoordinate,
       footprint: arrivalPlace.footprint,
       roomNumber: '119',
+      floorNumber: '1',
       indoorDestinationId: 'room119',
     );
     await tester.pumpWidget(
@@ -146,6 +166,52 @@ void main() {
     expect(find.byType(SearchBarField), findsOneWidget);
     expect(arButton, findsNothing);
   });
+
+  for (final place in [
+    const CampusPlace(
+      id: 'external-place',
+      type: CampusDestinationType.building,
+      title: 'External campus result',
+      subtitle: 'Outside CSULB',
+      source: 'csulb',
+      external: true,
+      outdoorDestination: harness.hornCoordinate,
+    ),
+    const CampusPlace(
+      id: 'external-place',
+      type: CampusDestinationType.building,
+      title: 'Mapbox result',
+      subtitle: 'Mapbox only',
+      source: 'mapbox',
+      outdoorDestination: harness.hornCoordinate,
+    ),
+  ]) {
+    testWidgets('Elbee rejects ${place.title} before selecting it', (
+      tester,
+    ) async {
+      final search = harness.FakeSearchGateway()..results = [place];
+      final controller = harness.build(search: search);
+      await tester.pumpWidget(host(controller, elbee: _Elbee()));
+      await tester.tap(find.text('Ask Elbee'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Find this place');
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ElbeeSheet),
+          matching: find.text('Ask Elbee'),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Place'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Elbee can only open verified CSULB campus places.'),
+        findsOneWidget,
+      );
+      expect(controller.destination, isNull);
+    });
+  }
 
   testWidgets('the AR button shows only on arrival, above the side buttons', (
     tester,

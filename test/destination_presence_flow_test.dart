@@ -32,6 +32,8 @@ CampusPlace place({
   title: room ? 'VEC 119' : harness.horn.title,
   subtitle: 'Test',
   source: 'cache',
+  buildingCode: room ? 'VEC' : null,
+  floorNumber: room ? '1' : null,
   outdoorDestination: harness.hornCoordinate,
   footprint: geometry ? outline : null,
   roomNumber: room ? '119' : null,

@@ -577,12 +577,6 @@ class _AccessibilityScreenState extends State<AccessibilityScreen> {
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        group('MOBILITY', const [
-          ('Accessible routes', 'Prioritize wheelchair and ramp access'),
-          ('Avoid stairs', null),
-          ('Prefer elevators', null),
-          ('Avoid steep slopes', null),
-        ]),
         group('GUIDANCE', const [
           ('Voice guidance', 'Spoken turn-by-turn directions'),
           ('Haptic turn alerts', null),

@@ -17,10 +17,14 @@ includes:
   accuracy. It hides when the fix goes stale (10 s) or is clearly outside. It
   loads the selected place and sends its backend door pose, plus a
   short-lived MultiSet token fetched from the backend (`POST /indoor/ar-token`),
-  to Unity. The MultiSet secret never ships in the app. Rooms without a valid
-  indoor pose show an unavailable message with Retry; token failures show a
-  separate retry message.
+  to Unity. Without a saved door pose, it starts a localization scan without
+  inventing a destination. Indoor AR points toward a room; it does not provide
+  turn-by-turn indoor routing. The MultiSet secret never ships in the app.
   Unity AR still requires verification on a physical phone.
+- Ask Elbee about CSULB buildings and rooms from the map. Elbee returns
+  verified places that open existing navigation; schedule access requires
+  consent for each request. It can also explain official parking rules. Elbee
+  is NaviPet's campus pet, separate from the university parking chatbot.
 
 ## Project structure
 

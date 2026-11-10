@@ -25,6 +25,20 @@ void main() {
       });
     });
 
+    test('localize omits the door pose', () {
+      final request = IndoorArRequest.localize(
+        room: '119',
+        mapCode: IndoorArRequest.buildMapCode,
+        frame: IndoorArRequest.buildFrame,
+      );
+      final json = request.toJson();
+      expect(json['mode'], 'localize');
+      expect(json.containsKey('position'), isFalse);
+      expect(json.containsKey('doorKey'), isFalse);
+      expect(json.containsKey('headingDeg'), isFalse);
+      expect(json.containsKey('floor'), isFalse);
+    });
+
     test('omits arToken when none was minted', () {
       final bare = IndoorArRequest(
         room: '119',

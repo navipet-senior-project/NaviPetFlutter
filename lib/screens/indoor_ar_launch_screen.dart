@@ -7,6 +7,7 @@ import '../data/campus_search_gateway.dart';
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../data/indoor_ar_token_gateway.dart';
+import '../data/indoor_floor_coverage.dart';
 
 /// Asks for the camera, opens the Unity AR camera and returns to the map.
 /// Opened fresh by every AR tap, so every tap asks again.
@@ -56,6 +57,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   };
 
   IndoorArRequest? _request;
+  var _guideToRoom = false;
   var _unavailable = false;
   var _tokenFailed = false;
   var _rationale = false;
@@ -79,31 +81,43 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       _unavailable = false;
       _tokenFailed = false;
     });
-    try {
-      final id = widget.destinationId;
-      if (id == null || id.trim().isEmpty) {
-        setState(() => _unavailable = true);
-        return;
-      }
-      final place = await widget.gateway.place(id);
-      if (!mounted) return;
-      final indoor = place.indoor;
-      if (indoor == null) {
-        setState(() => _unavailable = true);
-        return;
-      }
-      _request = IndoorArRequest(
-        room: place.roomNumber ?? place.title,
-        doorKey: indoor.doorKey,
-        floor: indoor.floor,
-        position: indoor.position,
-        headingDeg: indoor.headingDeg,
-        mapCode: indoor.mapCode,
-        frame: indoor.frame,
-      );
-    } catch (_) {
-      if (mounted) setState(() => _unavailable = true);
+    final id = widget.destinationId?.trim();
+    if (id == null || id.isEmpty) {
+      setState(() => _unavailable = true);
       return;
+    } else {
+      try {
+        final place = await widget.gateway.place(id);
+        if (!mounted) return;
+        final indoor = place.indoor;
+        if (!indoorScanCovered(place.buildingCode, place.floorNumber)) {
+          setState(() => _unavailable = true);
+          return;
+        }
+        if (indoor == null) {
+          _request = IndoorArRequest.localize(
+            room: place.roomNumber ?? place.title,
+            floor: place.floorNumber ?? '',
+            mapCode: IndoorArRequest.buildMapCode,
+            frame: IndoorArRequest.buildFrame,
+          );
+          _guideToRoom = false;
+        } else {
+          _request = IndoorArRequest(
+            room: place.roomNumber ?? place.title,
+            doorKey: indoor.doorKey,
+            floor: indoor.floor,
+            position: indoor.position,
+            headingDeg: indoor.headingDeg,
+            mapCode: indoor.mapCode,
+            frame: indoor.frame,
+          );
+          _guideToRoom = true;
+        }
+      } catch (_) {
+        if (mounted) setState(() => _unavailable = true);
+        return;
+      }
     }
     try {
       final camera = await widget.cameraStatus();
@@ -168,7 +182,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   String? _resultText(IndoorArResult result) => switch (result.status) {
     IndoorArStatus.arrived =>
-      'MultiSet localized this area. Room ${_request!.room} is ${result.checkDistanceM!.toStringAsFixed(1)} m away${result.confidence == null ? '' : ' (confidence ${(result.confidence! * 100).round()}%)'}.',
+      !_guideToRoom
+          ? 'MultiSet localized this area.'
+          : 'MultiSet localized this area. Room ${_request!.room} is ${result.checkDistanceM!.toStringAsFixed(1)} m away${result.confidence == null ? '' : ' (confidence ${(result.confidence! * 100).round()}%)'}.',
     IndoorArStatus.localizationFailed =>
       'Could not match this camera view to the VEC map. Try facing a well lit wall, door, or sign.',
     IndoorArStatus.cancelled => null,
@@ -219,7 +235,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
             )
           : _rationale
           ? _message(
-              'Allow camera access so NaviPet can scan this area and match it to the VEC indoor map.',
+              _guideToRoom
+                  ? 'Allow camera access so NaviPet can point toward this room. '
+                        'This is a direction to the room, not turn-by-turn guidance.'
+                  : 'Allow camera access to scan and find your position. '
+                        'No door position is saved, so this does not start a route.',
               action: 'Continue',
               onAction: _askForCamera,
               back: 'Not now',

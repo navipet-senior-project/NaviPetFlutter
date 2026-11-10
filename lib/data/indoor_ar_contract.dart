@@ -32,7 +32,7 @@ class IndoorArToken {
   String toString() => 'IndoorArToken(expiresOn: $expiresOn)';
 }
 
-/// One AR session's destination: a single door.
+/// One AR session: a saved door, or localization with no door pose.
 class IndoorArRequest {
   IndoorArRequest({
     required this.room,
@@ -43,7 +43,7 @@ class IndoorArRequest {
     required this.mapCode,
     required this.frame,
     this.arToken,
-  }) {
+  }) : mode = null {
     if (doorKey.isEmpty || floor.isEmpty || mapCode.isEmpty) {
       throw ArgumentError('doorKey, floor and mapCode must not be empty');
     }
@@ -60,11 +60,38 @@ class IndoorArRequest {
     }
   }
 
+  /// Scan to find the phone. Omits door pose fields so none can be invented.
+  IndoorArRequest.localize({
+    this.room = '',
+    this.floor = '',
+    required this.mapCode,
+    required this.frame,
+    this.arToken,
+  }) : mode = localizeMode,
+       doorKey = '',
+       position = const IndoorArVector3(0, 0, 0),
+       headingDeg = 0 {
+    if (mapCode.isEmpty || frame.isEmpty) {
+      throw ArgumentError('mapCode and frame must not be empty');
+    }
+  }
+
   static const schemaVersion = 2;
 
+  /// Unity build map. Used only when the backend sent no door pose.
+  static const buildMapCode = 'MSET_XTBY7AM7ZK77';
+  static const buildFrame = 'multiset-mapset';
+  static const localizeMode = 'localize';
+
+  /// `localize` or null for a destination request. Null stays off the JSON.
+  final String? mode;
   final String room;
+
+  /// Empty only for [IndoorArRequest.localize]. Not serialized in that mode.
   final String doorKey;
   final String floor;
+
+  /// Zero only for [IndoorArRequest.localize]. Not a door and not serialized.
   final IndoorArVector3 position;
   final double headingDeg;
   final String mapCode;
@@ -74,28 +101,48 @@ class IndoorArRequest {
   /// localisation, such as the transport spike.
   final IndoorArToken? arToken;
 
-  IndoorArRequest withArToken(IndoorArToken token) => IndoorArRequest(
-    room: room,
-    doorKey: doorKey,
-    floor: floor,
-    position: position,
-    headingDeg: headingDeg,
-    mapCode: mapCode,
-    frame: frame,
-    arToken: token,
-  );
+  bool get isLocalize => mode == localizeMode;
 
-  Map<String, Object?> toJson() => {
-    'schemaVersion': schemaVersion,
-    'room': room,
-    'doorKey': doorKey,
-    'floor': floor,
-    'position': position.toJson(),
-    'headingDeg': headingDeg,
-    'mapCode': mapCode,
-    'frame': frame,
-    if (arToken != null) 'arToken': arToken!.toJson(),
-  };
+  IndoorArRequest withArToken(IndoorArToken token) => isLocalize
+      ? IndoorArRequest.localize(
+          room: room,
+          floor: floor,
+          mapCode: mapCode,
+          frame: frame,
+          arToken: token,
+        )
+      : IndoorArRequest(
+          room: room,
+          doorKey: doorKey,
+          floor: floor,
+          position: position,
+          headingDeg: headingDeg,
+          mapCode: mapCode,
+          frame: frame,
+          arToken: token,
+        );
+
+  Map<String, Object?> toJson() => isLocalize
+      ? {
+          'schemaVersion': schemaVersion,
+          'mode': localizeMode,
+          'mapCode': mapCode,
+          'frame': frame,
+          if (room.isNotEmpty) 'room': room,
+          if (floor.isNotEmpty) 'floor': floor,
+          if (arToken != null) 'arToken': arToken!.toJson(),
+        }
+      : {
+          'schemaVersion': schemaVersion,
+          'room': room,
+          'doorKey': doorKey,
+          'floor': floor,
+          'position': position.toJson(),
+          'headingDeg': headingDeg,
+          'mapCode': mapCode,
+          'frame': frame,
+          if (arToken != null) 'arToken': arToken!.toJson(),
+        };
 }
 
 enum IndoorArStatus {

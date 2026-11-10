@@ -7,6 +7,7 @@ import 'campus_bounds.dart';
 import 'campus_place.dart';
 import 'campus_search_controller.dart';
 import 'campus_search_gateway.dart';
+import 'indoor_floor_coverage.dart';
 import 'destination_presence.dart';
 import 'location_service.dart';
 import 'navi_map_controller.dart';
@@ -70,6 +71,10 @@ class NavigationFlowController extends ChangeNotifier {
     final accuracy = reading?.accuracyMeters;
     final now = DateTime.now();
     return destination?.hasIndoorNavigation == true &&
+        indoorScanCovered(
+          destination?.buildingCode,
+          destination?.floorNumber,
+        ) &&
         destination?.id?.trim().isNotEmpty == true &&
         destination?.footprint != null &&
         reading?.usable == true &&

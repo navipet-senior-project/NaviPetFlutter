@@ -19,7 +19,11 @@ import 'support/indoor_ar_fixtures.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 const _rationale =
-    'Allow camera access so NaviPet can scan this area and match it to the VEC indoor map.';
+    'Allow camera access so NaviPet can point toward this room. '
+    'This is a direction to the room, not turn-by-turn guidance.';
+const _scanRationale =
+    'Allow camera access to scan and find your position. '
+    'No door position is saved, so this does not start a route.';
 const _cameraOff =
     'Camera access is off. Turn it on in Settings to use AR directions.';
 
@@ -211,60 +215,121 @@ void main() {
     );
   });
 
-  for (final failure in [
-    'missing indoor',
-    'fetch failure',
-    'malformed indoor',
-  ]) {
-    testWidgets(
-      '$failure offers retry without launching or asking for camera',
-      (tester) async {
-        var attempts = 0;
-        final harness = _Harness(
-          status: PermissionStatus.granted,
-          fetch: (_) async {
-            if (++attempts > 1) return http.Response(_fixture, 200);
-            if (failure == 'fetch failure') {
-              throw const SocketException('offline');
-            }
-            final json = jsonDecode(_fixture) as Map<String, dynamic>;
-            final place = json['place'] as Map<String, dynamic>;
-            place['indoor'] = failure == 'missing indoor'
-                ? null
-                : {'doorKey': 'broken'};
-            return http.Response(jsonEncode(json), 200);
-          },
-        );
-        await harness.pump(tester);
-        await harness.tapAr(tester);
-        expect(
-          find.text("Indoor AR isn't available for this room"),
-          findsOneWidget,
-        );
-        expect(harness.fake.requests, isEmpty);
-        expect(harness.statusChecks, 0);
-        await tester.tap(find.text('Retry'));
-        await tester.pumpAndSettle();
-        expect(harness.fetchedIds, [_destinationId, _destinationId]);
-        expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
-        expect(find.text('map'), findsOneWidget);
+  testWidgets('fetch failure offers retry without launching', (tester) async {
+    var attempts = 0;
+    final harness = _Harness(
+      status: PermissionStatus.granted,
+      fetch: (_) async {
+        if (++attempts > 1) return http.Response(_fixture, 200);
+        throw const SocketException('offline');
       },
     );
-  }
-
-  testWidgets('missing destination never fetches or launches', (tester) async {
-    final harness = _Harness(destinationId: null);
     await harness.pump(tester);
     await harness.tapAr(tester);
     expect(
       find.text("Indoor AR isn't available for this room"),
       findsOneWidget,
     );
+    expect(harness.fake.requests, isEmpty);
+    expect(harness.statusChecks, 0);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(harness.fetchedIds, [_destinationId, _destinationId]);
+    expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
+    expect(find.text('map'), findsOneWidget);
+  });
+
+  for (final failure in ['missing indoor', 'malformed indoor']) {
+    testWidgets('$failure scans without a door pose', (tester) async {
+      final harness = _Harness(
+        status: PermissionStatus.denied,
+        fetch: (_) async {
+          final json = jsonDecode(_fixture) as Map<String, dynamic>;
+          final place = json['place'] as Map<String, dynamic>;
+          place['indoor'] = failure == 'missing indoor'
+              ? null
+              : {'doorKey': 'broken'};
+          return http.Response(jsonEncode(json), 200);
+        },
+      );
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      expect(find.text(_scanRationale), findsOneWidget);
+      expect(harness.fake.requests, isEmpty);
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(harness.fake.requests.single.toJson(), {
+        'schemaVersion': 2,
+        'mode': 'localize',
+        'room': '119',
+        'floor': '1',
+        'mapCode': 'MSET_XTBY7AM7ZK77',
+        'frame': 'multiset-mapset',
+        'arToken': {
+          'token': 'test-token',
+          'expiresOn': '2026-01-01T00:30:00.000Z',
+        },
+      });
+      expect(
+        harness.fake.requests.single.toJson().containsKey('position'),
+        isFalse,
+      );
+    });
+  }
+
+  testWidgets('localization-only success does not claim room distance', (
+    tester,
+  ) async {
+    final harness = _Harness(
+      status: PermissionStatus.granted,
+      result: const IndoorArResult(
+        status: IndoorArStatus.arrived,
+        checkDistanceM: 0.5,
+        localizationQueries: 1,
+        durationMs: 1,
+      ),
+      fetch: (_) async {
+        final json = jsonDecode(_fixture) as Map<String, dynamic>;
+        (json['place'] as Map<String, dynamic>)['indoor'] = null;
+        return http.Response(jsonEncode(json), 200);
+      },
+    );
+    await harness.pump(tester);
+    await harness.tapAr(tester);
+    expect(find.textContaining('localized this area.'), findsOneWidget);
+    expect(find.textContaining('m away'), findsNothing);
+  });
+
+  testWidgets('missing destination cannot launch VEC localization', (
+    tester,
+  ) async {
+    final harness = _Harness(
+      destinationId: null,
+      status: PermissionStatus.granted,
+    );
+    await harness.pump(tester);
+    await harness.tapAr(tester);
     expect(harness.fetchedIds, isEmpty);
     expect(harness.fake.requests, isEmpty);
-    await tester.tap(find.text('Back to map'));
-    await tester.pumpAndSettle();
-    expect(find.text('map'), findsOneWidget);
+    expect(harness.mintRequests, isEmpty);
+  });
+
+  testWidgets('unsupported building cannot launch VEC localization', (
+    tester,
+  ) async {
+    final harness = _Harness(
+      status: PermissionStatus.granted,
+      fetch: (_) async {
+        final json = jsonDecode(_fixture) as Map<String, dynamic>;
+        (json['place'] as Map<String, dynamic>)['buildingCode'] = 'HC';
+        (json['place'] as Map<String, dynamic>)['indoor'] = null;
+        return http.Response(jsonEncode(json), 200);
+      },
+    );
+    await harness.pump(tester);
+    await harness.tapAr(tester);
+    expect(harness.fake.requests, isEmpty);
+    expect(harness.mintRequests, isEmpty);
   });
 
   testWidgets('a granted camera launches straight away', (tester) async {
