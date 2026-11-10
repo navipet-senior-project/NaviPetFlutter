@@ -25,7 +25,6 @@ includes:
   verified places that open existing navigation; schedule access requires
   consent for each request. It can also explain official parking rules. Elbee
   is NaviPet's campus pet, separate from the university parking chatbot.
-- Mobility routing preferences are disabled until walkable indoor data exists.
 
 ## Project structure
 
