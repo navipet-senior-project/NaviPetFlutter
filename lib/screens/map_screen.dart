@@ -13,6 +13,7 @@ import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
+import '../data/indoor_floor_coverage.dart';
 import '../theme/app_theme.dart';
 import '../data/elbee_gateway.dart';
 import '../widgets/ar_mode_icon.dart';
@@ -699,7 +700,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (state is FlowArrived) ...[
+          if (state is FlowArrived &&
+              indoorScanCovered(
+                state.destination.buildingCode,
+                state.destination.floorNumber,
+              )) ...[
             MergeSemantics(
               child: Semantics(
                 label: 'AR mode',

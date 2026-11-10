@@ -300,7 +300,7 @@ void main() {
     expect(find.textContaining('m away'), findsNothing);
   });
 
-  testWidgets('missing destination still scans without fetching', (
+  testWidgets('missing destination cannot launch VEC localization', (
     tester,
   ) async {
     final harness = _Harness(
@@ -310,11 +310,26 @@ void main() {
     await harness.pump(tester);
     await harness.tapAr(tester);
     expect(harness.fetchedIds, isEmpty);
-    expect(
-      harness.fake.requests.single.toJson().containsKey('position'),
-      isFalse,
+    expect(harness.fake.requests, isEmpty);
+    expect(harness.mintRequests, isEmpty);
+  });
+
+  testWidgets('unsupported building cannot launch VEC localization', (
+    tester,
+  ) async {
+    final harness = _Harness(
+      status: PermissionStatus.granted,
+      fetch: (_) async {
+        final json = jsonDecode(_fixture) as Map<String, dynamic>;
+        (json['place'] as Map<String, dynamic>)['buildingCode'] = 'HC';
+        (json['place'] as Map<String, dynamic>)['indoor'] = null;
+        return http.Response(jsonEncode(json), 200);
+      },
     );
-    expect(harness.fake.requests.single.toJson()['mode'], 'localize');
+    await harness.pump(tester);
+    await harness.tapAr(tester);
+    expect(harness.fake.requests, isEmpty);
+    expect(harness.mintRequests, isEmpty);
   });
 
   testWidgets('a granted camera launches straight away', (tester) async {

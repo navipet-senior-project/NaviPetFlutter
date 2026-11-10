@@ -7,6 +7,7 @@ import '../data/campus_search_gateway.dart';
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../data/indoor_ar_token_gateway.dart';
+import '../data/indoor_floor_coverage.dart';
 
 /// Asks for the camera, opens the Unity AR camera and returns to the map.
 /// Opened fresh by every AR tap, so every tap asks again.
@@ -82,16 +83,17 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     });
     final id = widget.destinationId?.trim();
     if (id == null || id.isEmpty) {
-      _request = IndoorArRequest.localize(
-        mapCode: IndoorArRequest.buildMapCode,
-        frame: IndoorArRequest.buildFrame,
-      );
-      _guideToRoom = false;
+      setState(() => _unavailable = true);
+      return;
     } else {
       try {
         final place = await widget.gateway.place(id);
         if (!mounted) return;
         final indoor = place.indoor;
+        if (!indoorScanCovered(place.buildingCode, place.floorNumber)) {
+          setState(() => _unavailable = true);
+          return;
+        }
         if (indoor == null) {
           _request = IndoorArRequest.localize(
             room: place.roomNumber ?? place.title,

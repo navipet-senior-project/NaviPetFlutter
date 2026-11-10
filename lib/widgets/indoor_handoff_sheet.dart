@@ -21,7 +21,7 @@ class IndoorHandoffSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final floor = destination.floorNumber;
-    final unscanned = indoorFloorNotScanned(floor);
+    final covered = indoorScanCovered(destination.buildingCode, floor);
     return Material(
       color: Colors.white,
       elevation: 8,
@@ -40,12 +40,19 @@ class IndoorHandoffSheet extends StatelessWidget {
             const Text(
               'Stairs, elevators, and mobility routing are unavailable.',
             ),
-            if (unscanned) Text('Floor $floor is not scanned.'),
-            if (destination.indoorDestinationId?.trim().isNotEmpty != true)
+            if (!covered)
+              Text(
+                floor == null || floor.isEmpty
+                    ? 'Indoor scanning is not available for this building.'
+                    : 'Floor $floor is not scanned.',
+              ),
+            if (covered &&
+                destination.indoorDestinationId?.trim().isNotEmpty != true)
               const Text(
                 'No saved door position. You can still scan to find your position.',
               ),
-            FilledButton(onPressed: onScan, child: const Text('Scan AR')),
+            if (covered)
+              FilledButton(onPressed: onScan, child: const Text('Scan AR')),
             TextButton(onPressed: onBack, child: const Text('Return to map')),
           ],
         ),

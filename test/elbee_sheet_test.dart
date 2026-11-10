@@ -15,8 +15,9 @@ class _Auth implements AuthTokenProvider {
 }
 
 class _Scripted implements ElbeeGateway {
-  _Scripted(this.reply);
+  _Scripted(this.reply, {this.throwsFirst = false});
   final ElbeeReply reply;
+  final bool throwsFirst;
   var calls = 0;
   bool? consent;
   String? question;
@@ -29,6 +30,7 @@ class _Scripted implements ElbeeGateway {
     calls++;
     this.question = question;
     consent = scheduleConsent;
+    if (throwsFirst && calls == 1) throw StateError('auth failed');
     return reply;
   }
 }
@@ -205,6 +207,35 @@ void main() {
     await tester.pump();
     expect(gateway.consent, isFalse);
     expect(find.text('CS 101'), findsNothing);
+  });
+
+  testWidgets('gateway failure restores the sheet for another question', (
+    tester,
+  ) async {
+    final gateway = _Scripted(
+      const ElbeeReply(status: ElbeeStatus.noMatch),
+      throwsFirst: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ElbeeSheet(gateway: gateway, onOpenPlace: (_) {}),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextField), 'Where is VEC?');
+    await tester.tap(find.text('Ask Elbee'));
+    await tester.pump();
+    expect(
+      find.text('Elbee could not be reached. Check your connection.'),
+      findsOneWidget,
+    );
+    expect(find.text('Ask Elbee'), findsOneWidget);
+
+    await tester.tap(find.text('Ask Elbee'));
+    await tester.pump();
+    expect(gateway.calls, 2);
+    expect(find.text('No verified campus match.'), findsOneWidget);
   });
 
   testWidgets('unavailable states use their own sentences', (tester) async {

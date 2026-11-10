@@ -30,6 +30,8 @@ final arrivalPlace = CampusPlace(
   title: harness.horn.title,
   subtitle: harness.horn.subtitle,
   source: 'cache',
+  buildingCode: 'VEC',
+  floorNumber: '1',
   outdoorDestination: harness.hornCoordinate,
   footprint: validFootprint({
     'type': 'Polygon',
@@ -82,12 +84,14 @@ void main() {
     final room = CampusPlace(
       id: 'vec119',
       type: CampusDestinationType.room,
+      buildingCode: 'VEC',
       title: 'VEC 119',
       subtitle: 'Test',
       source: 'cache',
       outdoorDestination: harness.hornCoordinate,
       footprint: arrivalPlace.footprint,
       roomNumber: '119',
+      floorNumber: '1',
       indoorDestinationId: 'room119',
     );
     await tester.pumpWidget(

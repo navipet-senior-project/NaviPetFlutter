@@ -51,7 +51,17 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
       _reply = null;
       _replyConsent = false;
     });
-    final reply = await widget.gateway.ask(question, scheduleConsent: consent);
+    final ElbeeReply reply;
+    try {
+      reply = await widget.gateway.ask(question, scheduleConsent: consent);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _reply = const ElbeeReply(status: ElbeeStatus.network);
+      });
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _busy = false;

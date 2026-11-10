@@ -3,8 +3,8 @@
 /// shortcut: floors 1 and 2 only, replace when a scan of another floor ships.
 const scannedIndoorFloors = {'1', '2'};
 
-bool indoorFloorNotScanned(String? floor) {
+bool indoorScanCovered(String? buildingCode, String? floor) {
+  if (buildingCode?.trim().toUpperCase() != 'VEC') return false;
   final value = floor?.trim();
-  if (value == null || value.isEmpty) return false;
-  return !scannedIndoorFloors.contains(value);
+  return value != null && scannedIndoorFloors.contains(value);
 }
