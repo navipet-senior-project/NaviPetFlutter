@@ -56,6 +56,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   };
 
   IndoorArRequest? _request;
+  var _guideToRoom = false;
   var _unavailable = false;
   var _tokenFailed = false;
   var _rationale = false;
@@ -79,31 +80,41 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       _unavailable = false;
       _tokenFailed = false;
     });
-    try {
-      final id = widget.destinationId;
-      if (id == null || id.trim().isEmpty) {
-        setState(() => _unavailable = true);
-        return;
-      }
-      final place = await widget.gateway.place(id);
-      if (!mounted) return;
-      final indoor = place.indoor;
-      if (indoor == null) {
-        setState(() => _unavailable = true);
-        return;
-      }
-      _request = IndoorArRequest(
-        room: place.roomNumber ?? place.title,
-        doorKey: indoor.doorKey,
-        floor: indoor.floor,
-        position: indoor.position,
-        headingDeg: indoor.headingDeg,
-        mapCode: indoor.mapCode,
-        frame: indoor.frame,
+    final id = widget.destinationId?.trim();
+    if (id == null || id.isEmpty) {
+      _request = IndoorArRequest.localize(
+        mapCode: IndoorArRequest.buildMapCode,
+        frame: IndoorArRequest.buildFrame,
       );
-    } catch (_) {
-      if (mounted) setState(() => _unavailable = true);
-      return;
+      _guideToRoom = false;
+    } else {
+      try {
+        final place = await widget.gateway.place(id);
+        if (!mounted) return;
+        final indoor = place.indoor;
+        if (indoor == null) {
+          _request = IndoorArRequest.localize(
+            room: place.roomNumber ?? place.title,
+            mapCode: IndoorArRequest.buildMapCode,
+            frame: IndoorArRequest.buildFrame,
+          );
+          _guideToRoom = false;
+        } else {
+          _request = IndoorArRequest(
+            room: place.roomNumber ?? place.title,
+            doorKey: indoor.doorKey,
+            floor: indoor.floor,
+            position: indoor.position,
+            headingDeg: indoor.headingDeg,
+            mapCode: indoor.mapCode,
+            frame: indoor.frame,
+          );
+          _guideToRoom = true;
+        }
+      } catch (_) {
+        if (mounted) setState(() => _unavailable = true);
+        return;
+      }
     }
     try {
       final camera = await widget.cameraStatus();
@@ -180,9 +191,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   void _leave(String? message) {
     if (!mounted) return;
     if (message != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
     context.canPop() ? context.pop() : context.go('/map');
   }
@@ -219,7 +229,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
             )
           : _rationale
           ? _message(
-              'Allow camera access so NaviPet can scan this area and match it to the VEC indoor map.',
+              _guideToRoom
+                  ? 'Allow camera access so NaviPet can point toward this room. '
+                        'This is a direction to the room, not turn-by-turn guidance.'
+                  : 'Allow camera access to scan and find your position. '
+                        'No door position is saved, so this does not start a route.',
               action: 'Continue',
               onAction: _askForCamera,
               back: 'Not now',

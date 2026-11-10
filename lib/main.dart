@@ -13,6 +13,7 @@ import 'data/app_state.dart';
 import 'data/auth_token_provider.dart';
 import 'data/campus_search_controller.dart';
 import 'data/campus_search_gateway.dart';
+import 'data/elbee_gateway.dart';
 import 'data/indoor_ar_token_gateway.dart';
 import 'data/location_service.dart';
 import 'data/mapbox_config.dart';
@@ -115,6 +116,10 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
         : null,
   );
   late final NavigationFlowController _flow = _buildFlow();
+  late final ElbeeGateway _elbee = HttpElbeeGateway(
+    baseUrl: AppConfig.backendBaseUrl,
+    auth: widget.authTokenProvider ?? AnonymousAuthTokenProvider(),
+  );
 
   /// The signed-in identity the flow currently reflects, so a later change
   /// (sign-out, sign-in, or a different user signing in on the same device)
@@ -200,6 +205,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
       providers: [
         ChangeNotifierProvider.value(value: widget.appState),
         ChangeNotifierProvider.value(value: _flow),
+        Provider<ElbeeGateway>.value(value: _elbee),
       ],
       child: MaterialApp.router(
         title: 'NaviPet',

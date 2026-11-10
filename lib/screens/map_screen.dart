@@ -14,8 +14,11 @@ import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
 import '../theme/app_theme.dart';
+import '../data/elbee_gateway.dart';
 import '../widgets/ar_mode_icon.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/elbee_sheet.dart';
+import '../widgets/indoor_handoff_sheet.dart';
 import '../widgets/place_preview_sheet.dart';
 import '../widgets/account_button.dart';
 import '../widgets/route_preview_sheet.dart';
@@ -379,8 +382,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             body: Stack(
               children: [
                 _mapWidget(),
-                if (state is FlowIdle || state is FlowError)
+                if (state is FlowIdle || state is FlowError) ...[
                   _searchBar(context, padding),
+                  _elbeeButton(padding),
+                ],
                 if (locationMessage != null && state is! FlowSearching)
                   _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
@@ -1005,55 +1010,90 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return '$minutes min';
   }
 
-  Widget _presenceChoice(
-    NavigationFlowController flow,
-    EdgeInsets padding,
-  ) => Positioned(
-    left: 0,
-    right: 0,
-    bottom: 0,
-    child: Material(
-      color: AppColors.surface,
-      elevation: 10,
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(AppRadius.lg),
-      ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Confirm your location',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+  Widget _presenceChoice(NavigationFlowController flow, EdgeInsets padding) =>
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: Material(
+          color: AppColors.surface,
+          elevation: 10,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.lg),
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Confirm your location',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'We cannot confirm whether you are inside the building. Refresh your location or continue with walking directions.',
+                ),
+                const SizedBox(height: 16),
+                if (flow.canScanAr)
+                  FilledButton(
+                    onPressed: () => _scanAr(flow.destination!),
+                    child: const Text('Scan AR'),
+                  ),
+                OutlinedButton(
+                  onPressed: flow.checkingPresence
+                      ? null
+                      : flow.refreshPresence,
+                  child: Text(
+                    flow.checkingPresence ? 'Refreshing…' : 'Refresh location',
+                  ),
+                ),
+                FilledButton(
+                  onPressed: flow.continueRoute,
+                  child: const Text('Continue with directions'),
+                ),
+                TextButton(onPressed: flow.back, child: const Text('Back')),
+              ],
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'We cannot confirm whether you are inside the building. Refresh your location or continue with walking directions.',
-            ),
-            const SizedBox(height: 16),
-            if (flow.canScanAr)
-              FilledButton(
-                onPressed: () => _scanAr(flow.destination!),
-                child: const Text('Scan AR'),
-              ),
-            OutlinedButton(
-              onPressed: flow.checkingPresence ? null : flow.refreshPresence,
-              child: Text(
-                flow.checkingPresence ? 'Refreshing…' : 'Refresh location',
-              ),
-            ),
-            FilledButton(
-              onPressed: flow.continueRoute,
-              child: const Text('Continue with directions'),
-            ),
-            TextButton(onPressed: flow.back, child: const Text('Back')),
-          ],
+          ),
         ),
-      ),
+      );
+
+  Widget _elbeeButton(EdgeInsets padding) => Positioned(
+    left: 16,
+    top: padding.top + 72,
+    child: Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: TextButton(onPressed: _openElbee, child: const Text('Ask Elbee')),
     ),
   );
+
+  Future<void> _openElbee() async {
+    final gateway = context.read<ElbeeGateway>();
+    final flow = _flow;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => ElbeeSheet(
+        gateway: gateway,
+        onOpenPlace: (placeId) async {
+          Navigator.of(sheetContext).pop();
+          try {
+            final place = await flow.searchGateway.place(placeId);
+            await flow.selectPlace(place);
+            await flow.requestDirections();
+          } catch (error) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open that place: $error')),
+            );
+          }
+        },
+      ),
+    );
+  }
 
   Widget _indoorHandoff(
     FlowIndoorHandoff state,
@@ -1063,37 +1103,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     left: 0,
     right: 0,
     bottom: 0,
-    child: Material(
-      color: AppColors.surface,
-      elevation: 8,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Building reached',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
-            ),
-            Text('Continue indoors to ${state.destination.name}.'),
-            if (state.destination.hasIndoorNavigation &&
-                state.destination.id?.trim().isNotEmpty == true)
-              FilledButton(
-                onPressed: () => _scanAr(state.destination),
-                child: const Text('Scan AR'),
-              )
-            else
-              const Text(
-                'Indoor directions for this room are not available yet.',
-              ),
-            TextButton(
-              onPressed: flow.back,
-              child: const Text('Return to map'),
-            ),
-          ],
-        ),
-      ),
+    child: IndoorHandoffSheet(
+      destination: state.destination,
+      padding: padding,
+      onScan: () => _scanAr(state.destination),
+      onBack: flow.back,
     ),
   );
 

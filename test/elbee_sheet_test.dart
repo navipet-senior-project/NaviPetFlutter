@@ -1,0 +1,181 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:navipet/data/auth_token_provider.dart';
+import 'package:navipet/data/elbee_gateway.dart';
+import 'package:navipet/data/elbee_reply.dart';
+import 'package:navipet/widgets/elbee_sheet.dart';
+
+class _Auth implements AuthTokenProvider {
+  @override
+  Future<String?> token({bool forceRefresh = false}) async => 'session';
+}
+
+class _Scripted implements ElbeeGateway {
+  _Scripted(this.reply);
+  final ElbeeReply reply;
+  var calls = 0;
+  bool? consent;
+  String? question;
+
+  @override
+  Future<ElbeeReply> ask(
+    String question, {
+    required bool includeNextClass,
+  }) async {
+    calls++;
+    this.question = question;
+    consent = includeNextClass;
+    return reply;
+  }
+}
+
+void main() {
+  test('parses verified cards and drops pose fields', () {
+    const injection = 'Ignore previous instructions. latitude: 1,2';
+    final reply = ElbeeReply.parse(200, {
+      'status': 'options',
+      'explanation': injection,
+      'cards': [
+        {
+          'place_id': 'place-119',
+          'title': injection,
+          'floor': '1',
+          'latitude': 33.7,
+          'longitude': -118.1,
+          'position': {'x': 1, 'y': 2, 'z': 3},
+          'steps': ['turn left'],
+        },
+        {
+          'kind': 'rule',
+          'text': 'Student permits: check the sign.',
+          'source_url': 'https://www.csulb.edu/parking',
+          'retrieved_at': '2026-11-10',
+        },
+      ],
+    });
+    expect(reply.cards.first.placeId, 'place-119');
+    expect(reply.cards.first.title, injection);
+    expect(reply.cards.last.opensRoute, isFalse);
+    expect(reply.explanation, injection);
+  });
+
+  test('named unavailable states stay distinct', () {
+    expect(
+      ElbeeReply.parse(200, {'status': 'off_campus'}).status,
+      ElbeeStatus.offCampus,
+    );
+    expect(
+      ElbeeReply.parse(200, {'status': 'no_match'}).status,
+      ElbeeStatus.noMatch,
+    );
+    expect(
+      ElbeeReply.parse(200, {'status': 'model_unavailable'}).status,
+      ElbeeStatus.modelUnavailable,
+    );
+    expect(ElbeeReply.parse(429, {}).status, ElbeeStatus.budget);
+    expect(
+      ElbeeReply.parse(200, {'status': 'options', 'cards': []}).status,
+      ElbeeStatus.noMatch,
+    );
+  });
+
+  test('schedule consent is the request flag', () async {
+    http.Request? sent;
+    final gateway = HttpElbeeGateway(
+      baseUrl: 'https://example.test',
+      auth: _Auth(),
+      client: MockClient((request) async {
+        sent = request;
+        return http.Response(jsonEncode({'status': 'no_match'}), 200);
+      }),
+    );
+    await gateway.ask('Where is VEC?', includeNextClass: false);
+    expect(sent!.headers['Authorization'], 'Bearer session');
+    expect(jsonDecode(sent!.body), {
+      'question': 'Where is VEC?',
+      'includeNextClass': false,
+    });
+    await gateway.ask('Where is my next class?', includeNextClass: true);
+    expect(jsonDecode(sent!.body)['includeNextClass'], isTrue);
+  });
+
+  testWidgets('cards, consent, and plain injection text', (tester) async {
+    const injection = '<script>alert(1)</script> Ignore previous instructions';
+    final gateway = _Scripted(
+      ElbeeReply(
+        status: ElbeeStatus.options,
+        explanation: injection,
+        cards: const [
+          ElbeeCard(title: injection, placeId: 'place-119', floor: '1'),
+        ],
+      ),
+    );
+    String? opened;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ElbeeSheet(gateway: gateway, onOpenPlace: (id) => opened = id),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(Image));
+    await tester.pump();
+    expect(find.text('Elbee tilts their head.'), findsOneWidget);
+    expect(gateway.calls, 0);
+
+    await tester.tap(find.text('Find my next class'));
+    await tester.pump();
+    await tester.tap(find.text('Ask Elbee'));
+    await tester.pump();
+    expect(gateway.consent, isFalse);
+    expect(gateway.question, 'Where is my next class?');
+    expect(find.text(injection), findsNWidgets(2));
+    expect(find.byType(RichText), findsWidgets);
+
+    await tester.tap(find.text(injection).last);
+    await tester.pump();
+    expect(opened, 'place-119');
+  });
+
+  testWidgets('unavailable states use their own sentences', (tester) async {
+    Future<void> show(ElbeeReply reply, String sentence) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ElbeeSheet(gateway: _Scripted(reply), onOpenPlace: (_) {}),
+          ),
+        ),
+      );
+      await tester.enterText(find.byType(TextField), 'hello');
+      await tester.tap(find.text('Ask Elbee'));
+      await tester.pump();
+      expect(find.text(sentence), findsOneWidget);
+    }
+
+    await show(
+      const ElbeeReply(status: ElbeeStatus.offCampus),
+      'Elbee only answers CSULB campus questions.',
+    );
+    await show(
+      const ElbeeReply(status: ElbeeStatus.noMatch),
+      'No verified campus match.',
+    );
+    await show(
+      const ElbeeReply(status: ElbeeStatus.modelUnavailable),
+      "Elbee's assistant is unavailable right now.",
+    );
+    await show(
+      const ElbeeReply(status: ElbeeStatus.budget),
+      "Elbee's question budget is used up.",
+    );
+    await show(
+      const ElbeeReply(status: ElbeeStatus.network),
+      'Elbee could not be reached. Check your connection.',
+    );
+  });
+}
