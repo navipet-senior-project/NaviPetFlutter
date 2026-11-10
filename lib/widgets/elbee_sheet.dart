@@ -145,7 +145,8 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
       ElbeeStatus.demo => 'Demo data. Not a live model.',
       ElbeeStatus.network =>
         'Elbee could not be reached. Check your connection.',
-      ElbeeStatus.signedOut => 'Sign in again to ask Elbee.',
+      ElbeeStatus.signedOut =>
+        'Sign in to use your next class in this question.',
       ElbeeStatus.rateLimited => 'Elbee is limiting questions for this hour.',
       ElbeeStatus.conflict => 'That question is already being answered.',
       ElbeeStatus.rejected =>

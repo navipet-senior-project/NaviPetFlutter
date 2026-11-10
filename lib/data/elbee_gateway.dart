@@ -46,9 +46,17 @@ class HttpElbeeGateway implements ElbeeGateway {
       'mode': 'ask',
     });
     try {
-      var response = await _post(body, forceRefresh: false);
+      var token = await _auth.token();
+      if (scheduleConsent && (token == null || token.isEmpty)) {
+        return const ElbeeReply(status: ElbeeStatus.signedOut);
+      }
+      var response = await _post(body, token: token);
       if (response.statusCode == 401) {
-        response = await _post(body, forceRefresh: true);
+        token = await _auth.token(forceRefresh: true);
+        if (scheduleConsent && (token == null || token.isEmpty)) {
+          return const ElbeeReply(status: ElbeeStatus.signedOut);
+        }
+        response = await _post(body, token: token);
       }
       Object? json;
       try {
@@ -66,8 +74,7 @@ class HttpElbeeGateway implements ElbeeGateway {
     }
   }
 
-  Future<http.Response> _post(String body, {required bool forceRefresh}) async {
-    final token = await _auth.token(forceRefresh: forceRefresh);
+  Future<http.Response> _post(String body, {required String? token}) async {
     return _client
         .post(
           Uri.parse('$baseUrl/elbee/ask'),
