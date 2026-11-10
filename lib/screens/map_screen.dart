@@ -1087,6 +1087,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           Navigator.of(sheetContext).pop();
           try {
             final place = await flow.searchGateway.place(placeId);
+            if (!place.isLocal) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Elbee can only open verified CSULB campus places.',
+                  ),
+                ),
+              );
+              return;
+            }
             await flow.selectPlace(place);
             await flow.requestDirections();
           } catch (error) {
