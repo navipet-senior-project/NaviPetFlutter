@@ -14,6 +14,7 @@ import '../screens/forgot_password_screen.dart';
 import '../screens/indoor_ar_launch_screen.dart';
 import '../screens/indoor_ar_spike_screen.dart';
 import '../screens/map_screen.dart';
+import '../screens/indoor_building_map_screen.dart';
 import '../screens/pet_customization_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/reset_password_screen.dart';
@@ -86,6 +87,10 @@ GoRouter createAppRouter(
       builder: (context, state) => const ResetPasswordScreen(),
     ),
     GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
+    GoRoute(
+      path: '/buildings/vec',
+      builder: (context, state) => const IndoorBuildingMapScreen(),
+    ),
     GoRoute(
       path: '/pet',
       builder: (context, state) => const PetCustomizationScreen(),

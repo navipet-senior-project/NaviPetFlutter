@@ -76,6 +76,7 @@ flutter:
   assets:
     - assets/mascot.png
     - assets/images/
+    - assets/indoor/vec_floors1and2.json
     - .env
 
   fonts:
