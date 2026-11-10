@@ -1087,6 +1087,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           Navigator.of(sheetContext).pop();
           try {
             final place = await flow.searchGateway.place(placeId);
+            if (!mounted) return;
             if (!place.isLocal) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
