@@ -1124,9 +1124,9 @@ Widget _historyCard(
 void _prototypeNotice(
   BuildContext context, [
   String message = 'This control is ready for backend integration.',
-]) =>
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+]) => ScaffoldMessenger.of(
+  context,
+).showSnackBar(SnackBar(content: Text(message)));
 void _showDeleteDialog(BuildContext context) => showDialog<void>(
   context: context,
   builder: (dialogContext) => AlertDialog(

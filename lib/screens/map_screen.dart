@@ -1010,55 +1010,55 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return '$minutes min';
   }
 
-  Widget _presenceChoice(NavigationFlowController flow, EdgeInsets padding) =>
-      Positioned(
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: Material(
-          color: AppColors.surface,
-          elevation: 10,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppRadius.lg),
-          ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Confirm your location',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'We cannot confirm whether you are inside the building. Refresh your location or continue with walking directions.',
-                ),
-                const SizedBox(height: 16),
-                if (flow.canScanAr)
-                  FilledButton(
-                    onPressed: () => _scanAr(flow.destination!),
-                    child: const Text('Scan AR'),
-                  ),
-                OutlinedButton(
-                  onPressed: flow.checkingPresence
-                      ? null
-                      : flow.refreshPresence,
-                  child: Text(
-                    flow.checkingPresence ? 'Refreshing…' : 'Refresh location',
-                  ),
-                ),
-                FilledButton(
-                  onPressed: flow.continueRoute,
-                  child: const Text('Continue with directions'),
-                ),
-                TextButton(onPressed: flow.back, child: const Text('Back')),
-              ],
+  Widget _presenceChoice(
+    NavigationFlowController flow,
+    EdgeInsets padding,
+  ) => Positioned(
+    left: 0,
+    right: 0,
+    bottom: 0,
+    child: Material(
+      color: AppColors.surface,
+      elevation: 10,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadius.lg),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Confirm your location',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
             ),
-          ),
+            const SizedBox(height: 12),
+            const Text(
+              'We cannot confirm whether you are inside the building. Refresh your location or continue with walking directions.',
+            ),
+            const SizedBox(height: 16),
+            if (flow.canScanAr)
+              FilledButton(
+                onPressed: () => _scanAr(flow.destination!),
+                child: const Text('Scan AR'),
+              ),
+            OutlinedButton(
+              onPressed: flow.checkingPresence ? null : flow.refreshPresence,
+              child: Text(
+                flow.checkingPresence ? 'Refreshing…' : 'Refresh location',
+              ),
+            ),
+            FilledButton(
+              onPressed: flow.continueRoute,
+              child: const Text('Continue with directions'),
+            ),
+            TextButton(onPressed: flow.back, child: const Text('Back')),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _elbeeButton(EdgeInsets padding) => Positioned(
     left: 16,
