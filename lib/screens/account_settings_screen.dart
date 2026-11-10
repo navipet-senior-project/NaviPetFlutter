@@ -538,11 +538,7 @@ class AccessibilityScreen extends StatefulWidget {
 
 class _AccessibilityScreenState extends State<AccessibilityScreen> {
   final Map<String, bool> values = {};
-  Widget group(
-    String title,
-    List<(String, String?)> rows, {
-    bool enabled = true,
-  }) => Column(
+  Widget group(String title, List<(String, String?)> rows) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _sectionTitle(title),
@@ -556,10 +552,8 @@ class _AccessibilityScreenState extends State<AccessibilityScreen> {
           children: [
             for (var i = 0; i < rows.length; i++) ...[
               SwitchListTile(
-                value: enabled && (values[rows[i].$1] ?? false),
-                onChanged: enabled
-                    ? (v) => setState(() => values[rows[i].$1] = v)
-                    : null,
+                value: values[rows[i].$1] ?? false,
+                onChanged: (v) => setState(() => values[rows[i].$1] = v),
                 activeThumbColor: _navy,
                 title: Text(rows[i].$1),
                 subtitle: rows[i].$2 == null ? null : Text(rows[i].$2!),
@@ -583,18 +577,6 @@ class _AccessibilityScreenState extends State<AccessibilityScreen> {
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        group('MOBILITY', const [
-          (
-            'Accessible routes',
-            'Unavailable until walkable indoor data exists',
-          ),
-          ('Avoid stairs', 'Unavailable until walkable indoor data exists'),
-          ('Prefer elevators', 'Unavailable until walkable indoor data exists'),
-          (
-            'Avoid steep slopes',
-            'Unavailable until walkable indoor data exists',
-          ),
-        ], enabled: false),
         group('GUIDANCE', const [
           ('Voice guidance', 'Spoken turn-by-turn directions'),
           ('Haptic turn alerts', null),
