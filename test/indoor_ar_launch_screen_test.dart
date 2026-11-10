@@ -277,6 +277,29 @@ void main() {
     });
   }
 
+  testWidgets('localization-only success does not claim room distance', (
+    tester,
+  ) async {
+    final harness = _Harness(
+      status: PermissionStatus.granted,
+      result: const IndoorArResult(
+        status: IndoorArStatus.arrived,
+        checkDistanceM: 0.5,
+        localizationQueries: 1,
+        durationMs: 1,
+      ),
+      fetch: (_) async {
+        final json = jsonDecode(_fixture) as Map<String, dynamic>;
+        (json['place'] as Map<String, dynamic>)['indoor'] = null;
+        return http.Response(jsonEncode(json), 200);
+      },
+    );
+    await harness.pump(tester);
+    await harness.tapAr(tester);
+    expect(find.textContaining('localized this area.'), findsOneWidget);
+    expect(find.textContaining('m away'), findsNothing);
+  });
+
   testWidgets('missing destination still scans without fetching', (
     tester,
   ) async {

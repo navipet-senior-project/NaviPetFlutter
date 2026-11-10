@@ -30,6 +30,7 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
 
   final _question = TextEditingController();
   var _consent = false;
+  var _replyConsent = false;
   var _busy = false;
   var _reaction = 0;
   ElbeeReply? _reply;
@@ -43,12 +44,19 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
   Future<void> _ask() async {
     final question = _question.text.trim();
     if (question.isEmpty || _busy) return;
-    setState(() => _busy = true);
-    final reply = await widget.gateway.ask(question, scheduleConsent: _consent);
+    final consent = _consent;
+    setState(() {
+      _busy = true;
+      _consent = false;
+      _reply = null;
+      _replyConsent = false;
+    });
+    final reply = await widget.gateway.ask(question, scheduleConsent: consent);
     if (!mounted) return;
     setState(() {
       _busy = false;
       _reply = reply;
+      _replyConsent = consent;
     });
   }
 
@@ -125,7 +133,8 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
                   if (card.indoorNote != null) card.indoorNote!,
                 ]),
               if (reply.parking != null) _parking(reply.parking!),
-              if (reply.nextClass != null) _nextClass(reply.nextClass!),
+              if (_replyConsent && reply.nextClass != null)
+                _nextClass(reply.nextClass!),
             ],
           ],
         ),

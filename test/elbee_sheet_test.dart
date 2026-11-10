@@ -172,6 +172,41 @@ void main() {
     expect(opened, 'place-119');
   });
 
+  testWidgets('consent applies to one request and gates next-class display', (
+    tester,
+  ) async {
+    final gateway = _Scripted(
+      const ElbeeReply(
+        status: ElbeeStatus.ok,
+        nextClass: ElbeeNextClass(courseCode: 'CS 101', placeId: null),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ElbeeSheet(gateway: gateway, onOpenPlace: (_) {}),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextField), 'next class');
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pump();
+    await tester.tap(find.text('Ask Elbee'));
+    await tester.pump();
+    expect(gateway.consent, isTrue);
+    expect(find.text('CS 101'), findsOneWidget);
+    expect(
+      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+      isFalse,
+    );
+
+    await tester.enterText(find.byType(TextField), 'Where is VEC?');
+    await tester.tap(find.text('Ask Elbee'));
+    await tester.pump();
+    expect(gateway.consent, isFalse);
+    expect(find.text('CS 101'), findsNothing);
+  });
+
   testWidgets('unavailable states use their own sentences', (tester) async {
     Future<void> show(ElbeeReply reply, String sentence) async {
       await tester.pumpWidget(
