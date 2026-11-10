@@ -63,12 +63,12 @@ class IndoorArRequest {
   /// Scan to find the phone. Omits door pose fields so none can be invented.
   IndoorArRequest.localize({
     this.room = '',
+    this.floor = '',
     required this.mapCode,
     required this.frame,
     this.arToken,
   }) : mode = localizeMode,
        doorKey = '',
-       floor = '',
        position = const IndoorArVector3(0, 0, 0),
        headingDeg = 0 {
     if (mapCode.isEmpty || frame.isEmpty) {
@@ -106,6 +106,7 @@ class IndoorArRequest {
   IndoorArRequest withArToken(IndoorArToken token) => isLocalize
       ? IndoorArRequest.localize(
           room: room,
+          floor: floor,
           mapCode: mapCode,
           frame: frame,
           arToken: token,
@@ -128,6 +129,7 @@ class IndoorArRequest {
           'mapCode': mapCode,
           'frame': frame,
           if (room.isNotEmpty) 'room': room,
+          if (floor.isNotEmpty) 'floor': floor,
           if (arToken != null) 'arToken': arToken!.toJson(),
         }
       : {

@@ -1,94 +1,132 @@
-/// Elbee answers from `POST /elbee/ask`.
+/// Answer from `POST /elbee/ask`.
 ///
-/// Body is `{question, includeNextClass}`. A 200 object has `status`
-/// (`options`, `no_match`, `off_campus`, `model_unavailable`, `budget`),
-/// optional `explanation` and `clarification` strings, and `cards`. A
-/// destination card needs `place_id` and `title`. A rule card needs `text`
-/// or `rules[].text`. Coordinates, steps, and parking eligibility are ignored.
+/// Request body is `{question, scheduleConsent, mode: "ask"}`. A 200 object
+/// uses `status`, `disclosure`, `explanation`, `clarifyingQuestion`, `cards`,
+/// `parking`, and `nextClass`. A destination card needs `placeId` and `title`.
+/// Coordinates, steps, and parking eligibility are ignored.
 enum ElbeeStatus {
-  options,
+  ok,
+  ambiguous,
   noMatch,
-  offCampus,
-  modelUnavailable,
+  offTopic,
   budget,
+  consentRequired,
+  unavailable,
+  demo,
   network,
   signedOut,
+  rateLimited,
+  conflict,
+  rejected,
 }
 
 class ElbeeCard {
   const ElbeeCard({
     required this.title,
+    required this.placeId,
     this.subtitle,
-    this.placeId,
     this.floor,
     this.indoorNote,
-    this.provenanceUrl,
-    this.ruleText,
-    this.sourceUrl,
-    this.retrievedAt,
   });
 
   final String title;
+  final String placeId;
   final String? subtitle;
-
-  /// Set only for a verified destination. Route handoff uses this id alone.
-  final String? placeId;
   final String? floor;
   final String? indoorNote;
-  final String? provenanceUrl;
-  final String? ruleText;
+}
+
+class ElbeeRule {
+  const ElbeeRule({required this.text, this.sourceUrl, this.retrievedAt});
+
+  final String text;
   final String? sourceUrl;
   final String? retrievedAt;
+}
 
-  bool get opensRoute => placeId != null;
+class ElbeeParking {
+  const ElbeeParking({required this.disclaimer, this.rules = const []});
+
+  final String disclaimer;
+  final List<ElbeeRule> rules;
+}
+
+class ElbeeNextClass {
+  const ElbeeNextClass({
+    required this.courseCode,
+    this.startTime,
+    this.endTime,
+    this.placeId,
+  });
+
+  final String courseCode;
+  final String? startTime;
+  final String? endTime;
+  final String? placeId;
 }
 
 class ElbeeReply {
   const ElbeeReply({
     required this.status,
+    this.disclosure,
     this.explanation,
-    this.clarification,
+    this.clarifyingQuestion,
     this.cards = const [],
+    this.parking,
+    this.nextClass,
   });
 
   final ElbeeStatus status;
+  final String? disclosure;
   final String? explanation;
-  final String? clarification;
+  final String? clarifyingQuestion;
   final List<ElbeeCard> cards;
+  final ElbeeParking? parking;
+  final ElbeeNextClass? nextClass;
 
   static ElbeeReply parse(int statusCode, Object? json) {
-    if (statusCode == 401) {
+    final error = json is Map ? json['error'] : null;
+    final code = error is Map ? error['code'] : null;
+    if (statusCode == 401 || code == 'INVALID_ACCESS_TOKEN') {
       return const ElbeeReply(status: ElbeeStatus.signedOut);
     }
-    if (statusCode == 429) {
-      return const ElbeeReply(status: ElbeeStatus.budget);
+    if (statusCode == 429 || code == 'RATE_LIMITED') {
+      return const ElbeeReply(status: ElbeeStatus.rateLimited);
     }
-    if (statusCode == 503 || statusCode == 501) {
-      return const ElbeeReply(status: ElbeeStatus.modelUnavailable);
+    if (statusCode == 409 || code == 'CONFLICT') {
+      return const ElbeeReply(status: ElbeeStatus.conflict);
     }
-    if (json is! Map) {
-      return const ElbeeReply(status: ElbeeStatus.modelUnavailable);
-    }
-    final status = switch (json['status']) {
-      'options' => ElbeeStatus.options,
-      'no_match' => ElbeeStatus.noMatch,
-      'off_campus' => ElbeeStatus.offCampus,
-      'model_unavailable' => ElbeeStatus.modelUnavailable,
-      'budget' => ElbeeStatus.budget,
-      _ => ElbeeStatus.modelUnavailable,
-    };
-    if (status != ElbeeStatus.options) {
+    if (statusCode == 422 || code == 'VALIDATION_ERROR') {
       return ElbeeReply(
-        status: status,
-        explanation: _text(json['explanation']),
+        status: ElbeeStatus.rejected,
+        explanation: error is Map ? _text(error['message']) : null,
       );
     }
-    final cards = _cards(json['cards']);
+    if (statusCode == 502 || code == 'UPSTREAM_ERROR') {
+      return const ElbeeReply(status: ElbeeStatus.network);
+    }
+    if (statusCode != 200 || json is! Map) {
+      return const ElbeeReply(status: ElbeeStatus.unavailable);
+    }
+    final status = switch (json['status']) {
+      'ok' => ElbeeStatus.ok,
+      'ambiguous' => ElbeeStatus.ambiguous,
+      'no_match' => ElbeeStatus.noMatch,
+      'off_topic' => ElbeeStatus.offTopic,
+      'budget_exhausted' => ElbeeStatus.budget,
+      'consent_required' => ElbeeStatus.consentRequired,
+      'unavailable' => ElbeeStatus.unavailable,
+      'demo' => ElbeeStatus.demo,
+      _ => ElbeeStatus.unavailable,
+    };
     return ElbeeReply(
-      status: cards.isEmpty ? ElbeeStatus.noMatch : status,
+      status: status,
+      disclosure: _text(json['disclosure']),
       explanation: _text(json['explanation']),
-      clarification: _text(json['clarification']),
-      cards: cards,
+      clarifyingQuestion: _text(json['clarifyingQuestion']),
+      cards: _cards(json['cards']),
+      parking: _parking(json['parking']),
+      nextClass: _nextClass(json['nextClass']),
     );
   }
 
@@ -97,57 +135,54 @@ class ElbeeReply {
     final cards = <ElbeeCard>[];
     for (final item in raw) {
       if (item is! Map) continue;
-      final card = _card(item);
-      if (card != null) cards.add(card);
+      final placeId = _text(item['placeId']);
+      final title = _text(item['title']);
+      if (placeId == null || title == null) continue;
+      cards.add(
+        ElbeeCard(
+          title: title,
+          placeId: placeId,
+          subtitle: _text(item['subtitle']),
+          floor: _text(item['floor']),
+          indoorNote: _text(item['indoorNote']),
+        ),
+      );
     }
     return cards;
   }
 
-  static ElbeeCard? _card(Map<dynamic, dynamic> json) {
-    final kind = json['kind'];
-    final placeId = _text(json['place_id']);
-    final title = _text(json['title']) ?? _text(json['text']);
-    final rule = _rule(json);
-    if (kind == 'rule' || (placeId == null && rule != null)) {
-      final text = rule?.text ?? title;
-      if (text == null) return null;
-      return ElbeeCard(
-        title: text,
-        ruleText: text,
-        sourceUrl: rule?.sourceUrl ?? _text(json['source_url']),
-        retrievedAt: rule?.retrievedAt ?? _text(json['retrieved_at']),
-        provenanceUrl: _text(json['provenance_url']),
-      );
+  static ElbeeParking? _parking(Object? raw) {
+    if (raw is! Map) return null;
+    final disclaimer = _text(raw['disclaimer']);
+    if (disclaimer == null) return null;
+    final rules = <ElbeeRule>[];
+    final rawRules = raw['rules'];
+    if (rawRules is List) {
+      for (final item in rawRules) {
+        if (item is! Map) continue;
+        final text = _text(item['text']);
+        if (text == null) continue;
+        rules.add(
+          ElbeeRule(
+            text: text,
+            sourceUrl: _text(item['sourceUrl']),
+            retrievedAt: _text(item['retrievedAt']),
+          ),
+        );
+      }
     }
-    if (placeId == null || title == null || kind == 'rule') return null;
-    return ElbeeCard(
-      title: title,
-      subtitle: _text(json['subtitle']),
-      placeId: placeId,
-      floor: _text(json['floor']),
-      indoorNote: _text(json['indoor_note']),
-      provenanceUrl: _text(json['provenance_url']),
-    );
+    return ElbeeParking(disclaimer: disclaimer, rules: rules);
   }
 
-  static _Rule? _rule(Map<dynamic, dynamic> json) {
-    final direct = _text(json['text']);
-    if (direct != null && json['place_id'] == null) {
-      return _Rule(
-        direct,
-        _text(json['source_url']),
-        _text(json['retrieved_at']),
-      );
-    }
-    final rules = json['rules'];
-    if (rules is! List || rules.isEmpty || rules.first is! Map) return null;
-    final first = rules.first as Map;
-    final text = _text(first['text']);
-    if (text == null) return null;
-    return _Rule(
-      text,
-      _text(first['source_url']),
-      _text(first['retrieved_at']),
+  static ElbeeNextClass? _nextClass(Object? raw) {
+    if (raw is! Map) return null;
+    final courseCode = _text(raw['courseCode']);
+    if (courseCode == null) return null;
+    return ElbeeNextClass(
+      courseCode: courseCode,
+      startTime: _text(raw['startTime']),
+      endTime: _text(raw['endTime']),
+      placeId: _text(raw['placeId']),
     );
   }
 
@@ -156,11 +191,4 @@ class ElbeeReply {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
   }
-}
-
-class _Rule {
-  const _Rule(this.text, this.sourceUrl, this.retrievedAt);
-  final String text;
-  final String? sourceUrl;
-  final String? retrievedAt;
 }

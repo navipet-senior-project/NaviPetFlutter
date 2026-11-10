@@ -262,6 +262,7 @@ void main() {
         'schemaVersion': 2,
         'mode': 'localize',
         'room': '119',
+        'floor': '1',
         'mapCode': 'MSET_XTBY7AM7ZK77',
         'frame': 'multiset-mapset',
         'arToken': {

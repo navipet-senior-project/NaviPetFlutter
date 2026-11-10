@@ -44,10 +44,7 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
     final question = _question.text.trim();
     if (question.isEmpty || _busy) return;
     setState(() => _busy = true);
-    final reply = await widget.gateway.ask(
-      question,
-      includeNextClass: _consent,
-    );
+    final reply = await widget.gateway.ask(question, scheduleConsent: _consent);
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -121,7 +118,14 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
             if (reply != null) ...[
               const SizedBox(height: 12),
               _status(reply),
-              for (final card in reply.cards) _card(card),
+              for (final card in reply.cards)
+                _place(card.title, card.placeId, [
+                  if (card.subtitle != null) card.subtitle!,
+                  if (card.floor != null) 'Floor ${card.floor}',
+                  if (card.indoorNote != null) card.indoorNote!,
+                ]),
+              if (reply.parking != null) _parking(reply.parking!),
+              if (reply.nextClass != null) _nextClass(reply.nextClass!),
             ],
           ],
         ),
@@ -131,50 +135,81 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
 
   Widget _status(ElbeeReply reply) {
     final fixed = switch (reply.status) {
-      ElbeeStatus.options => null,
+      ElbeeStatus.ok || ElbeeStatus.ambiguous => null,
       ElbeeStatus.noMatch => 'No verified campus match.',
-      ElbeeStatus.offCampus => 'Elbee only answers CSULB campus questions.',
-      ElbeeStatus.modelUnavailable =>
-        "Elbee's assistant is unavailable right now.",
+      ElbeeStatus.offTopic => 'Elbee only answers CSULB campus questions.',
+      ElbeeStatus.unavailable => "Elbee's assistant is unavailable right now.",
       ElbeeStatus.budget => "Elbee's question budget is used up.",
+      ElbeeStatus.consentRequired =>
+        'Check "Use my next class" before asking about your schedule.',
+      ElbeeStatus.demo => 'Demo data. Not a live model.',
       ElbeeStatus.network =>
         'Elbee could not be reached. Check your connection.',
       ElbeeStatus.signedOut => 'Sign in again to ask Elbee.',
+      ElbeeStatus.rateLimited => 'Elbee is limiting questions for this hour.',
+      ElbeeStatus.conflict => 'That question is already being answered.',
+      ElbeeStatus.rejected =>
+        'Ask a CSULB question in 500 characters or fewer.',
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (reply.disclosure != null) Text(reply.disclosure!),
         if (fixed != null) Text(fixed),
         if (reply.explanation != null) Text(reply.explanation!),
-        if (reply.clarification != null) Text(reply.clarification!),
+        if (reply.clarifyingQuestion != null) Text(reply.clarifyingQuestion!),
       ],
     );
   }
 
-  Widget _card(ElbeeCard card) {
-    final lines = <String>[
-      card.title,
-      if (card.subtitle != null) card.subtitle!,
-      if (card.floor != null) 'Floor ${card.floor}',
-      if (card.indoorNote != null) card.indoorNote!,
-      if (card.provenanceUrl != null) card.provenanceUrl!,
-      if (card.sourceUrl != null) card.sourceUrl!,
-      if (card.retrievedAt != null) 'Retrieved ${card.retrievedAt}',
+  Widget _parking(ElbeeParking parking) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(parking.disclaimer),
+          for (final rule in parking.rules) ...[
+            Text(rule.text),
+            if (rule.sourceUrl != null) Text(rule.sourceUrl!),
+            if (rule.retrievedAt != null) Text('Retrieved ${rule.retrievedAt}'),
+          ],
+        ],
+      ),
+    ),
+  );
+
+  Widget _nextClass(ElbeeNextClass next) {
+    final lines = [
+      next.courseCode,
+      if (next.startTime != null && next.endTime != null)
+        '${next.startTime}–${next.endTime}',
     ];
-    final text = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [for (final line in lines) Text(line)],
-    );
-    return Card(
-      child: card.opensRoute
-          ? InkWell(
-              onTap: () => widget.onOpenPlace(card.placeId!),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: text,
-              ),
-            )
-          : Padding(padding: const EdgeInsets.all(AppSpacing.md), child: text),
-    );
+    final placeId = next.placeId;
+    if (placeId == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [for (final line in lines) Text(line)],
+          ),
+        ),
+      );
+    }
+    return _place(lines.first, placeId, lines.skip(1).toList());
   }
+
+  Widget _place(String title, String placeId, List<String> lines) => Card(
+    child: InkWell(
+      onTap: () => widget.onOpenPlace(placeId),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [Text(title), for (final line in lines) Text(line)],
+        ),
+      ),
+    ),
+  );
 }

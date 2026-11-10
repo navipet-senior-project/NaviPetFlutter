@@ -8,8 +8,8 @@ import 'auth_token_provider.dart';
 import 'elbee_reply.dart';
 
 abstract interface class ElbeeGateway {
-  /// [includeNextClass] is the per-request schedule consent flag.
-  Future<ElbeeReply> ask(String question, {required bool includeNextClass});
+  /// [scheduleConsent] is this request's permission to read the next class.
+  Future<ElbeeReply> ask(String question, {required bool scheduleConsent});
 }
 
 class HttpElbeeGateway implements ElbeeGateway {
@@ -31,14 +31,19 @@ class HttpElbeeGateway implements ElbeeGateway {
   @override
   Future<ElbeeReply> ask(
     String question, {
-    required bool includeNextClass,
+    required bool scheduleConsent,
   }) async {
+    final trimmed = question.trim();
     if (baseUrl.isEmpty) {
       return const ElbeeReply(status: ElbeeStatus.network);
     }
+    if (trimmed.isEmpty || trimmed.length > 500) {
+      return const ElbeeReply(status: ElbeeStatus.rejected);
+    }
     final body = jsonEncode({
-      'question': question,
-      'includeNextClass': includeNextClass,
+      'question': trimmed,
+      'scheduleConsent': scheduleConsent,
+      'mode': 'ask',
     });
     try {
       var response = await _post(body, forceRefresh: false);
@@ -50,9 +55,6 @@ class HttpElbeeGateway implements ElbeeGateway {
         json = jsonDecode(response.body);
       } on FormatException {
         json = null;
-      }
-      if (response.statusCode >= 500 && response.statusCode != 503) {
-        return const ElbeeReply(status: ElbeeStatus.network);
       }
       return ElbeeReply.parse(response.statusCode, json);
     } on TimeoutException {
