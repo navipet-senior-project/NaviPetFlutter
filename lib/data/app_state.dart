@@ -105,6 +105,7 @@ class AppState extends ChangeNotifier {
   String? _equippedOutfit;
   bool _checkingNearbyTasks = false;
   bool _classesBusy = false;
+  String? _classesError;
   final Map<String, DateTime> _onlineSessionStarts = {};
   Future<void>? _profileFetch;
   String? _profileFetchUserId;
@@ -127,6 +128,9 @@ class AppState extends ChangeNotifier {
   UserAccount? get activeUser => _activeUser;
   List<CourseClass> get classes => List.unmodifiable(_classes);
   bool get classesBusy => _classesBusy;
+
+  /// Why the last [refreshClasses] failed; null once one succeeds.
+  String? get classesError => _classesError;
   int get points => _points;
   Set<String> get ownedOutfits => Set.unmodifiable(_ownedOutfits);
   String? get equippedOutfit => _equippedOutfit;
@@ -316,6 +320,7 @@ class AppState extends ChangeNotifier {
     final user = client?.auth.currentUser;
     if (client == null || user == null) return;
     _classesBusy = true;
+    _classesError = null;
     notifyListeners();
     try {
       _classes = await _fetchClasses(client, user.id);
@@ -337,9 +342,9 @@ class AppState extends ChangeNotifier {
       _completionCounts = counts;
       await refreshPoints();
     } on ClassesApiException catch (error) {
-      _errorMessage = error.message;
+      _errorMessage = _classesError = error.message;
     } on PostgrestException catch (error) {
-      _errorMessage = error.message;
+      _errorMessage = _classesError = error.message;
     } finally {
       _classesBusy = false;
       notifyListeners();
@@ -1090,6 +1095,7 @@ class AppState extends ChangeNotifier {
       _activeUser = null;
       _resetProfileFetchState();
       _classes = const [];
+      _classesError = null;
       _completionKeys = const {};
       _completionCounts = const {};
       _points = 0;
