@@ -8,8 +8,7 @@ import '../widgets/account_button.dart';
 
 /// Pet Customization screen, cloned from the Figma "Pet cuztomization" frame
 /// (node 17:3). Shows the dressed mascot, quick-action pills and a wardrobe
-/// bento grid of outfits. The Menu tab in the shared bottom nav routes to the
-/// Class Checklist (matching the prototype wiring).
+/// bento grid of outfits. Opened as the Shop from Pet Home.
 class PetCustomizationScreen extends StatefulWidget {
   const PetCustomizationScreen({super.key});
 
@@ -17,26 +16,27 @@ class PetCustomizationScreen extends StatefulWidget {
   State<PetCustomizationScreen> createState() => _PetCustomizationScreenState();
 }
 
-class _Outfit {
-  const _Outfit(this.id, this.label, this.icon, this.price);
+class PetOutfit {
+  const PetOutfit(this.id, this.label, this.icon, this.price);
   final String id;
   final String label;
   final IconData icon;
   final int price;
 }
 
-class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
-  // Grid order matches the Figma layout: tee (active), cap, shades, hat.
-  static const _outfits = [
-    _Outfit('csulb_tee', 'CSULB Tee', Icons.checkroom, 20),
-    _Outfit('grad_cap', 'Grad Cap', Icons.school_outlined, 30),
-    _Outfit('shades', 'Shades', Icons.remove_red_eye_outlined, 15),
-    _Outfit('beach_hat', 'Beach Hat', Icons.beach_access_outlined, 25),
-  ];
+/// The store catalog. Grid order matches the Figma layout: tee, cap, shades,
+/// hat. Prices are charged by the `buy_outfit` RPC, not by the client.
+const petOutfits = [
+  PetOutfit('csulb_tee', 'CSULB Tee', Icons.checkroom, 20),
+  PetOutfit('grad_cap', 'Grad Cap', Icons.school_outlined, 30),
+  PetOutfit('shades', 'Shades', Icons.remove_red_eye_outlined, 15),
+  PetOutfit('beach_hat', 'Beach Hat', Icons.beach_access_outlined, 25),
+];
 
+class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
   bool _buying = false;
 
-  Future<void> _selectOutfit(_Outfit outfit) async {
+  Future<void> _selectOutfit(PetOutfit outfit) async {
     final state = context.read<AppState>();
     if (_buying) return;
     setState(() => _buying = true);
@@ -109,19 +109,28 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: const [
-              Icon(
-                Icons.sentiment_satisfied_outlined,
-                size: 20,
-                color: AppColors.petInk,
-              ),
-              SizedBox(width: AppSpacing.sm),
-              Text(
-                'Elbee',
-                style: TextStyle(fontSize: 16, color: AppColors.petInk),
-              ),
-            ],
+          Flexible(
+            child: Row(
+              children: [
+                // Shown when Pet Home pushed this screen as its Shop.
+                if (Navigator.canPop(context))
+                  const BackButton(color: AppColors.petInk),
+                const Icon(
+                  Icons.sentiment_satisfied_outlined,
+                  size: 20,
+                  color: AppColors.petInk,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                const Flexible(
+                  child: Text(
+                    'Elbee',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 16, color: AppColors.petInk),
+                  ),
+                ),
+              ],
+            ),
           ),
           Row(
             children: [
@@ -160,7 +169,7 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
 
   Widget _mascot() {
     final equippedId = context.watch<AppState>().equippedOutfit;
-    final equipped = _outfits.where((outfit) => outfit.id == equippedId);
+    final equipped = petOutfits.where((outfit) => outfit.id == equippedId);
     return Column(
       children: [
         Container(
@@ -213,14 +222,16 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
           mainAxisSpacing: AppSpacing.lg,
           crossAxisSpacing: AppSpacing.lg,
           childAspectRatio: 1.02,
-          children: [for (var i = 0; i < _outfits.length; i++) _outfitCard(i)],
+          children: [
+            for (var i = 0; i < petOutfits.length; i++) _outfitCard(i),
+          ],
         ),
       ],
     );
   }
 
   Widget _outfitCard(int index) {
-    final outfit = _outfits[index];
+    final outfit = petOutfits[index];
     final state = context.watch<AppState>();
     final owned = state.ownedOutfits.contains(outfit.id);
     final active = state.equippedOutfit == outfit.id;
