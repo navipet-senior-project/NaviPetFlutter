@@ -18,6 +18,7 @@ class IndoorArLaunchScreen extends StatefulWidget {
     required this.destinationId,
     required this.gateway,
     required this.tokenGateway,
+    this.request,
     this.now = DateTime.now,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
@@ -26,6 +27,7 @@ class IndoorArLaunchScreen extends StatefulWidget {
 
   final IndoorArLauncher launcher;
   final String? destinationId;
+  final IndoorArRequest? request;
   final CampusSearchGateway gateway;
 
   /// Null when the app has no backend session to ask; AR is then unavailable.
@@ -81,8 +83,18 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       _unavailable = false;
       _tokenFailed = false;
     });
+    final request = widget.request;
     final id = widget.destinationId?.trim();
-    if (id == null || id.isEmpty) {
+    if (request != null) {
+      if (request.mapCode != IndoorArRequest.buildMapCode ||
+          request.frame != IndoorArRequest.buildFrame ||
+          !indoorScanCovered('VEC', request.floor)) {
+        setState(() => _unavailable = true);
+        return;
+      }
+      _request = request;
+      _guideToRoom = !request.isLocalize;
+    } else if (id == null || id.isEmpty) {
       setState(() => _unavailable = true);
       return;
     } else {
