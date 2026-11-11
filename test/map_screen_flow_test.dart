@@ -87,6 +87,7 @@ void main() {
     final active = controller.state;
     expect(active, isA<FlowActiveNavigation>());
     expect(find.byTooltip('Outdoor AR unavailable'), findsOneWidget);
+    expect(find.text('AR'), findsNothing);
     expect(find.byKey(const ValueKey('navipet-map')), findsOneWidget);
     expect(
       tester.getSemantics(find.bySemanticsLabel('Outdoor AR unavailable')),
@@ -140,6 +141,9 @@ void main() {
     await tester.pump();
 
     final button = tester.getRect(find.byTooltip('Outdoor AR unavailable'));
+    expect(button.width, 112);
+    expect(button.height, 56);
+    expect(button.right, lessThanOrEqualTo(400 - 16));
     expect(button.top, greaterThan(48));
     expect(button.bottom, lessThan(1600 / 2 - 40));
     expect(tester.takeException(), isNull);
@@ -217,8 +221,9 @@ void main() {
       timestamp: DateTime.now(),
     );
     await tester.pump();
-    expect(find.text('Scan AR'), findsOneWidget);
-    await tester.tap(find.text('Scan AR'));
+    expect(find.text('Scan AR'), findsNothing);
+    expect(find.byTooltip('Scan AR'), findsOneWidget);
+    await tester.tap(find.byTooltip('Scan AR'));
     await tester.pumpAndSettle();
     expect(find.text('destination vec119'), findsOneWidget);
     await tester.pump(staleFix);

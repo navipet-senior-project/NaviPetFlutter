@@ -26,6 +26,7 @@ import '../widgets/route_preview_sheet.dart';
 import '../widgets/search_bar_field.dart';
 import '../widgets/search_overlay.dart';
 import '../widgets/travel_mode_selector.dart';
+import '../widgets/outdoor_ar_entry_button.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.controller});
@@ -698,44 +699,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       right: 16,
       bottom: bottom,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (state is FlowActiveNavigation) ...[
-            MergeSemantics(
-              child: Semantics(
-                label: 'Outdoor AR unavailable',
-                hint: 'Shows why outdoor AR guidance is not available yet',
-                button: true,
-                child: SizedBox.square(
-                  dimension: 48,
-                  child: FloatingActionButton(
-                    heroTag: 'outdoor-ar',
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.navy,
-                    tooltip: 'Outdoor AR unavailable',
-                    onPressed: _showOutdoorArUnavailable,
-                    child: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ArModeIcon(color: AppColors.navy, size: 22),
-                          ExcludeSemantics(
-                            child: Text(
-                              'AR',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                height: 1.1,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            OutdoorArEntryButton(
+              onPressed: () => showOutdoorArUnavailableDialog(context),
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
@@ -805,22 +774,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       ),
     );
   }
-
-  Future<void> _showOutdoorArUnavailable() => showDialog<void>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Outdoor AR unavailable'),
-      content: const Text(
-        'Outdoor AR guidance is not available yet. Your walking route stays active on the map.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Return to map'),
-        ),
-      ],
-    ),
-  );
 
   Widget _locationBanner(
     EdgeInsets padding,
@@ -1028,9 +981,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   if (flow.canScanAr)
-                    TextButton(
+                    IconButton(
+                      tooltip: 'Scan AR',
                       onPressed: () => _scanAr(state.destination),
-                      child: const Text('Scan AR'),
+                      icon: const Icon(Icons.view_in_ar_outlined),
                     ),
                   TextButton(
                     onPressed: flow.back,
