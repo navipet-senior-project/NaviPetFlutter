@@ -26,6 +26,7 @@ import '../widgets/route_preview_sheet.dart';
 import '../widgets/search_bar_field.dart';
 import '../widgets/search_overlay.dart';
 import '../widgets/travel_mode_selector.dart';
+import '../widgets/outdoor_ar_entry_button.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.controller});
@@ -698,8 +699,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       right: 16,
       bottom: bottom,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (state is FlowActiveNavigation) ...[
+            OutdoorArEntryButton(
+              onPressed: () => showOutdoorArUnavailableDialog(context),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           if (state is FlowArrived &&
               indoorScanCovered(
                 state.destination.buildingCode,
@@ -973,9 +981,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   if (flow.canScanAr)
-                    TextButton(
+                    IconButton(
+                      tooltip: 'Scan AR',
                       onPressed: () => _scanAr(state.destination),
-                      child: const Text('Scan AR'),
+                      icon: const Icon(Icons.view_in_ar_outlined),
                     ),
                   TextButton(
                     onPressed: flow.back,
