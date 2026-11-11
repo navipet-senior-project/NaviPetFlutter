@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
+import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../data/indoor_ar_token_gateway.dart';
 import '../data/navigation_flow_controller.dart';
@@ -139,6 +140,9 @@ GoRouter createAppRouter(
       builder: (context, state) => IndoorArLaunchScreen(
         launcher: NativeIndoorArLauncher(),
         destinationId: state.uri.queryParameters['destination'],
+        request: state.extra is IndoorArRequest
+            ? state.extra as IndoorArRequest
+            : null,
         gateway: context.read<NavigationFlowController>().searchGateway,
         tokenGateway: indoorArTokenGateway,
       ),
