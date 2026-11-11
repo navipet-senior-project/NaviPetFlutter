@@ -1,8 +1,54 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../data/elbee_gateway.dart';
 import '../data/elbee_reply.dart';
+import '../data/navigation_flow_controller.dart';
 import '../theme/app_theme.dart';
+
+/// Opens Elbee and sends a tapped card to [flow] as a verified campus place.
+/// [onPlaceSelected] runs once the place is selected, before directions are
+/// requested, so a screen other than the map can switch to it.
+Future<void> showElbeeSheet(
+  BuildContext context, {
+  required NavigationFlowController flow,
+  VoidCallback? onPlaceSelected,
+}) {
+  final gateway = context.read<ElbeeGateway>();
+  // Captured up front: [onPlaceSelected] may leave this screen.
+  final messenger = ScaffoldMessenger.of(context);
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => ElbeeSheet(
+      gateway: gateway,
+      onOpenPlace: (placeId) async {
+        Navigator.of(sheetContext).pop();
+        try {
+          final place = await flow.searchGateway.place(placeId);
+          if (!context.mounted) return;
+          if (!place.isLocal) {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Elbee can only open verified CSULB campus places.',
+                ),
+              ),
+            );
+            return;
+          }
+          await flow.selectPlace(place);
+          onPlaceSelected?.call();
+          await flow.requestDirections();
+        } catch (error) {
+          messenger.showSnackBar(
+            SnackBar(content: Text('Could not open that place: $error')),
+          );
+        }
+      },
+    ),
+  );
+}
 
 /// Asks the authenticated Elbee route and renders verified cards as text.
 class ElbeeSheet extends StatefulWidget {

@@ -15,7 +15,6 @@ import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
 import '../data/indoor_floor_coverage.dart';
 import '../theme/app_theme.dart';
-import '../data/elbee_gateway.dart';
 import '../widgets/ar_mode_icon.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/elbee_sheet.dart';
@@ -1084,41 +1083,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     ),
   );
 
-  Future<void> _openElbee() async {
-    final gateway = context.read<ElbeeGateway>();
-    final flow = _flow;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => ElbeeSheet(
-        gateway: gateway,
-        onOpenPlace: (placeId) async {
-          Navigator.of(sheetContext).pop();
-          try {
-            final place = await flow.searchGateway.place(placeId);
-            if (!mounted) return;
-            if (!place.isLocal) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Elbee can only open verified CSULB campus places.',
-                  ),
-                ),
-              );
-              return;
-            }
-            await flow.selectPlace(place);
-            await flow.requestDirections();
-          } catch (error) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not open that place: $error')),
-            );
-          }
-        },
-      ),
-    );
-  }
+  Future<void> _openElbee() => showElbeeSheet(context, flow: _flow);
 
   Widget _indoorHandoff(
     FlowIndoorHandoff state,

@@ -48,35 +48,11 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     super.dispose();
   }
 
-  void _edit(BuildContext context, [CourseClass? course]) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      builder: (_) => ChangeNotifierProvider.value(
-        value: context.read<AppState>(),
-        child: ClassEditorSheet(course: course),
-      ),
-    );
-  }
+  void _edit(BuildContext context, [CourseClass? course]) =>
+      showClassEditorSheet(context, course);
 
-  void _showClass(BuildContext context, CourseClass course) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      builder: (sheetContext) => ClassDetailSheet(
-        course: course,
-        completions: context.read<AppState>().completionCountFor(course.id),
-        onEdit: () {
-          Navigator.pop(sheetContext);
-          _edit(context, course);
-        },
-      ),
-    );
-  }
+  void _showClass(BuildContext context, CourseClass course) =>
+      showClassDetailSheet(context, course);
 
   @override
   Widget build(BuildContext context) {
