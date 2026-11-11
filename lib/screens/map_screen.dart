@@ -700,6 +700,45 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (state is FlowActiveNavigation) ...[
+            MergeSemantics(
+              child: Semantics(
+                label: 'Outdoor AR unavailable',
+                hint: 'Shows why outdoor AR guidance is not available yet',
+                button: true,
+                child: SizedBox.square(
+                  dimension: 48,
+                  child: FloatingActionButton(
+                    heroTag: 'outdoor-ar',
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.navy,
+                    tooltip: 'Outdoor AR unavailable',
+                    onPressed: _showOutdoorArUnavailable,
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ArModeIcon(color: AppColors.navy, size: 22),
+                          ExcludeSemantics(
+                            child: Text(
+                              'AR',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           if (state is FlowArrived &&
               indoorScanCovered(
                 state.destination.buildingCode,
@@ -766,6 +805,22 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       ),
     );
   }
+
+  Future<void> _showOutdoorArUnavailable() => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Outdoor AR unavailable'),
+      content: const Text(
+        'Outdoor AR guidance is not available yet. Your walking route stays active on the map.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Return to map'),
+        ),
+      ],
+    ),
+  );
 
   Widget _locationBanner(
     EdgeInsets padding,
