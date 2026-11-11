@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../data/campus_search_gateway.dart';
+import '../data/campus_place.dart';
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../data/indoor_ar_token_gateway.dart';
@@ -62,6 +63,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   var _guideToRoom = false;
   var _unavailable = false;
   var _tokenFailed = false;
+  String? _placeLookupFailure;
   var _rationale = false;
   var _blocked = false;
 
@@ -82,6 +84,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     setState(() {
       _unavailable = false;
       _tokenFailed = false;
+      _placeLookupFailure = null;
     });
     final request = widget.request;
     final id = widget.destinationId?.trim();
@@ -126,8 +129,26 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
           );
           _guideToRoom = true;
         }
+      } on CampusSearchException catch (error) {
+        if (mounted) {
+          setState(() {
+            _placeLookupFailure = switch (error.failure) {
+              CampusSearchFailure.offline =>
+                'Could not load this place. Check your connection and try again.',
+              CampusSearchFailure.unauthorized =>
+                'Could not verify your account. Sign in again and retry.',
+              CampusSearchFailure.api =>
+                'Could not load place details. Try again.',
+            };
+          });
+        }
+        return;
       } catch (_) {
-        if (mounted) setState(() => _unavailable = true);
+        if (mounted) {
+          setState(() {
+            _placeLookupFailure = 'Could not load place details. Try again.';
+          });
+        }
         return;
       }
     }
@@ -223,11 +244,20 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: _blocked || _rationale || _unavailable
+    appBar:
+        _blocked || _rationale || _unavailable || _placeLookupFailure != null
         ? AppBar(title: const Text('AR mode'))
         : null,
     body: Center(
-      child: _unavailable
+      child: _placeLookupFailure != null
+          ? _message(
+              _placeLookupFailure!,
+              action: 'Retry',
+              onAction: _start,
+              back: 'Back to map',
+              onBack: () => _leave(null),
+            )
+          : _unavailable
           ? _message(
               _tokenFailed
                   ? "Couldn't start AR. Check your connection and try again."
