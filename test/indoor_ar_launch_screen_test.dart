@@ -98,6 +98,7 @@ class _Harness {
             destinationId: state.uri.queryParameters['destination'],
             gateway: HttpCampusSearchGateway(
               baseUrl: 'https://example.test',
+              auth: session,
               client: MockClient((request) async {
                 fetchedIds.add(request.url.pathSegments.last);
                 return fetch != null
@@ -227,7 +228,9 @@ void main() {
     await harness.pump(tester);
     await harness.tapAr(tester);
     expect(
-      find.text("Indoor AR isn't available for this room"),
+      find.text(
+        'Could not load this place. Check your connection and try again.',
+      ),
       findsOneWidget,
     );
     expect(harness.fake.requests, isEmpty);
@@ -238,6 +241,37 @@ void main() {
     expect(harness.fake.requests.single.toJson(), vec119Request().toJson());
     expect(find.text('map'), findsOneWidget);
   });
+
+  for (final (name, response, message)
+      in <(String, Future<http.Response> Function(http.Request), String)>[
+        (
+          'authentication failure',
+          (_) async => http.Response('', 401),
+          'Could not verify your account. Sign in again and retry.',
+        ),
+        (
+          'place API failure',
+          (_) async => http.Response('', 503),
+          'Could not load place details. Try again.',
+        ),
+      ]) {
+    testWidgets('$name does not ask for camera or mint an AR token', (
+      tester,
+    ) async {
+      final harness = _Harness(
+        status: PermissionStatus.granted,
+        fetch: response,
+      );
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+
+      expect(find.text(message), findsOneWidget);
+      expect(harness.statusChecks, 0);
+      expect(harness.cameraRequests, 0);
+      expect(harness.mintRequests, isEmpty);
+      expect(harness.fake.requests, isEmpty);
+    });
+  }
 
   for (final failure in ['missing indoor', 'malformed indoor']) {
     testWidgets('$failure scans without a door pose', (tester) async {
