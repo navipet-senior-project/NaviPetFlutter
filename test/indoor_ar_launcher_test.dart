@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:navipet/data/indoor_ar_contract.dart';
 import 'package:navipet/data/indoor_ar_launcher.dart';
+import 'package:navipet/data/navigation_models.dart';
+import 'package:navipet/data/outdoor_ar_contract.dart';
 
 import 'support/indoor_ar_fixtures.dart';
 
@@ -35,6 +37,36 @@ void main() {
     );
     expect(result.status, IndoorArStatus.cancelled);
     expect(result.durationMs, 900);
+  });
+
+  test('sends an outdoor request on the same channel', () async {
+    MethodCall? received;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      received = call;
+      return '{"status":"error","errorCode":"BAD_REQUEST",'
+          '"localizationQueries":0,"durationMs":3}';
+    });
+    final request = OutdoorArRequest.to(
+      const NaviDestination(
+        name: 'Library',
+        address: '',
+        coordinate: NavigationCoordinate(latitude: 1, longitude: 2),
+        entranceCoordinate: NavigationCoordinate(latitude: 3, longitude: 4),
+      ),
+    );
+
+    final result = await NativeIndoorArLauncher(
+      isSupportedPlatform: true,
+    ).launchOutdoor(request);
+
+    expect(received?.method, 'launch');
+    expect(jsonDecode(received!.arguments as String), {
+      'schemaVersion': 2,
+      'mode': 'outdoor',
+      'destination': {'name': 'Library', 'latitude': 3, 'longitude': 4},
+      'dataUseAccepted': true,
+    });
+    expect(result.errorCode, 'BAD_REQUEST');
   });
 
   test('returns unavailable when the host has no channel', () async {

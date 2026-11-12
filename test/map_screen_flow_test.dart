@@ -5,10 +5,12 @@ import 'package:navipet/data/app_state.dart';
 import 'package:navipet/data/campus_place.dart';
 import 'package:navipet/data/elbee_gateway.dart';
 import 'package:navipet/data/elbee_reply.dart';
+import 'package:navipet/data/indoor_ar_contract.dart';
 import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/data/location_service.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/data/navigation_flow_state.dart';
+import 'package:navipet/data/outdoor_ar_contract.dart';
 import 'package:navipet/screens/map_screen.dart';
 import 'package:navipet/widgets/ar_mode_icon.dart';
 import 'package:navipet/widgets/elbee_sheet.dart';
@@ -72,7 +74,140 @@ class _Elbee implements ElbeeGateway {
   );
 }
 
+/// An active walk on a build that opted in to outdoor AR.
+Future<(NavigationFlowController, List<OutdoorArRequest>)> pumpOutdoorAr(
+  WidgetTester tester, {
+  IndoorArResult result = const IndoorArResult(
+    status: IndoorArStatus.cancelled,
+    localizationQueries: 0,
+    durationMs: 1,
+  ),
+  bool camera = true,
+}) async {
+  final controller = harness.build();
+  final requests = <OutdoorArRequest>[];
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppState()),
+        ChangeNotifierProvider.value(value: controller),
+      ],
+      child: MaterialApp(
+        home: MapScreen(
+          controller: controller,
+          outdoorArEnabled: true,
+          requestCamera: () async => camera,
+          launchOutdoorAr: (request) async {
+            requests.add(request);
+            return result;
+          },
+        ),
+      ),
+    ),
+  );
+  await controller.selectPlace(arrivalPlace);
+  await controller.requestDirections();
+  await controller.calculateRoute(continueWithUncertain: true);
+  await controller.startRoute(continueWithUncertain: true);
+  await tester.pump();
+  await tester.tap(find.byTooltip('Outdoor AR'));
+  await tester.pumpAndSettle();
+  return (controller, requests);
+}
+
 void main() {
+  testWidgets('outdoor AR launches after consent and keeps the route', (
+    tester,
+  ) async {
+    final (controller, requests) = await pumpOutdoorAr(tester);
+    final active = controller.state as FlowActiveNavigation;
+    expect(find.textContaining('Google will process sensor data'), findsOne);
+    expect(find.text('Learn more'), findsOneWidget);
+    expect(requests, isEmpty);
+
+    await tester.tap(find.text('Agree and continue'));
+    await tester.pumpAndSettle();
+
+    expect(requests.single.toJson(), {
+      'schemaVersion': 2,
+      'mode': 'outdoor',
+      'destination': {
+        'name': 'Horn Center',
+        'latitude': active.destination.routingCoordinate.latitude,
+        'longitude': active.destination.routingCoordinate.longitude,
+      },
+      'dataUseAccepted': true,
+    });
+    expect(controller.state, same(active));
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byKey(const ValueKey('navipet-map')), findsOneWidget);
+  });
+
+  testWidgets('outdoor AR does not launch without consent or camera', (
+    tester,
+  ) async {
+    final (controller, requests) = await pumpOutdoorAr(tester, camera: false);
+    final active = controller.state;
+
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+
+    await tester.tap(find.byTooltip('Outdoor AR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Agree and continue'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('needs camera access'), findsOneWidget);
+
+    expect(requests, isEmpty);
+    expect(controller.state, same(active));
+  });
+
+  for (final (name, result, text) in [
+    (
+      'no Unity library',
+      const IndoorArResult.unavailable(),
+      'Outdoor AR guidance is not available yet.',
+    ),
+    (
+      'an indoor-only Unity library',
+      const IndoorArResult(
+        status: IndoorArStatus.error,
+        localizationQueries: 0,
+        durationMs: 1,
+        errorCode: 'BAD_REQUEST',
+      ),
+      'Outdoor AR guidance is not available yet.',
+    ),
+    (
+      'a failed session',
+      const IndoorArResult(
+        status: IndoorArStatus.localizationFailed,
+        localizationQueries: 0,
+        durationMs: 1,
+      ),
+      'Outdoor AR could not start.',
+    ),
+  ]) {
+    testWidgets('outdoor AR falls back to the map with $name', (tester) async {
+      final (controller, requests) = await pumpOutdoorAr(
+        tester,
+        result: result,
+      );
+      final active = controller.state;
+      await tester.tap(find.text('Agree and continue'));
+      await tester.pumpAndSettle();
+
+      expect(requests, hasLength(1));
+      expect(find.text('Outdoor AR unavailable'), findsOneWidget);
+      expect(find.textContaining(text), findsOneWidget);
+      await tester.tap(find.text('Return to map'));
+      await tester.pumpAndSettle();
+      expect(controller.state, same(active));
+      expect(active, isA<FlowActiveNavigation>());
+    });
+  }
+
   testWidgets('outdoor AR explains availability and preserves active route', (
     tester,
   ) async {

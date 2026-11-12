@@ -17,7 +17,10 @@ includes:
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
 - During an active outdoor walk, an AR control explains that outdoor AR guidance
-  is unavailable and returns to the map with the route still active.
+  is unavailable and returns to the map with the route still active. A build
+  that opts in can instead hand the walk's destination to an ARCore Geospatial
+  session; that path is untested on a device and needs a Unity library no one
+  has built yet. See [docs/outdoor-ar-geospatial.md](docs/outdoor-ar-geospatial.md).
 - Calendar, Pet Shop and Pack, and Account screens. On Android (and on iOS
   when a prebuilt UnityFramework is present, see `docs/ios-testing.md`), Scan AR
   appears during navigation to a place with indoor AR once a fresh
