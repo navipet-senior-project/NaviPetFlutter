@@ -282,6 +282,13 @@ void main() {
     }
   });
 
+  testWidgets('tapping the next-class icon opens class details', (tester) async {
+    await _pump(tester, _FakeAppState());
+    await tester.tap(find.byIcon(Icons.location_on_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Senior Project'), findsOneWidget);
+  });
+
   testWidgets('Elbee stands on the rug, clear of the HUD and today card', (
     tester,
   ) async {

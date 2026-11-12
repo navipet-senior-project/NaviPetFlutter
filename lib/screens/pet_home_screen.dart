@@ -398,7 +398,10 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     final course = next.course;
     return _card(
       _infoWithAction(
-        Row(
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => showClassDetailSheet(context, course),
+          child: Row(
           children: [
             Container(
               width: 44,
@@ -415,10 +418,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () => showClassDetailSheet(context, course),
-                child: Padding(
+              child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,10 +443,10 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                       ),
                     ],
                   ),
-                ),
               ),
             ),
           ],
+          ),
         ),
         _petButton(label: 'Guide', onPressed: _openGuide),
       ),
@@ -534,7 +534,7 @@ class _RoomPainter extends CustomPainter {
     );
     canvas.drawRect(Rect.fromLTWH(0, floorTop, size.width, 6), trim);
 
-    final window = Rect.fromLTWH(size.width * .08, size.height * .20, 116, 136);
+    final window = Rect.fromLTWH(size.width * .08, size.height * .34, 116, 136);
     final windowPath = Path()
       ..moveTo(window.left, window.bottom)
       ..lineTo(window.left, window.top + 55)
@@ -575,7 +575,7 @@ class _RoomPainter extends CustomPainter {
     canvas.drawOval(rug, white);
     canvas.drawOval(rug, navy);
 
-    final sign = Rect.fromLTWH(size.width * .64, size.height * .25, 82, 54);
+    final sign = Rect.fromLTWH(size.width * .64, size.height * .39, 82, 54);
     canvas.drawRRect(
       RRect.fromRectAndRadius(sign, const Radius.circular(6)),
       white,

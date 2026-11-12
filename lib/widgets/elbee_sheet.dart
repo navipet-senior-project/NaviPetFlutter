@@ -20,9 +20,10 @@ Future<void> showElbeeSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (sheetContext) => ElbeeSheet(
-      gateway: gateway,
-      onOpenPlace: (placeId) async {
+    builder: (sheetContext) => SafeArea(
+      child: ElbeeSheet(
+        gateway: gateway,
+        onOpenPlace: (placeId) async {
         Navigator.of(sheetContext).pop();
         try {
           final place = await flow.searchGateway.place(placeId);
@@ -45,7 +46,8 @@ Future<void> showElbeeSheet(
             SnackBar(content: Text('Could not open that place: $error')),
           );
         }
-      },
+        },
+      ),
     ),
   );
 }
@@ -123,7 +125,12 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
       child: SingleChildScrollView(
-        child: Column(
+        physics: const ClampingScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .9,
+          ),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -193,6 +200,7 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
                 _nextClass(reply.nextClass!),
             ],
           ],
+          ),
         ),
       ),
     );
