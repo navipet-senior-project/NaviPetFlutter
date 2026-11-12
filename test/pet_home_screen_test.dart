@@ -328,12 +328,11 @@ void main() {
 
     await _pump(tester, _FakeAppState(fakeClasses: const []));
     expect(
-      find.text('Add a class to start exploring together.'),
+      find.text('No upcoming classes this week.'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Add class'));
-    await tester.pumpAndSettle();
-    expect(find.text('checklist page'), findsOneWidget);
+    expect(find.text('Add class'), findsNothing);
+    expect(find.text('Calendar'), findsNothing);
 
     final failedRefresh = _FakeAppState(
       fakeClasses: const [],
@@ -441,10 +440,11 @@ void main() {
       _FakeAppState(fakeClasses: const []),
       router: _router(initialLocation: '/pet/quests'),
     );
-    expect(find.text('Add a class on Calendar to get quests'), findsOneWidget);
-    await tester.tap(find.text('Open Calendar'));
-    await tester.pumpAndSettle();
-    expect(find.text('checklist page'), findsOneWidget);
+    expect(
+      find.text('No quests yet. Your class quests will appear here.'),
+      findsOneWidget,
+    );
+    expect(find.text('Open Calendar'), findsNothing);
   });
 
   testWidgets('Pack previews, resets, and equips owned outfits only', (

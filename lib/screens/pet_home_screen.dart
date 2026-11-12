@@ -372,33 +372,24 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       );
     }
     if (next == null) {
-      final hasClasses = context.read<AppState>().classes.isNotEmpty;
       return _card(
-        _infoWithAction(
-          Row(
-            children: [
-              const Icon(
-                Icons.event_available_outlined,
-                color: AppColors.petInk,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  hasClasses
-                      ? 'No upcoming classes this week.'
-                      : 'Add a class to start exploring together.',
-                  style: const TextStyle(
-                    color: AppColors.petInk,
-                    fontWeight: FontWeight.w700,
-                  ),
+        Row(
+          children: [
+            const Icon(
+              Icons.event_available_outlined,
+              color: AppColors.petInk,
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'No upcoming classes this week.',
+                style: TextStyle(
+                  color: AppColors.petInk,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
-          ),
-          TextButton(
-            onPressed: () => context.go('/checklist'),
-            child: Text(hasClasses ? 'Calendar' : 'Add class'),
-          ),
+            ),
+          ],
         ),
       );
     }

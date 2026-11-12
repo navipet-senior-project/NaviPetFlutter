@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
@@ -414,18 +413,13 @@ class _PetQuestsScreenState extends State<PetQuestsScreen> {
           Image.asset('assets/images/elbee.png', height: 116),
           const SizedBox(height: 12),
           const Text(
-            'Add a class on Calendar to get quests',
+            'No quests yet. Your class quests will appear here.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.petInk,
               fontSize: 18,
               fontWeight: FontWeight.w800,
             ),
-          ),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: () => context.go('/checklist'),
-            child: const Text('Open Calendar'),
           ),
         ],
       ),
