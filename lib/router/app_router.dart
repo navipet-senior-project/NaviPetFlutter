@@ -17,6 +17,9 @@ import '../screens/indoor_ar_spike_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/indoor_building_map_screen.dart';
 import '../screens/pet_customization_screen.dart';
+import '../screens/pet_home_screen.dart';
+import '../screens/pet_pack_screen.dart';
+import '../screens/pet_quests_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/reset_password_screen.dart';
 import '../screens/sign_in_screen.dart';
@@ -94,7 +97,21 @@ GoRouter createAppRouter(
     ),
     GoRoute(
       path: '/pet',
-      builder: (context, state) => const PetCustomizationScreen(),
+      builder: (context, state) => const PetHomeScreen(),
+      routes: [
+        GoRoute(
+          path: 'shop',
+          builder: (context, state) => const PetCustomizationScreen(),
+        ),
+        GoRoute(
+          path: 'pack',
+          builder: (context, state) => const PetPackScreen(),
+        ),
+        GoRoute(
+          path: 'quests',
+          builder: (context, state) => const PetQuestsScreen(),
+        ),
+      ],
     ),
     GoRoute(
       path: '/checklist',

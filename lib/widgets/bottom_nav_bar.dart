@@ -10,7 +10,7 @@ enum NaviTab { menu, location, pets }
 /// Shared bottom navigation bar, cloned from the Figma prototype.
 ///
 /// Three labelled slots: Calendar on the left routing to the class calendar,
-/// Pet in the centre routing to Pet Customization, and Locations on the right
+/// Pet in the centre routing to Pet Home, and Locations on the right
 /// routing to the Map. Used by the Map, Pet and Calendar screens so they share
 /// the same navigation surface.
 class NaviBottomNav extends StatelessWidget {
@@ -26,7 +26,8 @@ class NaviBottomNav extends StatelessWidget {
       case NaviTab.location:
         context.go('/map');
       case NaviTab.pets:
-        context.go('/pet');
+        final returnTo = active == NaviTab.menu ? '/checklist' : '/map';
+        context.push('/pet?from=$returnTo');
     }
   }
 
@@ -134,6 +135,10 @@ class NaviBottomNav extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                // The bar is a fixed 64px; a larger label overflows it.
+                textScaler: MediaQuery.textScalerOf(
+                  context,
+                ).clamp(maxScaleFactor: 1.5),
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.2,

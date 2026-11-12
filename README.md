@@ -8,13 +8,19 @@ includes:
   sessions, and profile data.
 - A native Mapbox map with live device location.
 - Mapbox destination autocomplete and walking directions.
+- A 2D Pet section with Elbee Home, Pack, Shop, and Quests. Home shows the
+  signed-in user's saved classes and verified point balance (shown as gems);
+  Quests uses the existing server-verified claim flow, Shop uses the existing
+  purchase RPC, and Pack only equips owned outfits. Pet level and message are
+  derived locally; classes, inventory, and rewards are not mocked. A campus
+  check-in is not proof of class attendance.
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
 - During an active outdoor walk, an AR control explains that outdoor AR guidance
   is unavailable and returns to the map with the route still active.
-- Existing Pet, Checklist, and Account screens. On Android (and on iOS when a
-  prebuilt UnityFramework is present, see `docs/ios-testing.md`), the Scan AR
-  button appears during navigation to a place with indoor AR once a fresh
+- Calendar, Pet Shop and Pack, and Account screens. On Android (and on iOS
+  when a prebuilt UnityFramework is present, see `docs/ios-testing.md`), Scan AR
+  appears during navigation to a place with indoor AR once a fresh
   location fix is at or within 2 m of the building footprint, regardless of GPS
   accuracy. It hides when the fix goes stale (10 s) or is clearly outside. It
   loads the selected place and sends its backend door pose, plus a
