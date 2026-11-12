@@ -20,6 +20,8 @@ Future<void> showElbeeSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    // Large text makes the sheet full height; keep it off the status bar.
+    useSafeArea: true,
     builder: (sheetContext) => SafeArea(
       child: ElbeeSheet(
         gateway: gateway,
