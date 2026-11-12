@@ -289,6 +289,16 @@ void main() {
     expect(find.text('Senior Project'), findsOneWidget);
   });
 
+  testWidgets('tapping next-class card padding opens class details', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeAppState());
+    final card = tester.getRect(find.byKey(const ValueKey('pet-today-card')));
+    await tester.tapAt(Offset(card.left + 6, card.top + 6));
+    await tester.pumpAndSettle();
+    expect(find.text('Senior Project'), findsOneWidget);
+  });
+
   testWidgets('Elbee stands on the rug, clear of the HUD and today card', (
     tester,
   ) async {
@@ -371,6 +381,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('map page'), findsOneWidget);
     expect(flow.destination?.id, harness.horn.id);
+  });
+
+  testWidgets('Guide scrolls and returns the answer at large text', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeAppState(),
+      size: const Size(440, 956),
+      textScale: 3.12,
+    );
+    await tester.tap(find.text('Guide'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.text('Ask Elbee'));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('Ask Elbee')).dy, lessThan(956));
+    await tester.enterText(find.byType(TextField), 'Where is Horn Center?');
+    await tester.tap(find.text('Ask Elbee'));
+    await tester.pumpAndSettle();
+    expect(find.text('Horn Center'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Quests owns missions, details, check-in and inline errors', (

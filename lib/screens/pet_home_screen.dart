@@ -72,8 +72,8 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
             final compact = constraints.maxHeight < 640;
             return Stack(
               children: [
-                const Positioned.fill(
-                  child: CustomPaint(painter: _RoomPainter()),
+                Positioned.fill(
+                  child: CustomPaint(painter: _RoomPainter(compact: compact)),
                 ),
                 Positioned(
                   top: MediaQuery.paddingOf(context).top + 8,
@@ -450,6 +450,8 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
         ),
         _petButton(label: 'Guide', onPressed: _openGuide),
       ),
+      onTap: () => showClassDetailSheet(context, course),
+      semanticLabel: 'Open ${course.courseCode} class details',
     );
   }
 
@@ -470,16 +472,28 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           ],
         );
 
-  Widget _card(Widget child) => Container(
-    key: const ValueKey('pet-today-card'),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: AppColors.cardBorder),
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: AppShadows.soft,
+  Widget _card(
+    Widget child, {
+    VoidCallback? onTap,
+    String? semanticLabel,
+  }) => Semantics(
+    button: onTap != null,
+    label: semanticLabel,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+      key: const ValueKey('pet-today-card'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.cardBorder),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.soft,
+      ),
+      child: child,
+      ),
     ),
-    child: child,
   );
 
   Widget _petButton({required String label, required VoidCallback onPressed}) =>
@@ -512,7 +526,9 @@ Rect petRugRect(Size room) => Rect.fromCenter(
 );
 
 class _RoomPainter extends CustomPainter {
-  const _RoomPainter();
+  const _RoomPainter({required this.compact});
+
+  final bool compact;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -534,7 +550,12 @@ class _RoomPainter extends CustomPainter {
     );
     canvas.drawRect(Rect.fromLTWH(0, floorTop, size.width, 6), trim);
 
-    final window = Rect.fromLTWH(size.width * .08, size.height * .34, 116, 136);
+    final window = Rect.fromLTWH(
+      size.width * .08,
+      size.height * (compact ? .34 : .20),
+      116,
+      136,
+    );
     final windowPath = Path()
       ..moveTo(window.left, window.bottom)
       ..lineTo(window.left, window.top + 55)
@@ -575,7 +596,12 @@ class _RoomPainter extends CustomPainter {
     canvas.drawOval(rug, white);
     canvas.drawOval(rug, navy);
 
-    final sign = Rect.fromLTWH(size.width * .64, size.height * .39, 82, 54);
+    final sign = Rect.fromLTWH(
+      size.width * .64,
+      size.height * (compact ? .39 : .25),
+      82,
+      54,
+    );
     canvas.drawRRect(
       RRect.fromRectAndRadius(sign, const Radius.circular(6)),
       white,

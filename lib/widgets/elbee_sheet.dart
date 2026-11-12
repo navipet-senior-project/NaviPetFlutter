@@ -126,11 +126,7 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
       padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
       child: SingleChildScrollView(
         physics: const ClampingScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * .9,
-          ),
-          child: Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -200,7 +196,6 @@ class _ElbeeSheetState extends State<ElbeeSheet> {
                 _nextClass(reply.nextClass!),
             ],
           ],
-          ),
         ),
       ),
     );
