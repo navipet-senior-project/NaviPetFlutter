@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -70,21 +72,27 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxHeight < 640;
+            final scaler = MediaQuery.textScalerOf(context);
+            final hudCompact = compact || scaler.scale(1) > 1.5;
+            final hudTop = MediaQuery.paddingOf(context).top + 8;
+            // shortcut: estimated two-row HUD height (56 row, 8 gap, level
+            // chip), measure it instead if the HUD gains rows.
+            final hudBottom = hudCompact
+                ? hudTop + 64 + math.max(56.0, 28 + scaler.scale(15) * 1.5)
+                : 0.0;
             return Stack(
               children: [
                 Positioned.fill(
-                  child: CustomPaint(painter: _RoomPainter(compact: compact)),
+                  child: CustomPaint(painter: _RoomPainter(hudBottom)),
                 ),
                 Positioned(
-                  top: MediaQuery.paddingOf(context).top + 8,
+                  top: hudTop,
                   left: 16,
                   right: 16,
                   child: _hud(
                     PetLevel(completions),
                     gems: loading ? null : state.points,
-                    compact:
-                        compact ||
-                        MediaQuery.textScalerOf(context).scale(1) > 1.5,
+                    compact: hudCompact,
                   ),
                 ),
                 Positioned(
@@ -179,6 +187,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
         'verified missions to the next level',
     value: '${level.current} of ${PetLevel.perLevel}',
     child: Container(
+      key: const ValueKey('pet-level'),
       constraints: const BoxConstraints(minHeight: 56),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: _hudDecoration(),
@@ -520,9 +529,10 @@ Rect petRugRect(Size room) => Rect.fromCenter(
 );
 
 class _RoomPainter extends CustomPainter {
-  const _RoomPainter({required this.compact});
+  const _RoomPainter(this.hudBottom);
 
-  final bool compact;
+  /// Bottom of a two-row HUD, or 0. The wall art moves down to clear it.
+  final double hudBottom;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -544,9 +554,10 @@ class _RoomPainter extends CustomPainter {
     );
     canvas.drawRect(Rect.fromLTWH(0, floorTop, size.width, 6), trim);
 
+    final drop = math.max(0.0, hudBottom + 12 - size.height * .20);
     final window = Rect.fromLTWH(
       size.width * .08,
-      size.height * (compact ? .34 : .20),
+      size.height * .20 + drop,
       116,
       136,
     );
@@ -592,7 +603,7 @@ class _RoomPainter extends CustomPainter {
 
     final sign = Rect.fromLTWH(
       size.width * .64,
-      size.height * (compact ? .39 : .25),
+      size.height * .25 + drop,
       82,
       54,
     );
@@ -627,5 +638,6 @@ class _RoomPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _RoomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _RoomPainter oldDelegate) =>
+      oldDelegate.hudBottom != hudBottom;
 }

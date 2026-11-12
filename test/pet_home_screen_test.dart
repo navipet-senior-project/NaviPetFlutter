@@ -388,6 +388,7 @@ void main() {
   testWidgets('Guide scrolls and returns the answer at large text', (
     tester,
   ) async {
+    tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
     await _pump(
       tester,
       _FakeAppState(),
@@ -397,6 +398,11 @@ void main() {
     await tester.tap(find.text('Guide'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+    // Clear of the status bar.
+    expect(
+      tester.getRect(find.byType(ElbeeSheet)).top,
+      greaterThanOrEqualTo(59),
+    );
     await tester.ensureVisible(find.text('Ask Elbee'));
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(find.text('Ask Elbee')).dy, lessThan(956));
@@ -671,6 +677,40 @@ void main() {
           );
         }
       }
+    }
+  });
+
+  testWidgets('wall art stays below a two-row HUD', (tester) async {
+    await (FontLoader('Plus Jakarta Sans')..addFont(
+          rootBundle.load('assets/fonts/PlusJakartaSans-Variable.ttf'),
+        ))
+        .load();
+    for (final (size, scale) in [
+      (const Size(440, 956), 2.35),
+      (const Size(393, 852), 2.0),
+      (const Size(320, 568), 2.0),
+      (const Size(375, 667), 1.0),
+    ]) {
+      tester.view.padding = const FakeViewPadding(top: 59);
+      await _pump(
+        tester,
+        _FakeAppState(),
+        size: size,
+        textScale: scale,
+        fontFamily: 'Plus Jakarta Sans',
+      );
+      final room = tester.widget<CustomPaint>(
+        find.byWidgetPredicate(
+          (w) =>
+              w is CustomPaint && '${w.painter.runtimeType}' == '_RoomPainter',
+        ),
+      );
+      // The painter drops the wall art 12px below this estimate.
+      expect(
+        tester.getRect(find.byKey(const ValueKey('pet-level'))).bottom,
+        lessThanOrEqualTo((room.painter as dynamic).hudBottom as double),
+        reason: '$size x$scale',
+      );
     }
   });
 }
