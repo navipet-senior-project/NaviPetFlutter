@@ -230,7 +230,7 @@ void main() {
     await _settleUntil(
       tester,
       'the preview',
-      () => find.text('Done').evaluate().isEmpty,
+      () => find.byType(AvatarCropScreen).evaluate().isEmpty,
     );
     await tester.pumpAndSettle();
     expect(gateway.updates, isEmpty, reason: 'nothing is sent before Save');
@@ -561,10 +561,16 @@ Future<void> _crop(WidgetTester tester) async {
   );
   await tester.pumpAndSettle();
   await tester.tap(find.text('Done'));
+  // Exercise the encoding frame before waiting for the route to close.
+  await tester.pump();
+  expect(find.text('Done'), findsNothing);
+  expect(find.byType(AvatarCropScreen), findsOneWidget);
+  expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  // Done disappears during native PNG encoding, before the route pops.
   await _settleUntil(
     tester,
     'the crop screen to close',
-    () => find.text('Done').evaluate().isEmpty,
+    () => find.byType(AvatarCropScreen).evaluate().isEmpty,
   );
   await tester.pumpAndSettle();
 }
