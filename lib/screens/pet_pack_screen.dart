@@ -183,7 +183,7 @@ class _PetPackScreenState extends State<PetPackScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: AppColors.petInk, width: 2),
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: const BorderRadius.all(Radius.elliptical(91, 20)),
               ),
             ),
           ),
@@ -248,20 +248,6 @@ class _PetPackScreenState extends State<PetPackScreen> {
                 side: const BorderSide(color: AppColors.petInk, width: 2),
               ),
               icon: const Icon(Icons.refresh),
-            ),
-          ),
-          Positioned(
-            bottom: 8,
-            left: 12,
-            right: 12,
-            child: Text(
-              outfit?.label ?? 'Elbee',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.petInk,
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-              ),
             ),
           ),
         ],

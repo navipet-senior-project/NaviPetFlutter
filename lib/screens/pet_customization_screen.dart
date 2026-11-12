@@ -124,7 +124,29 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
             height: 58,
             child: ColoredBox(color: Color(0xFFF3E2B0)),
           ),
-          Image.asset(petImageFor(equippedId), height: height - 32),
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Image.asset(
+                      petImageFor(equippedId),
+                      key: const ValueKey('shop-stage-elbee'),
+                    ),
+                  ),
+                  Text(
+                    'Elbee · ${outfit?.label ?? 'No outfit'}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.petInk,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           if (outfit != null &&
               outfit.id != 'grad_cap' &&
               outfit.id != 'csulb_tee')
@@ -136,19 +158,6 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
                 child: Icon(outfit.icon, color: AppColors.petInk, size: 19),
               ),
             ),
-          Positioned(
-            bottom: 8,
-            left: 12,
-            right: 12,
-            child: Text(
-              'Elbee · ${outfit?.label ?? 'No outfit'}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.petInk,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
         ],
       ),
     );

@@ -256,6 +256,45 @@ void main() {
     }
   });
 
+  testWidgets('Elbee stands on the rug, clear of the HUD and today card', (
+    tester,
+  ) async {
+    for (final (size, scale) in [
+      (const Size(390, 844), 1.0),
+      (const Size(375, 667), 1.0),
+      (const Size(320, 568), 2.0),
+    ]) {
+      await _pump(tester, _FakeAppState(), size: size, textScale: scale);
+      final room = tester.getRect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is CustomPaint && '${w.painter.runtimeType}' == '_RoomPainter',
+        ),
+      );
+      final rug = petRugRect(room.size).shift(room.topLeft);
+      final mascot = tester.getRect(find.byKey(const ValueKey('pet-mascot')));
+      final hudBottom = tester
+          .getRect(find.byKey(const ValueKey('pet-back')))
+          .bottom;
+      final card = tester.getRect(find.byKey(const ValueKey('pet-today-card')));
+      final reason = '$size x$scale';
+
+      expect(rug.contains(mascot.bottomCenter), isTrue, reason: reason);
+      expect(
+        tester.getRect(find.text("1 mission left today. Let's go!")).top,
+        greaterThan(hudBottom),
+        reason: reason,
+      );
+      // The card must never grow up over the HUD and its back button.
+      expect(card.top, greaterThan(hudBottom), reason: reason);
+      // At 2x text the taller card may cover Elbee's feet; at default text
+      // it must not.
+      if (scale == 1) {
+        expect(mascot.bottom, lessThan(card.top), reason: reason);
+      }
+    }
+  });
+
   testWidgets('Home displays loading, empty and retry states', (tester) async {
     await _pump(tester, _FakeAppState(fakeClasses: const [], busy: true));
     expect(find.text('Checking your schedule...'), findsWidgets);
@@ -391,6 +430,8 @@ void main() {
     await tester.tap(find.text('Grad Cap'));
     await tester.pumpAndSettle();
     expect(find.text('Previewing · not saved'), findsOneWidget);
+    // Only the grid card names the outfit; no label crosses the pedestal.
+    expect(find.text('Grad Cap'), findsOneWidget);
     expect(find.text('Wear Grad Cap'), findsOneWidget);
     await tester.tap(find.text('Wear Grad Cap'));
     await tester.pumpAndSettle();
@@ -406,6 +447,12 @@ void main() {
       tester,
       state,
       router: _router(initialLocation: '/pet/shop?from=/map'),
+    );
+
+    // The stage label sits under Elbee, not across the feet.
+    expect(
+      tester.getRect(find.byKey(const ValueKey('shop-stage-elbee'))).bottom,
+      lessThanOrEqualTo(tester.getRect(find.text('Elbee · No outfit')).top),
     );
 
     await tester.tap(find.byKey(const ValueKey('shop-shades')));

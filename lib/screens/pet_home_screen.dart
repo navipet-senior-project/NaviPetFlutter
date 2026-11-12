@@ -86,18 +86,22 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                   ),
                 ),
                 Positioned(
-                  top: constraints.maxHeight * (compact ? .34 : .36),
+                  // Bottom-anchored so Elbee's feet stay on the rug whatever
+                  // the bubble height or text scale.
+                  bottom:
+                      constraints.maxHeight -
+                      petRugRect(constraints.biggest).center.dy,
                   left: 0,
                   right: 0,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _mascot(state.equippedOutfit, compact: compact),
-                      const SizedBox(height: 8),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 230),
                         child: _messageBubble(message),
                       ),
+                      const SizedBox(height: 8),
+                      _mascot(state.equippedOutfit, compact: compact),
                     ],
                   ),
                 ),
@@ -268,6 +272,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           ? 'Elbee the shark'
           : 'Elbee the shark, wearing ${outfit.label}',
       child: SizedBox(
+        key: const ValueKey('pet-mascot'),
         height: compact ? 150 : 184,
         child: Stack(
           alignment: Alignment.center,
@@ -367,26 +372,31 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     if (next == null) {
       final hasClasses = context.read<AppState>().classes.isNotEmpty;
       return _card(
-        Row(
-          children: [
-            const Icon(Icons.event_available_outlined, color: AppColors.petInk),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                hasClasses
-                    ? 'No upcoming classes this week.'
-                    : 'Add a class to start exploring together.',
-                style: const TextStyle(
-                  color: AppColors.petInk,
-                  fontWeight: FontWeight.w700,
+        _infoWithAction(
+          Row(
+            children: [
+              const Icon(
+                Icons.event_available_outlined,
+                color: AppColors.petInk,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  hasClasses
+                      ? 'No upcoming classes this week.'
+                      : 'Add a class to start exploring together.',
+                  style: const TextStyle(
+                    color: AppColors.petInk,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-            TextButton(
-              onPressed: () => context.go('/checklist'),
-              child: Text(hasClasses ? 'Calendar' : 'Add class'),
-            ),
-          ],
+            ],
+          ),
+          TextButton(
+            onPressed: () => context.go('/checklist'),
+            child: Text(hasClasses ? 'Calendar' : 'Add class'),
+          ),
         ),
       );
     }
@@ -394,62 +404,81 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     final now = DateTime.now();
     final course = next.course;
     return _card(
-      Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.accentSoft,
-              borderRadius: BorderRadius.circular(12),
+      _infoWithAction(
+        Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accentSoft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.location_on_outlined,
+                color: AppColors.petInk,
+              ),
             ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.location_on_outlined,
-              color: AppColors.petInk,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => showClassDetailSheet(context, course),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${upcomingDayLabel(next.start, now)} · ${course.startLabel}',
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+            const SizedBox(width: 12),
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => showClassDetailSheet(context, course),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${upcomingDayLabel(next.start, now)} · ${course.startLabel}',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${course.courseCode} · ${course.locationLabel}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.petInk,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
+                      Text(
+                        '${course.courseCode} · ${course.locationLabel}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.petInk,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          _petButton(label: 'Guide', onPressed: _openGuide),
-        ],
+          ],
+        ),
+        _petButton(label: 'Guide', onPressed: _openGuide),
       ),
     );
   }
 
+  // Stacks the action under the text at large text scales, where a
+  // side-by-side row leaves the text only a few pixels wide.
+  Widget _infoWithAction(Widget info, Widget action) =>
+      MediaQuery.textScalerOf(context).scale(1) > 1.5
+      ? Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [info, const SizedBox(height: 8), action],
+        )
+      : Row(
+          children: [
+            Expanded(child: info),
+            const SizedBox(width: 8),
+            action,
+          ],
+        );
+
   Widget _card(Widget child) => Container(
+    key: const ValueKey('pet-today-card'),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: Colors.white,
@@ -481,6 +510,13 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
         ),
       );
 }
+
+/// The rug Elbee stands on. Shared by the painter and the mascot anchor.
+Rect petRugRect(Size room) => Rect.fromCenter(
+  center: Offset(room.width / 2, room.height * .68 + 54),
+  width: room.width * .7,
+  height: 56,
+);
 
 class _RoomPainter extends CustomPainter {
   const _RoomPainter();
@@ -542,11 +578,7 @@ class _RoomPainter extends CustomPainter {
     );
     canvas.drawPath(windowPath, navy);
 
-    final rug = Rect.fromCenter(
-      center: Offset(size.width / 2, floorTop + 54),
-      width: size.width * .7,
-      height: 56,
-    );
+    final rug = petRugRect(size);
     canvas.drawOval(rug, white);
     canvas.drawOval(rug, navy);
 
