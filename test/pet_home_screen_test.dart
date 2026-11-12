@@ -57,6 +57,7 @@ class _FakeAppState extends AppState {
     this.equipThrows = false,
     this.claimResult = TaskClaimResult.claimed,
     this.gems = 120,
+    this.onlineRunning = false,
   }) : _classes = fakeClasses,
        owned = {...owned};
 
@@ -69,6 +70,8 @@ class _FakeAppState extends AppState {
   final bool equipThrows;
   final TaskClaimResult claimResult;
   final int gems;
+  bool onlineRunning;
+  int _durationReads = 0;
 
   int refreshes = 0;
   final equipCalls = <String>[];
@@ -110,6 +113,26 @@ class _FakeAppState extends AppState {
   int completionCountFor(String classId) => classId == '1' ? 7 : 0;
 
   @override
+  bool get hasRunningOnlineSession => onlineRunning;
+
+  @override
+  bool onlineSessionRunning(String classId) => onlineRunning && classId == '2';
+
+  @override
+  Duration onlineSessionDuration(String classId) =>
+      Duration(seconds: ++_durationReads);
+
+  @override
+  Duration onlineSessionRequirement(CourseClass course) =>
+      const Duration(minutes: 30);
+
+  @override
+  void startOnlineSession(String classId) {
+    onlineRunning = true;
+    notifyListeners();
+  }
+
+  @override
   List<DailyClassTask> dailyTasks([DateTime? day]) => [
     for (final course in _classes)
       DailyClassTask(
@@ -119,7 +142,7 @@ class _FakeAppState extends AppState {
             ? 'Attend ${course.courseCode} online'
             : 'Go to ${course.locationLabel} for ${course.courseCode}',
         reward: course.isOnline ? 5 : 10,
-        done: course.isOnline,
+        done: course.isOnline && !onlineRunning,
       ),
   ];
 
@@ -381,6 +404,20 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Try again'), findsOneWidget);
+  });
+
+  testWidgets('running online quest duration redraws each second', (
+    tester,
+  ) async {
+    final state = _FakeAppState(onlineRunning: true);
+    await _pump(
+      tester,
+      state,
+      router: _router(initialLocation: '/pet/quests'),
+    );
+    expect(find.textContaining('Online session: 0:01'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('Online session: 0:02'), findsOneWidget);
   });
 
   testWidgets('Quests loading, error and empty states stay in the section', (

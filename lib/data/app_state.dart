@@ -330,6 +330,7 @@ class AppState extends ChangeNotifier {
     try {
       final classes = await _fetchClasses(client, user.id);
       if (!canCommit()) return;
+      _classes = classes;
       // Task completions only live in Supabase, whichever source served the
       // classes, so they must load on both paths.
       final completionRows = await client
@@ -345,7 +346,6 @@ class AppState extends ChangeNotifier {
         counts[classId] = (counts[classId] ?? 0) + 1;
       }
       if (!canCommit()) return;
-      _classes = classes;
       _completionKeys = keys;
       _completionCounts = counts;
       await refreshPoints(canCommit: canCommit);

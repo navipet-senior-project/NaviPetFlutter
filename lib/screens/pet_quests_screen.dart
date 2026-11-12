@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +19,23 @@ class PetQuestsScreen extends StatefulWidget {
 class _PetQuestsScreenState extends State<PetQuestsScreen> {
   final _errors = <String, String>{};
   String? _claiming;
+  Timer? _onlineTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _onlineTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && context.read<AppState>().hasRunningOnlineSession) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _onlineTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
