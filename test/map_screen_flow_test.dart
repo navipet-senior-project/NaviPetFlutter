@@ -8,7 +8,6 @@ import 'package:navipet/data/elbee_reply.dart';
 import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/data/location_service.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
-import 'package:navipet/data/navigation_flow_state.dart';
 import 'package:navipet/screens/map_screen.dart';
 import 'package:navipet/widgets/ar_mode_icon.dart';
 import 'package:navipet/widgets/elbee_sheet.dart';
@@ -73,82 +72,6 @@ class _Elbee implements ElbeeGateway {
 }
 
 void main() {
-  testWidgets('outdoor AR explains availability and preserves active route', (
-    tester,
-  ) async {
-    final controller = harness.build();
-    await tester.pumpWidget(host(controller));
-    await controller.selectPlace(arrivalPlace);
-    await controller.requestDirections();
-    await controller.calculateRoute(continueWithUncertain: true);
-    await controller.startRoute(continueWithUncertain: true);
-    await tester.pump();
-
-    final active = controller.state;
-    expect(active, isA<FlowActiveNavigation>());
-    expect(find.byTooltip('Outdoor AR unavailable'), findsOneWidget);
-    expect(find.text('AR'), findsNothing);
-    expect(find.byKey(const ValueKey('navipet-map')), findsOneWidget);
-    expect(
-      tester.getSemantics(find.bySemanticsLabel('Outdoor AR unavailable')),
-      isSemantics(isButton: true, hasTapAction: true),
-    );
-
-    await tester.tap(find.byTooltip('Map type'));
-    await tester.pumpAndSettle();
-    expect(find.text('Map type'), findsOneWidget);
-    expect(find.byTooltip('Outdoor AR unavailable'), findsOneWidget);
-    await tester.tap(find.text('Standard').last);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byTooltip('Outdoor AR unavailable'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text(
-        'Outdoor AR guidance is not available yet. Your walking route stays active on the map.',
-      ),
-      findsOneWidget,
-    );
-    expect(controller.state, same(active));
-
-    await tester.tap(find.text('Return to map'));
-    await tester.pumpAndSettle();
-    expect(controller.state, same(active));
-    expect(
-      (controller.state as FlowActiveNavigation).destination.name,
-      'Horn Center',
-    );
-    expect(find.byKey(const ValueKey('navipet-map')), findsOneWidget);
-    expect(find.byTooltip('Outdoor AR unavailable'), findsOneWidget);
-  });
-
-  testWidgets('outdoor AR control stays reachable with safe-area insets', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(800, 1600);
-    tester.view.devicePixelRatio = 2;
-    tester.view.padding = const FakeViewPadding(top: 48, bottom: 40);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPadding);
-
-    final controller = harness.build();
-    await tester.pumpWidget(host(controller));
-    await controller.selectPlace(arrivalPlace);
-    await controller.requestDirections();
-    await controller.calculateRoute(continueWithUncertain: true);
-    await controller.startRoute(continueWithUncertain: true);
-    await tester.pump();
-
-    final button = tester.getRect(find.byTooltip('Outdoor AR unavailable'));
-    expect(button.width, 112);
-    expect(button.height, 56);
-    expect(button.right, lessThanOrEqualTo(400 - 16));
-    expect(button.top, greaterThan(48));
-    expect(button.bottom, lessThan(1600 / 2 - 40));
-    expect(tester.takeException(), isNull);
-  });
-
   Future<void> driveToArrival(NavigationFlowController controller) async {
     await controller.selectPlace(arrivalPlace);
     await controller.requestDirections();
@@ -221,9 +144,8 @@ void main() {
       timestamp: DateTime.now(),
     );
     await tester.pump();
-    expect(find.text('Scan AR'), findsNothing);
-    expect(find.byTooltip('Scan AR'), findsOneWidget);
-    await tester.tap(find.byTooltip('Scan AR'));
+    expect(find.text('Scan AR'), findsOneWidget);
+    await tester.tap(find.text('Scan AR'));
     await tester.pumpAndSettle();
     expect(find.text('destination vec119'), findsOneWidget);
     await tester.pump(staleFix);
@@ -291,7 +213,7 @@ void main() {
     });
   }
 
-  testWidgets('indoor AR button shows only on arrival, above side buttons', (
+  testWidgets('the AR button shows only on arrival, above the side buttons', (
     tester,
   ) async {
     final controller = harness.build();
@@ -311,8 +233,7 @@ void main() {
 
     await controller.startRoute(continueWithUncertain: true);
     await tester.pump();
-    expect(arButton, findsOneWidget);
-    expect(find.byTooltip('Outdoor AR unavailable'), findsOneWidget);
+    expect(arButton, findsNothing);
 
     await controller.onLiveLocation(
       harness.hornCoordinate,
@@ -326,7 +247,6 @@ void main() {
     );
     await tester.pump();
     expect(arButton, findsOneWidget);
-    expect(find.byTooltip('Outdoor AR unavailable'), findsNothing);
     expect(find.text('AR'), findsOneWidget);
     expect(find.text('AR mode'), findsNothing);
     expect(find.bySemanticsLabel('AR mode'), findsOneWidget);

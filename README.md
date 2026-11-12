@@ -10,8 +10,6 @@ includes:
 - Mapbox destination autocomplete and walking directions.
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
-- During an active outdoor walk, an AR control explains that outdoor AR guidance
-  is unavailable and returns to the map with the route still active.
 - Existing Pet, Checklist, and Account screens. On Android (and on iOS when a
   prebuilt UnityFramework is present, see `docs/ios-testing.md`), the Scan AR
   button appears during navigation to a place with indoor AR once a fresh
