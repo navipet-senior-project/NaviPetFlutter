@@ -35,7 +35,9 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
   String? _buyingId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => petTextScaleCap(_build);
+
+  Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.5;
     return Scaffold(
@@ -241,7 +243,7 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
   }
 
   Widget _gemBadge(int balance) => Container(
-    height: 44,
+    constraints: const BoxConstraints(minHeight: 44),
     padding: const EdgeInsets.symmetric(horizontal: 10),
     decoration: BoxDecoration(
       color: Colors.white,

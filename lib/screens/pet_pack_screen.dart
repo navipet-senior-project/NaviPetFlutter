@@ -22,7 +22,9 @@ class _PetPackScreenState extends State<PetPackScreen> {
   bool _wearing = false;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => petTextScaleCap(_build);
+
+  Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
     final owned = [
       for (final outfit in petOutfits)
@@ -52,6 +54,8 @@ class _PetPackScreenState extends State<PetPackScreen> {
                       builder: (context, constraints) => _stage(
                         preview,
                         equipped: equipped,
+                        // Keeps Elbee's head below the status pill as it grows.
+                        top: 32 + MediaQuery.textScalerOf(context).scale(12),
                         height: math.min(
                           268.0,
                           math.max(190.0, constraints.maxHeight * .42),
@@ -155,6 +159,7 @@ class _PetPackScreenState extends State<PetPackScreen> {
   Widget _stage(
     PetOutfit? outfit, {
     required bool equipped,
+    required double top,
     required double height,
   }) => SizedBox(
     height: height,
@@ -188,10 +193,10 @@ class _PetPackScreenState extends State<PetPackScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 32, bottom: 40),
+            padding: EdgeInsets.only(top: top, bottom: 40),
             child: Image.asset(
               petImageFor(outfit?.id),
-              height: height - 76,
+              height: height - top - 44,
               fit: BoxFit.contain,
             ),
           ),
@@ -209,27 +214,35 @@ class _PetPackScreenState extends State<PetPackScreen> {
           Positioned(
             top: 10,
             left: 10,
-            child: Semantics(
-              liveRegion: true,
-              label: equipped
-                  ? 'Wearing ${outfit?.label ?? 'no outfit'}'
-                  : 'Previewing ${outfit?.label ?? 'Elbee'}, not saved',
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: AppColors.petInk, width: 2),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  equipped ? 'Wearing' : 'Previewing · not saved',
-                  style: const TextStyle(
-                    color: AppColors.petInk,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+            // Stops short of the reset button; shrinks rather than clips.
+            right: 60,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Semantics(
+                  liveRegion: true,
+                  label: equipped
+                      ? 'Wearing ${outfit?.label ?? 'no outfit'}'
+                      : 'Previewing ${outfit?.label ?? 'Elbee'}, not saved',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.petInk, width: 2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      equipped ? 'Wearing' : 'Previewing · not saved',
+                      style: const TextStyle(
+                        color: AppColors.petInk,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -404,7 +417,7 @@ class _PetPackScreenState extends State<PetPackScreen> {
   );
 
   Widget _gemBadge(int balance) => Container(
-    height: 44,
+    constraints: const BoxConstraints(minHeight: 44),
     padding: const EdgeInsets.symmetric(horizontal: 10),
     decoration: BoxDecoration(
       color: Colors.white,

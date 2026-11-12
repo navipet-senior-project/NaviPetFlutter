@@ -38,7 +38,9 @@ class _PetQuestsScreenState extends State<PetQuestsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => petTextScaleCap(_build);
+
+  Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
     final tasks = state.dailyTasks();
     final loading = state.classesBusy && state.classes.isEmpty;

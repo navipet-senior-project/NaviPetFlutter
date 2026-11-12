@@ -41,7 +41,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => petTextScaleCap(_build);
+
+  Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
     final loading = state.classesBusy && state.classes.isEmpty;
     final error =
@@ -177,7 +179,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
         'verified missions to the next level',
     value: '${level.current} of ${PetLevel.perLevel}',
     child: Container(
-      height: MediaQuery.textScalerOf(context).scale(1) > 1.5 ? 72 : 56,
+      constraints: const BoxConstraints(minHeight: 56),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: _hudDecoration(),
       child: ExcludeSemantics(
@@ -227,7 +229,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   Widget _gems(int? gems) => Semantics(
     label: gems == null ? 'Gems loading' : '$gems gems',
     child: Container(
-      height: 56,
+      constraints: const BoxConstraints(minHeight: 56),
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: _hudDecoration(),
       child: Row(

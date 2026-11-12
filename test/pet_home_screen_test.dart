@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:navipet/data/app_state.dart';
@@ -230,6 +231,7 @@ Future<void> _pump(
   NavigationFlowController? flow,
   Size size = const Size(390, 844),
   double textScale = 1,
+  String? fontFamily,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -245,6 +247,7 @@ Future<void> _pump(
         Provider<ElbeeGateway>.value(value: _Elbee()),
       ],
       child: MaterialApp.router(
+        theme: ThemeData(fontFamily: fontFamily),
         routerConfig: config,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
@@ -579,6 +582,36 @@ void main() {
         textScale: 2,
       );
       expect(tester.takeException(), isNull, reason: location);
+    }
+  });
+
+  testWidgets('Pet section does not overflow at the largest text sizes', (
+    tester,
+  ) async {
+    // The app font, not the test font: its taller lines are what overflowed.
+    await (FontLoader('Plus Jakarta Sans')..addFont(
+          rootBundle.load('assets/fonts/PlusJakartaSans-Variable.ttf'),
+        ))
+        .load();
+    for (final size in [const Size(320, 568), const Size(402, 874)]) {
+      for (final scale in [2.0, 2.35, 3.12]) {
+        for (final tab in ['', '/pack', '/shop', '/quests']) {
+          await _pump(
+            tester,
+            _FakeAppState(owned: {'grad_cap'}),
+            router: _router(initialLocation: '/pet$tab?from=/checklist'),
+            size: size,
+            textScale: scale,
+            fontFamily: 'Plus Jakarta Sans',
+          );
+          expect(tester.takeException(), isNull, reason: '$tab $size $scale');
+          // One line each: labels used to wrap mid-word ("Hom/e").
+          expect(
+            tester.getSize(find.text('Quests')).height,
+            tester.getSize(find.text('Home')).height,
+          );
+        }
+      }
     }
   });
 }

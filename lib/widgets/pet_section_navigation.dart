@@ -21,6 +21,13 @@ void leavePetSection(BuildContext context) {
   context.go(returnTo == '/checklist' ? '/checklist' : '/map');
 }
 
+/// Pet layouts fit text up to 2x; beyond that the fixed HUD and tabs overflow.
+Widget petTextScaleCap(WidgetBuilder builder) =>
+    MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 2,
+      child: Builder(builder: builder),
+    );
+
 class PetSectionHeader extends StatelessWidget {
   const PetSectionHeader({super.key, required this.title, this.trailing});
 
@@ -56,14 +63,18 @@ class PetSectionHeader extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.petInk,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
+          // Shrinks instead of truncating a large-text title to one letter.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              maxLines: 1,
+              style: const TextStyle(
+                color: AppColors.petInk,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),
@@ -99,7 +110,7 @@ class PetSectionBottomNavigation extends StatelessWidget {
       explicitChildNodes: true,
       label: 'Pet section',
       child: Container(
-        height: (largeText ? 112 : 68) + bottomInset,
+        height: (largeText ? 84 : 68) + bottomInset,
         padding: EdgeInsets.fromLTRB(8, 4, 8, bottomInset),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -151,7 +162,7 @@ class PetSectionBottomNavigation extends StatelessWidget {
                 context.pushReplacement(petSectionLocation(tab, from));
               },
         child: SizedBox(
-          height: largeText ? 104 : 56,
+          height: largeText ? 76 : 56,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -168,12 +179,19 @@ class PetSectionBottomNavigation extends StatelessWidget {
                     alignment: Alignment.center,
                     child: Icon(icon, size: 22, color: AppColors.petInk),
                   ),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: AppColors.petInk,
-                      fontSize: 12,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  // Shrinks instead of wrapping a large-text label mid-word.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: AppColors.petInk,
+                        fontSize: 12,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
