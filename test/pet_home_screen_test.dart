@@ -143,7 +143,7 @@ class _FakeAppState extends AppState {
             ? 'Attend ${course.courseCode} online'
             : 'Go to ${course.locationLabel} for ${course.courseCode}',
         reward: course.isOnline ? 5 : 10,
-        done: course.isOnline && !onlineRunning,
+        done: false,
       ),
   ];
 
@@ -307,7 +307,7 @@ void main() {
 
       expect(rug.contains(mascot.bottomCenter), isTrue, reason: reason);
       expect(
-        tester.getRect(find.text("1 mission left today. Let's go!")).top,
+        tester.getRect(find.text("2 missions left today. Let's go!")).top,
         greaterThan(hudBottom),
         reason: reason,
       );
@@ -327,10 +327,7 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsWidgets);
 
     await _pump(tester, _FakeAppState(fakeClasses: const []));
-    expect(
-      find.text('No upcoming classes this week.'),
-      findsOneWidget,
-    );
+    expect(find.text('No upcoming classes this week.'), findsOneWidget);
     expect(find.text('Add class'), findsNothing);
     expect(find.text('Calendar'), findsNothing);
 
@@ -383,7 +380,7 @@ void main() {
       find.text('Go to Vivian Engineering Center 308 for CECS 491A'),
       findsOneWidget,
     );
-    expect(find.text('Reward received'), findsOneWidget);
+    expect(find.text('Reward received'), findsNothing);
     expect(
       find.textContaining('A campus check-in is not proof of class attendance'),
       findsOneWidget,
@@ -416,6 +413,27 @@ void main() {
     expect(find.textContaining('Online session: 0:01'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
     expect(find.textContaining('Online session: 0:02'), findsOneWidget);
+  });
+
+  testWidgets('online quest starts from its normal Start action', (
+    tester,
+  ) async {
+    final state = _FakeAppState();
+    await _pump(tester, state, router: _router(initialLocation: '/pet/quests'));
+
+    final action = find.byKey(const ValueKey('quest-action-2-attend_online'));
+    expect(
+      find.descendant(of: action, matching: find.text('Start')),
+      findsOneWidget,
+    );
+    await tester.tap(action);
+    await tester.pump();
+
+    expect(state.onlineRunning, isTrue);
+    expect(
+      find.descendant(of: action, matching: find.text('Claim')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Quests loading, error and empty states stay in the section', (
