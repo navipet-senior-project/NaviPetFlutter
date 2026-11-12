@@ -375,10 +375,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       return _card(
         Row(
           children: [
-            const Icon(
-              Icons.event_available_outlined,
-              color: AppColors.petInk,
-            ),
+            const Icon(Icons.event_available_outlined, color: AppColors.petInk),
             const SizedBox(width: 10),
             const Expanded(
               child: Text(
@@ -402,23 +399,23 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           borderRadius: BorderRadius.circular(8),
           onTap: () => showClassDetailSheet(context, course),
           child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.accentSoft,
-                borderRadius: BorderRadius.circular(12),
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.accentSoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.location_on_outlined,
+                  color: AppColors.petInk,
+                ),
               ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.location_on_outlined,
-                color: AppColors.petInk,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,9 +440,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                       ),
                     ],
                   ),
+                ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
         _petButton(label: 'Guide', onPressed: _openGuide),
@@ -472,29 +469,26 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           ],
         );
 
-  Widget _card(
-    Widget child, {
-    VoidCallback? onTap,
-    String? semanticLabel,
-  }) => Semantics(
-    button: onTap != null,
-    label: semanticLabel,
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-      key: const ValueKey('pet-today-card'),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.cardBorder),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppShadows.soft,
-      ),
-      child: child,
-      ),
-    ),
-  );
+  Widget _card(Widget child, {VoidCallback? onTap, String? semanticLabel}) =>
+      Semantics(
+        button: onTap != null,
+        label: semanticLabel,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            key: const ValueKey('pet-today-card'),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: AppColors.cardBorder),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppShadows.soft,
+            ),
+            child: child,
+          ),
+        ),
+      );
 
   Widget _petButton({required String label, required VoidCallback onPressed}) =>
       SizedBox(

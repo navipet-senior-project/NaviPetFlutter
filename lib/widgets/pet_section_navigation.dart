@@ -85,10 +85,7 @@ class PetSectionHeader extends StatelessWidget {
 }
 
 class PetSectionBottomNavigation extends StatelessWidget {
-  const PetSectionBottomNavigation({
-    super.key,
-    required this.active,
-  });
+  const PetSectionBottomNavigation({super.key, required this.active});
 
   final PetSectionTab active;
 

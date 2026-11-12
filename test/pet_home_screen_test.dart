@@ -282,7 +282,9 @@ void main() {
     }
   });
 
-  testWidgets('tapping the next-class icon opens class details', (tester) async {
+  testWidgets('tapping the next-class icon opens class details', (
+    tester,
+  ) async {
     await _pump(tester, _FakeAppState());
     await tester.tap(find.byIcon(Icons.location_on_outlined));
     await tester.pumpAndSettle();

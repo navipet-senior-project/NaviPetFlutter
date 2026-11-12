@@ -24,28 +24,28 @@ Future<void> showElbeeSheet(
       child: ElbeeSheet(
         gateway: gateway,
         onOpenPlace: (placeId) async {
-        Navigator.of(sheetContext).pop();
-        try {
-          final place = await flow.searchGateway.place(placeId);
-          if (!context.mounted) return;
-          if (!place.isLocal) {
-            messenger.showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Elbee can only open verified CSULB campus places.',
+          Navigator.of(sheetContext).pop();
+          try {
+            final place = await flow.searchGateway.place(placeId);
+            if (!context.mounted) return;
+            if (!place.isLocal) {
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Elbee can only open verified CSULB campus places.',
+                  ),
                 ),
-              ),
+              );
+              return;
+            }
+            await flow.selectPlace(place);
+            onPlaceSelected?.call();
+            await flow.requestDirections();
+          } catch (error) {
+            messenger.showSnackBar(
+              SnackBar(content: Text('Could not open that place: $error')),
             );
-            return;
           }
-          await flow.selectPlace(place);
-          onPlaceSelected?.call();
-          await flow.requestDirections();
-        } catch (error) {
-          messenger.showSnackBar(
-            SnackBar(content: Text('Could not open that place: $error')),
-          );
-        }
         },
       ),
     ),
