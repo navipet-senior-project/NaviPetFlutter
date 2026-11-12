@@ -7,12 +7,12 @@ import 'package:navipet/data/elbee_gateway.dart';
 import 'package:navipet/data/elbee_reply.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
 import 'package:navipet/data/user_account.dart';
-import 'package:navipet/router/app_router.dart';
-import 'package:navipet/screens/checklist_screen.dart';
 import 'package:navipet/screens/pet_customization_screen.dart';
 import 'package:navipet/screens/pet_home_screen.dart';
-import 'package:navipet/widgets/class_detail_sheet.dart';
+import 'package:navipet/screens/pet_pack_screen.dart';
+import 'package:navipet/screens/pet_quests_screen.dart';
 import 'package:navipet/widgets/elbee_sheet.dart';
+import 'package:navipet/widgets/bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
 
 import 'support/flow_fakes.dart' as harness;
@@ -46,26 +46,29 @@ const _online = CourseClass(
   isOnline: true,
 );
 
-/// An [AppState] with no backend: every read is canned and every write that
-/// would reach Supabase is recorded instead.
 class _FakeAppState extends AppState {
   _FakeAppState({
-    this.fakeClasses = const [_inPerson, _online],
+    List<CourseClass> fakeClasses = const [_inPerson, _online],
     this.busy = false,
     this.error,
-    this.owned = const {},
+    Set<String> owned = const {},
     this.equipped,
     this.refreshThrows = false,
     this.equipThrows = false,
-  });
+    this.claimResult = TaskClaimResult.claimed,
+    this.gems = 120,
+  }) : _classes = fakeClasses,
+       owned = {...owned};
 
-  final List<CourseClass> fakeClasses;
+  final List<CourseClass> _classes;
   final bool busy;
   final String? error;
   final Set<String> owned;
   String? equipped;
   final bool refreshThrows;
   final bool equipThrows;
+  final TaskClaimResult claimResult;
+  final int gems;
 
   int refreshes = 0;
   final equipCalls = <String>[];
@@ -75,8 +78,6 @@ class _FakeAppState extends AppState {
   @override
   bool get isAuthenticated => true;
 
-  // A dark avatar: the default amber one fails the contrast guideline on
-  // every screen, which is not what these tests are about.
   @override
   UserAccount? get activeUser => const UserAccount(
     id: 'user',
@@ -88,7 +89,7 @@ class _FakeAppState extends AppState {
   );
 
   @override
-  List<CourseClass> get classes => fakeClasses;
+  List<CourseClass> get classes => _classes;
 
   @override
   bool get classesBusy => busy;
@@ -97,7 +98,7 @@ class _FakeAppState extends AppState {
   String? get classesError => error;
 
   @override
-  int get points => 120;
+  int get points => gems;
 
   @override
   Set<String> get ownedOutfits => owned;
@@ -105,13 +106,12 @@ class _FakeAppState extends AppState {
   @override
   String? get equippedOutfit => equipped;
 
-  // Seven verified completions: level 2, two of five toward level 3.
   @override
   int completionCountFor(String classId) => classId == '1' ? 7 : 0;
 
   @override
   List<DailyClassTask> dailyTasks([DateTime? day]) => [
-    for (final course in fakeClasses)
+    for (final course in _classes)
       DailyClassTask(
         course: course,
         kind: course.isOnline ? 'attend_online' : 'attend',
@@ -138,7 +138,11 @@ class _FakeAppState extends AppState {
   }
 
   @override
-  Future<void> buyOutfit(String outfitId) async => buyCalls.add(outfitId);
+  Future<void> buyOutfit(String outfitId) async {
+    buyCalls.add(outfitId);
+    owned.add(outfitId);
+    notifyListeners();
+  }
 
   @override
   Future<TaskClaimResult> verifyAndToggleTask(
@@ -146,7 +150,7 @@ class _FakeAppState extends AppState {
     DateTime date,
   ) async {
     claims++;
-    return TaskClaimResult.claimed;
+    return claimResult;
   }
 }
 
@@ -161,25 +165,38 @@ class _Elbee implements ElbeeGateway {
   );
 }
 
-/// Pet Home on its real path, with the screens it links to stubbed out.
-GoRouter _stubRouter() => GoRouter(
-  initialLocation: '/pet',
+GoRouter _router({String initialLocation = '/pet?from=/checklist'}) => GoRouter(
+  initialLocation: initialLocation,
   routes: [
     GoRoute(
       path: '/pet',
       builder: (context, state) => const PetHomeScreen(),
       routes: [
         GoRoute(
+          path: 'pack',
+          builder: (context, state) => const PetPackScreen(),
+        ),
+        GoRoute(
           path: 'shop',
-          builder: (context, state) => const Scaffold(body: Text('shop page')),
+          builder: (context, state) => const PetCustomizationScreen(),
+        ),
+        GoRoute(
+          path: 'quests',
+          builder: (context, state) => const PetQuestsScreen(),
         ),
       ],
     ),
-    for (final page in ['checklist', 'map', 'account'])
-      GoRoute(
-        path: '/$page',
-        builder: (context, state) => Scaffold(body: Text('$page page')),
+    GoRoute(
+      path: '/checklist',
+      builder: (context, state) => Scaffold(
+        body: const Text('checklist page'),
+        bottomNavigationBar: const NaviBottomNav(active: NaviTab.menu),
       ),
+    ),
+    GoRoute(
+      path: '/map',
+      builder: (context, state) => Scaffold(body: const Text('map page')),
+    ),
   ],
 );
 
@@ -194,7 +211,7 @@ Future<void> _pump(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final config = router ?? _stubRouter();
+  final config = router ?? _router();
   addTearDown(config.dispose);
   addTearDown(state.dispose);
   await tester.pumpWidget(
@@ -218,250 +235,59 @@ Future<void> _pump(
   await tester.pump();
 }
 
-String _sharkAsset(WidgetTester tester) {
-  final image = tester.widget<Image>(
-    find.descendant(
-      of: find.byType(PetHomeScreen),
-      matching: find.byType(Image),
-    ),
-  );
-  return (image.image as AssetImage).assetName;
-}
-
 void main() {
-  testWidgets('shows the shark, level, gems, actions, message and the day', (
+  testWidgets('Pet Home shows Elbee, progress, gems, class and Guide', (
     tester,
   ) async {
     await _pump(tester, _FakeAppState());
 
-    expect(_sharkAsset(tester), 'assets/images/elbee.png');
-    expect(find.text('Level 2'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel(
-        'Level 2, 2 of 5 verified missions to the next level',
-      ),
-      findsOneWidget,
-    );
+    expect(find.byType(PetHomeScreen), findsOneWidget);
+    expect(find.text('Elbee · Lv 2'), findsOneWidget);
     expect(find.text('120'), findsOneWidget);
-    expect(find.bySemanticsLabel('120 gems'), findsOneWidget);
-    for (final action in ['Quest', 'Shop', 'Pack', 'Guide']) {
-      expect(find.text(action), findsOneWidget);
+    expect(find.bySemanticsLabel('Elbee the shark'), findsOneWidget);
+    expect(find.text("Today's quests"), findsNothing);
+    expect(
+      find.text('CECS 491A · Vivian Engineering Center 308'),
+      findsOneWidget,
+    );
+    expect(find.text('Guide'), findsOneWidget);
+    for (final tab in ['Home', 'Pack', 'Shop', 'Quests']) {
+      expect(find.byKey(ValueKey('pet-tab-$tab')), findsOneWidget);
     }
-    expect(find.text("1 mission left today. Let's go!"), findsOneWidget);
-
-    expect(find.text("Today's missions"), findsOneWidget);
-    expect(
-      find.text('Go to Vivian Engineering Center 308 for CECS 491A'),
-      findsOneWidget,
-    );
-    expect(find.text('CECS 491A · 10:00–11:15 AM'), findsOneWidget);
-    expect(find.text('Completed · CECS 453 · 1:00–2:15 PM'), findsOneWidget);
-    expect(find.text('Upcoming classes'), findsOneWidget);
-    expect(find.text('CECS 491A · Senior Project'), findsOneWidget);
-    expect(find.text('CECS 453 · Mobile Apps'), findsOneWidget);
   });
 
-  testWidgets('the equipped outfit picks the shark artwork', (tester) async {
-    await _pump(
-      tester,
-      _FakeAppState(owned: {'grad_cap'}, equipped: 'grad_cap'),
-    );
-    expect(_sharkAsset(tester), 'assets/images/elbee_graduate.png');
-    expect(
-      find.bySemanticsLabel('Elbee the shark, wearing Grad Cap'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('an outfit without artwork shows as a badge on the shark', (
-    tester,
-  ) async {
-    await _pump(tester, _FakeAppState(owned: {'shades'}, equipped: 'shades'));
-    expect(_sharkAsset(tester), 'assets/images/elbee.png');
-    expect(find.byIcon(Icons.remove_red_eye_outlined), findsOneWidget);
-  });
-
-  testWidgets('loading shows progress instead of an empty day or zero gems', (
-    tester,
-  ) async {
+  testWidgets('Home displays loading, empty and retry states', (tester) async {
     await _pump(tester, _FakeAppState(fakeClasses: const [], busy: true));
+    expect(find.text('Checking your schedule...'), findsWidgets);
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
 
-    expect(find.text('Loading your day...'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.bySemanticsLabel('Gems loading'), findsOneWidget);
-    expect(find.text('Checking your schedule...'), findsOneWidget);
-    expect(find.text('No classes yet'), findsNothing);
-  });
-
-  testWidgets('no classes offers the Calendar', (tester) async {
     await _pump(tester, _FakeAppState(fakeClasses: const []));
-
-    expect(find.text('No classes yet'), findsOneWidget);
-    expect(find.text("Add a class and I'll plan our day!"), findsOneWidget);
-    expect(find.text("Today's missions"), findsNothing);
-
-    await tester.tap(find.text('Open Calendar'));
+    expect(
+      find.text('Add a class to start exploring together.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Add class'));
     await tester.pumpAndSettle();
     expect(find.text('checklist page'), findsOneWidget);
-  });
 
-  testWidgets('a failed load says so, hides the empty state and retries', (
-    tester,
-  ) async {
-    final state = _FakeAppState(fakeClasses: const [], error: 'Server down');
-    await _pump(tester, state);
-
-    expect(
-      find.text("Couldn't load your classes. Server down"),
-      findsOneWidget,
+    final failedRefresh = _FakeAppState(
+      fakeClasses: const [],
+      error: 'Server down',
+      refreshThrows: true,
     );
-    expect(find.text('No classes yet'), findsNothing);
-    expect(find.textContaining("couldn't load your day"), findsOneWidget);
-
+    await _pump(tester, failedRefresh);
+    expect(find.textContaining("Couldn't load your classes"), findsOneWidget);
     await tester.tap(find.text('Retry'));
     await tester.pump();
-    expect(state.refreshes, 1);
+    expect(failedRefresh.refreshes, 1);
+
+    await _pump(tester, _FakeAppState(error: 'Temporary connection issue'));
+    expect(find.text('CECS 491A'), findsOneWidget);
+    expect(find.text('Guide'), findsOneWidget);
+    expect(find.textContaining('Temporary connection issue'), findsOneWidget);
   });
 
-  testWidgets('a refresh that throws keeps the day and shows the error', (
-    tester,
-  ) async {
-    final state = _FakeAppState(refreshThrows: true);
-    await _pump(tester, state);
-    expect(find.text('Retry'), findsNothing);
-
-    await tester.fling(find.byType(ListView), const Offset(0, 400), 1000);
-    await tester.pumpAndSettle();
-
-    expect(state.refreshes, 1);
-    expect(find.textContaining('Could not reach NaviPet'), findsOneWidget);
-    expect(find.text("Today's missions"), findsOneWidget);
-  });
-
-  testWidgets('a mission opens its details without claiming anything', (
-    tester,
-  ) async {
-    final state = _FakeAppState();
-    await _pump(tester, state);
-
-    await tester.tap(
-      find.text('Go to Vivian Engineering Center 308 for CECS 491A'),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('CECS 491A · Senior Project'), findsWidgets);
-    expect(find.text('10:00–11:15 AM'), findsOneWidget);
-    expect(find.text('Vivian Engineering Center 308'), findsOneWidget);
-    expect(
-      find.text('10 gems, added once NaviPet verifies the mission'),
-      findsOneWidget,
-    );
-    expect(find.text('Not completed yet'), findsOneWidget);
-    expect(
-      find.textContaining('It is not proof of class attendance.'),
-      findsOneWidget,
-    );
-    expect(state.claims, 0);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Open Calendar'));
-    await tester.pumpAndSettle();
-    expect(find.text('checklist page'), findsOneWidget);
-    expect(state.claims, 0);
-  });
-
-  testWidgets('an online mission shows its status and no check-in note', (
-    tester,
-  ) async {
-    await _pump(tester, _FakeAppState());
-
-    await tester.tap(find.text('Attend CECS 453 online'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Completed today'), findsOneWidget);
-    expect(find.text('Online class'), findsOneWidget);
-    expect(find.textContaining('not proof of class attendance'), findsNothing);
-  });
-
-  testWidgets('an upcoming class opens the class details', (tester) async {
-    await _pump(tester, _FakeAppState());
-
-    await tester.ensureVisible(find.text('CECS 453 · Mobile Apps'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('CECS 453 · Mobile Apps'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(ClassDetailSheet), findsOneWidget);
-    expect(find.text('Edit class'), findsOneWidget);
-  });
-
-  testWidgets('Quest opens the Calendar and Shop opens the store', (
-    tester,
-  ) async {
-    await _pump(tester, _FakeAppState());
-
-    await tester.tap(find.text('Shop'));
-    await tester.pumpAndSettle();
-    expect(find.text('shop page'), findsOneWidget);
-
-    tester.state<NavigatorState>(find.byType(Navigator)).pop();
-    await tester.pumpAndSettle();
-    expect(find.byType(PetHomeScreen), findsOneWidget);
-
-    await tester.tap(find.text('Quest'));
-    await tester.pumpAndSettle();
-    expect(find.text('checklist page'), findsOneWidget);
-  });
-
-  testWidgets('an empty Pack leads to the Shop', (tester) async {
-    await _pump(tester, _FakeAppState());
-
-    await tester.tap(find.text('Pack'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Your pack is empty'), findsOneWidget);
-
-    await tester.tap(find.text('Open Shop'));
-    await tester.pumpAndSettle();
-    expect(find.text('shop page'), findsOneWidget);
-  });
-
-  testWidgets('Pack wears an owned outfit and never buys one', (tester) async {
-    final state = _FakeAppState(
-      owned: {'grad_cap', 'shades'},
-      equipped: 'shades',
-    );
-    await _pump(tester, state);
-
-    await tester.tap(find.text('Pack'));
-    await tester.pumpAndSettle();
-    expect(find.text('Grad Cap'), findsOneWidget);
-    expect(find.text('Shades'), findsOneWidget);
-    expect(find.text('Wearing'), findsOneWidget);
-    // Unowned outfits are not offered.
-    expect(find.text('CSULB Tee'), findsNothing);
-    expect(find.text('Beach Hat'), findsNothing);
-
-    await tester.tap(find.text('Wear'));
-    await tester.pumpAndSettle();
-
-    expect(state.equipCalls, ['grad_cap']);
-    expect(state.buyCalls, isEmpty);
-    expect(_sharkAsset(tester), 'assets/images/elbee_graduate.png');
-  });
-
-  testWidgets('a failed equip is reported and changes nothing', (tester) async {
-    final state = _FakeAppState(owned: {'grad_cap'}, equipThrows: true);
-    await _pump(tester, state);
-
-    await tester.tap(find.text('Pack'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Wear'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Could not wear Grad Cap'), findsOneWidget);
-    expect(_sharkAsset(tester), 'assets/images/elbee.png');
-  });
-
-  testWidgets('Guide asks Elbee and opens a verified place on the map', (
+  testWidgets('Guide opens Elbee and routes a selected place to the map', (
     tester,
   ) async {
     final flow = harness.build();
@@ -470,87 +296,209 @@ void main() {
     await tester.tap(find.text('Guide'));
     await tester.pumpAndSettle();
     expect(find.byType(ElbeeSheet), findsOneWidget);
-
     await tester.enterText(find.byType(TextField), 'Where is Horn Center?');
     await tester.tap(find.text('Ask Elbee'));
     await tester.pump();
     await tester.tap(find.text('Horn Center'));
     await tester.pumpAndSettle();
-
     expect(find.text('map page'), findsOneWidget);
     expect(flow.destination?.id, harness.horn.id);
   });
 
-  testWidgets('meets the tap target, label and contrast guidelines', (
+  testWidgets('Quests owns missions, details, check-in and inline errors', (
+    tester,
+  ) async {
+    final state = _FakeAppState(
+      claimResult: TaskClaimResult.locationUnavailable,
+    );
+    final router = _router(initialLocation: '/pet/quests?from=/checklist');
+    await _pump(tester, state, router: router);
+
+    expect(find.text("Today's quests"), findsOneWidget);
+    expect(
+      find.text('Go to Vivian Engineering Center 308 for CECS 491A'),
+      findsOneWidget,
+    );
+    expect(find.text('Reward received'), findsOneWidget);
+    expect(
+      find.textContaining('A campus check-in is not proof of class attendance'),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.text('Go to Vivian Engineering Center 308 for CECS 491A'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('10:00 AM'), findsWidgets);
+    expect(find.text('Reward: 10 gems'), findsOneWidget);
+    await tester.tapAt(const Offset(20, 300));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('quest-action-1-attend')));
+    await tester.pumpAndSettle();
+    expect(state.claims, 1);
+    expect(
+      find.text('Turn on location access to check in to this class.'),
+      findsOneWidget,
+    );
+    expect(find.text('Try again'), findsOneWidget);
+  });
+
+  testWidgets('Quests loading, error and empty states stay in the section', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeAppState(fakeClasses: const [], busy: true),
+      router: _router(initialLocation: '/pet/quests'),
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await _pump(
+      tester,
+      _FakeAppState(fakeClasses: const [], error: 'Server down'),
+      router: _router(initialLocation: '/pet/quests'),
+    );
+    expect(find.textContaining("Couldn't load today's quests"), findsOneWidget);
+
+    await _pump(
+      tester,
+      _FakeAppState(fakeClasses: const []),
+      router: _router(initialLocation: '/pet/quests'),
+    );
+    expect(find.text('Add a class on Calendar to get quests'), findsOneWidget);
+    await tester.tap(find.text('Open Calendar'));
+    await tester.pumpAndSettle();
+    expect(find.text('checklist page'), findsOneWidget);
+  });
+
+  testWidgets('Pack previews, resets, and equips owned outfits only', (
+    tester,
+  ) async {
+    final state = _FakeAppState(
+      owned: {'grad_cap', 'shades'},
+      equipped: 'shades',
+    );
+    await _pump(
+      tester,
+      state,
+      router: _router(initialLocation: '/pet/pack?from=/checklist'),
+    );
+
+    expect(find.text('Grad Cap'), findsOneWidget);
+    expect(find.text('Shades'), findsWidgets);
+    expect(find.text('CSULB Tee'), findsNothing);
+    await tester.tap(find.text('Grad Cap'));
+    await tester.pumpAndSettle();
+    expect(find.text('Previewing · not saved'), findsOneWidget);
+    expect(find.text('Wear Grad Cap'), findsOneWidget);
+    await tester.tap(find.text('Wear Grad Cap'));
+    await tester.pumpAndSettle();
+    expect(state.equipCalls, ['grad_cap']);
+    expect(state.buyCalls, isEmpty);
+  });
+
+  testWidgets('Shop verifies purchase and leaves equip to Pack', (
+    tester,
+  ) async {
+    final state = _FakeAppState();
+    await _pump(
+      tester,
+      state,
+      router: _router(initialLocation: '/pet/shop?from=/map'),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('shop-shades')));
+    await tester.pumpAndSettle();
+    expect(state.buyCalls, ['shades']);
+    expect(state.equipCalls, isEmpty);
+    expect(find.text('Shades added to your Pack.'), findsOneWidget);
+  });
+
+  testWidgets('Pack reports failed equip without changing inventory', (
+    tester,
+  ) async {
+    final state = _FakeAppState(owned: {'grad_cap'}, equipThrows: true);
+    await _pump(tester, state, router: _router(initialLocation: '/pet/pack'));
+
+    await tester.tap(find.text('Grad Cap'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wear Grad Cap'));
+    await tester.pumpAndSettle();
+    expect(state.equipCalls, ['grad_cap']);
+    expect(state.buyCalls, isEmpty);
+    expect(find.textContaining('Could not wear Grad Cap'), findsOneWidget);
+  });
+
+  testWidgets('Shop disables unaffordable outfits', (tester) async {
+    await _pump(
+      tester,
+      _FakeAppState(gems: 5),
+      router: _router(initialLocation: '/pet/shop'),
+    );
+
+    expect(find.text('Need 10 more gems'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('shop-shades')))
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('Pet back returns to the main tab and nav switches sections', (
+    tester,
+  ) async {
+    final state = _FakeAppState();
+    final router = _router(initialLocation: '/pet?from=/checklist');
+    await _pump(tester, state, router: router);
+
+    await tester.tap(find.byKey(const ValueKey('pet-tab-Quests')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PetQuestsScreen), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Back to Navipet'));
+    await tester.pumpAndSettle();
+    expect(find.text('checklist page'), findsOneWidget);
+  });
+
+  testWidgets('main Pet button preserves its Calendar return path', (
+    tester,
+  ) async {
+    final router = _router(initialLocation: '/checklist');
+    await _pump(tester, _FakeAppState(), router: router);
+
+    await tester.tap(find.byKey(const ValueKey('nav-Pet')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PetHomeScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('pet-tab-Quests')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PetQuestsScreen), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('checklist page'), findsOneWidget);
+  });
+
+  testWidgets('Pet section meets accessibility and fits small 2x screens', (
     tester,
   ) async {
     final handle = tester.ensureSemantics();
     await _pump(tester, _FakeAppState());
-
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
-
-    for (final action in ['Quest', 'Shop', 'Pack', 'Guide']) {
-      expect(
-        tester.getSemantics(find.byKey(ValueKey('pet-action-$action'))),
-        matchesSemantics(
-          label: action,
-          isButton: true,
-          hasTapAction: true,
-          hasFocusAction: true,
-          isFocusable: true,
-        ),
-      );
-    }
     handle.dispose();
-  });
 
-  for (final state in [
-    () => _FakeAppState(owned: {'shades'}, equipped: 'shades'),
-    () => _FakeAppState(fakeClasses: const [], error: 'Server down'),
-    () => _FakeAppState(fakeClasses: const []),
-  ]) {
-    testWidgets('fits a small phone at 2x text without overflow', (
-      tester,
-    ) async {
-      await _pump(tester, state(), size: const Size(320, 568), textScale: 2);
-      expect(tester.takeException(), isNull);
-
-      // The room scrolls with the page, so Pack can start below the fold.
-      await tester.ensureVisible(find.text('Pack'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Pack'));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-  }
-
-  testWidgets('the app router serves Pet Home at /pet and the store under it', (
-    tester,
-  ) async {
-    // No classes: the Calendar's task list is not what this test is about.
-    final state = _FakeAppState(fakeClasses: const []);
-    await _pump(
-      tester,
-      state,
-      router: createAppRouter(state, initialLocation: '/pet'),
-    );
-    expect(find.byType(PetHomeScreen), findsOneWidget);
-
-    await tester.tap(find.text('Shop'));
-    await tester.pumpAndSettle();
-    expect(find.byType(PetCustomizationScreen), findsOneWidget);
-
-    await tester.tap(find.byType(BackButton));
-    await tester.pumpAndSettle();
-    expect(find.byType(PetCustomizationScreen), findsNothing);
-    expect(find.byType(PetHomeScreen), findsOneWidget);
-
-    await tester.tap(find.text('Quest'));
-    await tester.pump();
-    await tester.pump();
-    expect(find.byType(ChecklistScreen), findsOneWidget);
+    for (final location in ['/pet', '/pet/pack', '/pet/shop', '/pet/quests']) {
+      await _pump(
+        tester,
+        _FakeAppState(owned: {'grad_cap'}),
+        router: _router(initialLocation: '$location?from=/checklist'),
+        size: const Size(320, 568),
+        textScale: 2,
+      );
+      expect(tester.takeException(), isNull, reason: location);
+    }
   });
 }

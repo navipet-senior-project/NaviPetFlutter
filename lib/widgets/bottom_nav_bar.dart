@@ -26,7 +26,8 @@ class NaviBottomNav extends StatelessWidget {
       case NaviTab.location:
         context.go('/map');
       case NaviTab.pets:
-        context.go('/pet');
+        final returnTo = active == NaviTab.menu ? '/checklist' : '/map';
+        context.push('/pet?from=$returnTo');
     }
   }
 

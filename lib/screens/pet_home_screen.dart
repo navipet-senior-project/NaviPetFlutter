@@ -3,21 +3,15 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
-import '../data/course_class.dart';
 import '../data/navigation_flow_controller.dart';
 import '../data/pet_home.dart';
 import '../theme/app_theme.dart';
 import '../widgets/account_button.dart';
-import '../widgets/bottom_nav_bar.dart';
 import '../widgets/class_detail_sheet.dart';
 import '../widgets/elbee_sheet.dart';
+import '../widgets/pet_section_navigation.dart';
 import 'pet_customization_screen.dart';
 
-/// Pet Home: Elbee in their room with the level, gems, the Quest / Shop /
-/// Pack / Guide actions, and today's missions and upcoming classes.
-///
-/// Read-only over [AppState]: gems are the verified wallet balance, and
-/// missions are claimed in the Calendar, where the server checks them.
 class PetHomeScreen extends StatefulWidget {
   const PetHomeScreen({super.key});
 
@@ -26,11 +20,6 @@ class PetHomeScreen extends StatefulWidget {
 }
 
 class _PetHomeScreenState extends State<PetHomeScreen> {
-  static const _cardShape = RoundedRectangleBorder(
-    borderRadius: BorderRadius.all(Radius.circular(AppRadius.md)),
-    side: BorderSide(color: AppColors.cardBorder),
-  );
-
   bool _refreshFailed = false;
 
   Future<void> _refresh() async {
@@ -38,7 +27,6 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     try {
       await context.read<AppState>().refreshClasses();
     } catch (_) {
-      // refreshClasses records API errors itself; a dropped connection throws.
       if (mounted) setState(() => _refreshFailed = true);
     }
   }
@@ -52,798 +40,547 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     );
   }
 
-  Future<void> _openPack() async {
-    final state = context.read<AppState>();
-    final messenger = ScaffoldMessenger.of(context);
-    final outfit = await showModalBottomSheet<PetOutfit>(
-      context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (sheetContext) => _PackSheet(
-        owned: [
-          for (final outfit in petOutfits)
-            if (state.ownedOutfits.contains(outfit.id)) outfit,
-        ],
-        equippedId: state.equippedOutfit,
-        onOpenShop: () {
-          Navigator.pop(sheetContext);
-          context.push('/pet/shop');
-        },
-      ),
-    );
-    if (outfit == null) return;
-    try {
-      await state.equipOutfit(outfit.id);
-    } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not wear ${outfit.label}: $error')),
-      );
-    }
-  }
-
-  void _showMission(DailyClassTask task) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (sheetContext) => _MissionSheet(
-        task: task,
-        onOpenCalendar: () {
-          Navigator.pop(sheetContext);
-          context.go('/checklist');
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final classes = state.classes;
-    final loading = state.classesBusy && classes.isEmpty;
+    final loading = state.classesBusy && state.classes.isEmpty;
     final error =
         state.classesError ??
         (_refreshFailed
             ? 'Could not reach NaviPet. Check your connection and try again.'
             : null);
-    final missions = state.dailyTasks();
-    final now = DateTime.now();
-    final completions = classes.fold<int>(
+    final next = upcomingClasses(state.classes, DateTime.now()).firstOrNull;
+    final completions = state.classes.fold<int>(
       0,
       (sum, course) => sum + state.completionCountFor(course.id),
     );
+    final message = petMessage(
+      loading: loading,
+      failed: error != null,
+      missions: state.dailyTasks(),
+    );
 
     return Scaffold(
-      backgroundColor: AppColors.screenBg,
+      backgroundColor: const Color(0xFFDDF1EF),
       body: SafeArea(
         top: false,
         bottom: false,
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              _room(
-                state,
-                level: PetLevel(completions),
-                loading: loading,
-                message: petMessage(
-                  loading: loading,
-                  failed: error != null,
-                  missions: missions,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 640;
+            return Stack(
+              children: [
+                const Positioned.fill(
+                  child: CustomPaint(painter: _RoomPainter()),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (error != null) _errorCard(error),
-                    if (loading)
-                      _loadingCard()
-                    else if (classes.isEmpty) ...[
-                      // After a failed load "no classes" would be a guess.
-                      if (error == null) _emptyCard(),
-                    ] else ...[
-                      _sectionTitle("Today's missions"),
-                      for (final task in missions) _missionTile(task),
-                      const SizedBox(height: AppSpacing.lg),
-                      _sectionTitle('Upcoming classes'),
-                      for (final next in upcomingClasses(classes, now))
-                        _classTile(next, now),
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 8,
+                  left: 16,
+                  right: 16,
+                  child: _hud(
+                    PetLevel(completions),
+                    gems: loading ? null : state.points,
+                    compact:
+                        compact ||
+                        MediaQuery.textScalerOf(context).scale(1) > 1.5,
+                  ),
+                ),
+                Positioned(
+                  top: constraints.maxHeight * (compact ? .34 : .36),
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _mascot(state.equippedOutfit, compact: compact),
+                      const SizedBox(height: 8),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 230),
+                        child: _messageBubble(message),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                  child: _todayCard(loading: loading, error: error, next: next),
+                ),
+              ],
+            );
+          },
         ),
       ),
-      bottomNavigationBar: const NaviBottomNav(active: NaviTab.pets),
+      bottomNavigationBar: const PetSectionBottomNavigation(
+        active: PetSectionTab.home,
+      ),
     );
   }
 
-  Widget _room(
-    AppState state, {
-    required PetLevel level,
-    required bool loading,
-    required String message,
-  }) {
-    final topInset = MediaQuery.paddingOf(context).top;
-    final equipped = petOutfits
-        .where((outfit) => outfit.id == state.equippedOutfit)
-        .firstOrNull;
-    return Stack(
+  Widget _hud(PetLevel level, {required int? gems, required bool compact}) {
+    final back = Semantics(
+      button: true,
+      label: 'Back to Navipet',
+      excludeSemantics: true,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: OutlinedButton(
+          key: const ValueKey('pet-back'),
+          onPressed: () => leavePetSection(context),
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.petInk,
+            side: const BorderSide(color: AppColors.petInk, width: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            padding: EdgeInsets.zero,
+          ),
+          child: const Icon(Icons.chevron_left, size: 26),
+        ),
+      ),
+    );
+    final wallet = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [_gems(gems), const SizedBox(width: 8), const AccountButton()],
+    );
+    if (compact) {
+      return Column(
+        children: [
+          Row(children: [back, const Spacer(), wallet]),
+          const SizedBox(height: 8),
+          _levelChip(level),
+        ],
+      );
+    }
+    return Row(
       children: [
-        Positioned.fill(
-          child: CustomPaint(painter: _RoomPainter(windowTop: topInset + 76)),
-        ),
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            topInset + AppSpacing.md,
-            AppSpacing.lg,
-            AppSpacing.lg,
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(child: _levelBadge(level)),
-                  const SizedBox(width: AppSpacing.sm),
-                  _gems(loading ? null : state.points),
-                  const AccountButton(),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _pet(equipped),
-                        const SizedBox(height: AppSpacing.sm),
-                        _bubble(message),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  IntrinsicWidth(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      spacing: AppSpacing.sm,
-                      children: [
-                        _action(
-                          Icons.flag_outlined,
-                          'Quest',
-                          () => context.go('/checklist'),
-                        ),
-                        _action(
-                          Icons.storefront_outlined,
-                          'Shop',
-                          () => context.push('/pet/shop'),
-                        ),
-                        _action(Icons.backpack_outlined, 'Pack', _openPack),
-                        _action(Icons.explore_outlined, 'Guide', _openGuide),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+        back,
+        const SizedBox(width: 8),
+        Expanded(child: _levelChip(level)),
+        const SizedBox(width: 8),
+        wallet,
       ],
     );
   }
 
-  Widget _levelBadge(PetLevel level) => Semantics(
+  Widget _levelChip(PetLevel level) => Semantics(
     container: true,
     label:
         'Level ${level.level}, ${level.current} of ${PetLevel.perLevel} '
         'verified missions to the next level',
-    child: ExcludeSemantics(
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.xs),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          boxShadow: AppShadows.soft,
-        ),
-        child: Row(
+    value: '${level.current} of ${PetLevel.perLevel}',
+    child: Container(
+      height: MediaQuery.textScalerOf(context).scale(1) > 1.5 ? 72 : 56,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: _hudDecoration(),
+      child: ExcludeSemantics(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              padding: const EdgeInsets.all(AppSpacing.xs),
-              decoration: const BoxDecoration(
-                color: AppColors.yellow,
-                shape: BoxShape.circle,
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  '${level.level}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.petInk,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Level ${level.level}',
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Elbee · Lv ${level.level}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
                       color: AppColors.petInk,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: level.progress,
-                      minHeight: 8,
-                      color: AppColors.yellow,
-                      backgroundColor: AppColors.cardBorder,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-          ],
-        ),
-      ),
-    ),
-  );
-
-  /// The wallet balance; [points] is null until the first load finishes, so
-  /// the chip never shows a zero that is only a placeholder.
-  Widget _gems(int? points) => Semantics(
-    container: true,
-    label: points == null ? 'Gems loading' : '$points gems',
-    child: ExcludeSemantics(
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          boxShadow: AppShadows.soft,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.diamond_outlined, size: 16, color: AppColors.blue),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              points?.toString() ?? '...',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: AppColors.petInk,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-
-  Widget _pet(PetOutfit? equipped) {
-    final image = petImageFor(equipped?.id);
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        // The cushion Elbee sits on.
-        Container(
-          width: 190,
-          height: 40,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF6B8C6),
-            borderRadius: BorderRadius.all(Radius.elliptical(95, 20)),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Image.asset(
-            image,
-            height: 190,
-            semanticLabel: equipped == null
-                ? 'Elbee the shark'
-                : 'Elbee the shark, wearing ${equipped.label}',
-          ),
-        ),
-        // Outfits without their own artwork still show as worn.
-        if (equipped != null && image == petImageFor(null))
-          Positioned(
-            right: 0,
-            bottom: 14,
-            child: CircleAvatar(
-              backgroundColor: AppColors.yellow,
-              child: Icon(equipped.icon, color: AppColors.petInk),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _bubble(String message) => Container(
-    padding: const EdgeInsets.symmetric(
-      horizontal: AppSpacing.md,
-      vertical: AppSpacing.sm,
-    ),
-    decoration: BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      boxShadow: AppShadows.soft,
-    ),
-    child: Text(
-      message,
-      textAlign: TextAlign.center,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: AppColors.petInk,
-      ),
-    ),
-  );
-
-  Widget _action(IconData icon, String label, VoidCallback onTap) => Semantics(
-    key: ValueKey('pet-action-$label'),
-    container: true,
-    button: true,
-    child: Material(
-      color: AppColors.surface,
-      elevation: 2,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 64, minHeight: 56),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: AppColors.petInk),
+                ),
                 Text(
-                  label,
+                  '${level.current} / ${PetLevel.perLevel}',
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.petInk,
+                    color: AppColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    ),
-  );
-
-  Widget _sectionTitle(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-    child: Semantics(
-      header: true,
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w800,
-          color: AppColors.petInk,
-        ),
-      ),
-    ),
-  );
-
-  Widget _missionTile(DailyClassTask task) => Card(
-    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-    elevation: 0,
-    color: AppColors.surface,
-    shape: _cardShape,
-    clipBehavior: Clip.antiAlias,
-    child: ListTile(
-      onTap: () => _showMission(task),
-      leading: Icon(
-        task.done ? Icons.check_circle : Icons.radio_button_unchecked,
-        color: task.done ? AppColors.green : AppColors.muted,
-      ),
-      title: Text(
-        task.label,
-        style: const TextStyle(
-          fontWeight: FontWeight.w700,
-          color: AppColors.petInk,
-        ),
-      ),
-      subtitle: Text(
-        '${task.done ? 'Completed · ' : ''}'
-        '${task.course.courseCode} · ${task.course.timeRangeLabel}',
-        style: const TextStyle(color: AppColors.labelInk),
-      ),
-      trailing: Text(
-        '+${task.reward}',
-        semanticsLabel: '${task.reward} gems',
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          color: AppColors.gemInk,
-        ),
-      ),
-    ),
-  );
-
-  Widget _classTile(UpcomingClass next, DateTime now) => Card(
-    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-    elevation: 0,
-    color: AppColors.surface,
-    shape: _cardShape,
-    clipBehavior: Clip.antiAlias,
-    child: ListTile(
-      onTap: () => showClassDetailSheet(context, next.course),
-      leading: Icon(
-        next.course.isOnline
-            ? Icons.videocam_outlined
-            : Icons.location_on_outlined,
-        color: AppColors.petInk,
-      ),
-      title: Text(
-        '${next.course.courseCode} · ${next.course.courseName}',
-        style: const TextStyle(
-          fontWeight: FontWeight.w700,
-          color: AppColors.petInk,
-        ),
-      ),
-      subtitle: Text(
-        '${upcomingDayLabel(next.start, now)} · '
-        '${next.course.timeRangeLabel}\n${next.course.locationLabel}',
-        style: const TextStyle(color: AppColors.labelInk),
-      ),
-      trailing: const Icon(Icons.chevron_right, color: AppColors.petInk),
-    ),
-  );
-
-  Widget _loadingCard() => const Padding(
-    padding: EdgeInsets.all(AppSpacing.xl),
-    child: Column(
-      children: [
-        CircularProgressIndicator(),
-        SizedBox(height: AppSpacing.md),
-        Text('Loading your day...', style: TextStyle(color: AppColors.petInk)),
-      ],
-    ),
-  );
-
-  Widget _emptyCard() => Card(
-    margin: EdgeInsets.zero,
-    elevation: 0,
-    color: AppColors.surface,
-    shape: _cardShape,
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'No classes yet',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.petInk,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          const Text(
-            'Add your classes in the Calendar to get daily missions.',
-            style: TextStyle(color: AppColors.labelInk),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          FilledButton(
-            onPressed: () => context.go('/checklist'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.yellow,
-              foregroundColor: AppColors.petInk,
-              minimumSize: const Size.fromHeight(48),
-            ),
-            child: const Text('Open Calendar'),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget _errorCard(String message) => Card(
-    margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-    elevation: 0,
-    color: AppColors.surface,
-    shape: _cardShape,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.lg,
-        AppSpacing.lg,
-        AppSpacing.xs,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.error_outline, color: AppColors.danger),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Text(
-                  "Couldn't load your classes. $message",
-                  style: const TextStyle(color: AppColors.petInk),
-                ),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(5),
+              child: LinearProgressIndicator(
+                value: level.progress,
+                minHeight: 8,
+                color: AppColors.yellow,
+                backgroundColor: const Color(0xFFEAECF0),
               ),
-            ],
-          ),
-          TextButton(onPressed: _refresh, child: const Text('Retry')),
-        ],
-      ),
-    ),
-  );
-}
-
-/// The outfits already owned. Choosing one pops it for Pet Home to equip
-/// through the existing `equip_outfit` RPC; nothing is bought here.
-class _PackSheet extends StatelessWidget {
-  const _PackSheet({
-    required this.owned,
-    required this.equippedId,
-    required this.onOpenShop,
-  });
-
-  final List<PetOutfit> owned;
-  final String? equippedId;
-  final VoidCallback onOpenShop;
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        0,
-        AppSpacing.xl,
-        AppSpacing.xl,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Pack',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.petInk,
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (owned.isEmpty) ...[
-            const Text(
-              'Your pack is empty. Outfits you buy in the Shop show up here.',
-              style: TextStyle(color: AppColors.labelInk),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton(
-              onPressed: onOpenShop,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.yellow,
-                foregroundColor: AppColors.petInk,
-                minimumSize: const Size.fromHeight(48),
-              ),
-              child: const Text('Open Shop'),
-            ),
-          ] else
-            for (final outfit in owned)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(outfit.icon, color: AppColors.petInk),
-                title: Text(
-                  outfit.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.petInk,
-                  ),
-                ),
-                trailing: outfit.id == equippedId
-                    ? const Text(
-                        'Wearing',
-                        style: TextStyle(color: AppColors.labelInk),
-                      )
-                    : TextButton(
-                        onPressed: () => Navigator.pop(context, outfit),
-                        child: Text(
-                          'Wear',
-                          semanticsLabel: 'Wear ${outfit.label}',
-                        ),
-                      ),
-              ),
-        ],
-      ),
-    ),
-  );
-}
-
-/// What a mission asks for and how it is verified. Claiming stays in the
-/// Calendar, so this sheet can never grant a reward.
-class _MissionSheet extends StatelessWidget {
-  const _MissionSheet({required this.task, required this.onOpenCalendar});
-
-  final DailyClassTask task;
-  final VoidCallback onOpenCalendar;
-
-  String get _howTo => switch (task.kind) {
-    'attend' =>
-      'Check in from the Calendar while you are near the class building '
-          'during class time.',
-    'attend_online' =>
-      'Run the online session from the Calendar for the scheduled class time.',
-    _ => 'Mark this done from the Calendar today.',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final course = task.course;
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          0,
-          AppSpacing.xl,
-          AppSpacing.xl,
+          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      ),
+    ),
+  );
+
+  Widget _gems(int? gems) => Semantics(
+    label: gems == null ? 'Gems loading' : '$gems gems',
+    child: Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: _hudDecoration(),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.diamond, size: 18, color: AppColors.blue),
+          const SizedBox(width: 4),
+          if (gems == null)
+            const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
             Text(
-              task.label,
+              '$gems',
               style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
                 color: AppColors.petInk,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            Text(
-              '${course.courseCode} · ${course.courseName}',
-              style: const TextStyle(fontSize: 15, color: AppColors.labelInk),
+        ],
+      ),
+    ),
+  );
+
+  BoxDecoration _hudDecoration() => BoxDecoration(
+    color: Colors.white,
+    border: Border.all(color: AppColors.petInk, width: 2),
+    borderRadius: BorderRadius.circular(18),
+    boxShadow: const [
+      BoxShadow(color: Color(0x2200244E), offset: Offset(0, 3)),
+    ],
+  );
+
+  Widget _mascot(String? outfitId, {required bool compact}) {
+    final outfit = petOutfits.where((item) => item.id == outfitId).firstOrNull;
+    final hasCustomArt = outfitId == 'grad_cap' || outfitId == 'csulb_tee';
+    return Semantics(
+      image: true,
+      label: outfit == null
+          ? 'Elbee the shark'
+          : 'Elbee the shark, wearing ${outfit.label}',
+      child: SizedBox(
+        height: compact ? 150 : 184,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Image.asset(
+              petImageFor(outfitId),
+              height: compact ? 150 : 184,
+              fit: BoxFit.contain,
+              excludeFromSemantics: true,
             ),
-            const SizedBox(height: AppSpacing.lg),
-            _row(Icons.schedule, course.timeRangeLabel),
-            _row(
-              course.isOnline
-                  ? Icons.videocam_outlined
-                  : Icons.location_on_outlined,
-              course.locationLabel,
-            ),
-            _row(
-              Icons.diamond_outlined,
-              '${task.reward} gems, added once NaviPet verifies the mission',
-            ),
-            _row(
-              task.done ? Icons.check_circle : Icons.radio_button_unchecked,
-              task.done ? 'Completed today' : 'Not completed yet',
-            ),
-            Text(_howTo, style: const TextStyle(color: AppColors.petInk)),
-            if (task.kind == 'attend') ...[
-              const SizedBox(height: AppSpacing.sm),
-              const Text(
-                'A campus check-in confirms you were near the building. It is '
-                'not proof of class attendance.',
-                style: TextStyle(color: AppColors.labelInk),
+            if (outfit != null && !hasCustomArt)
+              Positioned(
+                right: 6,
+                bottom: 6,
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppColors.yellow,
+                  child: Icon(outfit.icon, color: AppColors.petInk, size: 19),
+                ),
               ),
-            ],
-            const SizedBox(height: AppSpacing.xl),
-            FilledButton(
-              onPressed: onOpenCalendar,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.yellow,
-                foregroundColor: AppColors.petInk,
-                minimumSize: const Size.fromHeight(48),
-              ),
-              child: const Text('Open Calendar'),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _row(IconData icon, String text) => Padding(
-    padding: const EdgeInsets.only(bottom: AppSpacing.md),
-    child: Row(
-      children: [
-        Icon(icon, size: 20, color: AppColors.petInk),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 15, color: AppColors.petInk),
-          ),
-        ),
-      ],
+  Widget _messageBubble(String message) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: AppColors.petInk, width: 2),
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(16),
+        topRight: Radius.circular(16),
+        bottomRight: Radius.circular(16),
+      ),
+    ),
+    child: Text(
+      message,
+      textAlign: TextAlign.center,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(color: AppColors.petInk, fontSize: 13),
     ),
   );
+
+  Widget _todayCard({
+    required bool loading,
+    required String? error,
+    required UpcomingClass? next,
+  }) {
+    if (loading) {
+      return _card(
+        Row(
+          children: [
+            const SizedBox.square(
+              dimension: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Checking your schedule...')),
+          ],
+        ),
+      );
+    }
+    if (error != null) {
+      return _card(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Couldn't load your classes. $error",
+              style: const TextStyle(color: AppColors.danger),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _refresh,
+                child: const Text('Retry'),
+              ),
+            ),
+            if (next != null)
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(next.course.courseCode),
+                  subtitle: Text(next.course.locationLabel),
+                  onTap: () => showClassDetailSheet(context, next.course),
+                  trailing: _petButton(label: 'Guide', onPressed: _openGuide),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+    if (next == null) {
+      final hasClasses = context.read<AppState>().classes.isNotEmpty;
+      return _card(
+        Row(
+          children: [
+            const Icon(Icons.event_available_outlined, color: AppColors.petInk),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                hasClasses
+                    ? 'No upcoming classes this week.'
+                    : 'Add a class to start exploring together.',
+                style: const TextStyle(
+                  color: AppColors.petInk,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.go('/checklist'),
+              child: Text(hasClasses ? 'Calendar' : 'Add class'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final now = DateTime.now();
+    final course = next.course;
+    return _card(
+      Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.accentSoft,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.location_on_outlined,
+              color: AppColors.petInk,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => showClassDetailSheet(context, course),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${upcomingDayLabel(next.start, now)} · ${course.startLabel}',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '${course.courseCode} · ${course.locationLabel}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.petInk,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _petButton(label: 'Guide', onPressed: _openGuide),
+        ],
+      ),
+    );
+  }
+
+  Widget _card(Widget child) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: AppColors.cardBorder),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: AppShadows.soft,
+    ),
+    child: child,
+  );
+
+  Widget _petButton({required String label, required VoidCallback onPressed}) =>
+      SizedBox(
+        height: 48,
+        child: FilledButton(
+          onPressed: onPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.yellow,
+            foregroundColor: AppColors.petInk,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: AppColors.petInk, width: 2),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
 }
 
-/// Elbee's room: a warm wall with a window, over a lilac checkered floor.
 class _RoomPainter extends CustomPainter {
-  const _RoomPainter({required this.windowTop});
-
-  /// Keeps the window below the status bar and the header row.
-  final double windowTop;
+  const _RoomPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final floorTop = size.height * 0.62;
-    canvas.drawRect(Offset.zero & size, Paint()..color = AppColors.accentSoft);
-
-    final window = RRect.fromRectAndRadius(
-      Rect.fromLTWH(AppSpacing.xl, windowTop, 96, 84),
-      const Radius.circular(AppRadius.sm),
-    );
-    canvas.drawRRect(window, Paint()..color = const Color(0xFFBFE3F7));
-    final frame = Paint()
-      ..color = AppColors.surface
+    final wall = Paint()..color = const Color(0xFFDDF1EF);
+    final floor = Paint()..color = const Color(0xFFF3E2B0);
+    final trim = Paint()..color = const Color(0xFFE3CF98);
+    final glass = Paint()..color = const Color(0xFFBFE3F7);
+    final white = Paint()..color = Colors.white;
+    final navy = Paint()
+      ..color = AppColors.petInk
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 6;
-    canvas.drawRRect(window, frame);
-    canvas.drawLine(
-      Offset(window.center.dx, window.top),
-      Offset(window.center.dx, window.bottom),
-      frame,
-    );
-    canvas.drawLine(
-      Offset(window.left, window.center.dy),
-      Offset(window.right, window.center.dy),
-      frame,
-    );
+      ..strokeWidth = 2;
 
-    const tile = 32.0;
-    final light = Paint()..color = const Color(0xFFEDE4FA);
-    final dark = Paint()..color = const Color(0xFFDFD2F4);
-    canvas.save();
-    canvas.clipRect(Rect.fromLTRB(0, floorTop, size.width, size.height));
-    for (var row = 0; floorTop + row * tile < size.height; row++) {
-      for (var column = 0; column * tile < size.width; column++) {
-        canvas.drawRect(
-          Rect.fromLTWH(column * tile, floorTop + row * tile, tile, tile),
-          (row + column).isEven ? light : dark,
-        );
-      }
-    }
-    canvas.restore();
-    // Baseboard.
+    canvas.drawRect(Offset.zero & size, wall);
+    final floorTop = size.height * .68;
     canvas.drawRect(
-      Rect.fromLTWH(0, floorTop - 6, size.width, 6),
-      Paint()..color = AppColors.surface,
+      Rect.fromLTWH(0, floorTop, size.width, size.height - floorTop),
+      floor,
+    );
+    canvas.drawRect(Rect.fromLTWH(0, floorTop, size.width, 6), trim);
+
+    final window = Rect.fromLTWH(size.width * .08, size.height * .20, 116, 136);
+    final windowPath = Path()
+      ..moveTo(window.left, window.bottom)
+      ..lineTo(window.left, window.top + 55)
+      ..quadraticBezierTo(window.left, window.top, window.left + 58, window.top)
+      ..quadraticBezierTo(
+        window.right,
+        window.top,
+        window.right,
+        window.top + 55,
+      )
+      ..lineTo(window.right, window.bottom)
+      ..close();
+    canvas.drawPath(windowPath, glass);
+    canvas.drawPath(
+      windowPath,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6,
+    );
+    canvas.drawLine(
+      Offset(window.center.dx, window.top + 4),
+      Offset(window.center.dx, window.bottom),
+      Paint()
+        ..color = Colors.white
+        ..strokeWidth = 4,
+    );
+    canvas.drawLine(
+      Offset(window.left + 3, window.top + 68),
+      Offset(window.right - 3, window.top + 68),
+      Paint()
+        ..color = Colors.white
+        ..strokeWidth = 4,
+    );
+    canvas.drawPath(windowPath, navy);
+
+    final rug = Rect.fromCenter(
+      center: Offset(size.width / 2, floorTop + 54),
+      width: size.width * .7,
+      height: 56,
+    );
+    canvas.drawOval(rug, white);
+    canvas.drawOval(rug, navy);
+
+    final sign = Rect.fromLTWH(size.width * .64, size.height * .25, 82, 54);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(sign, const Radius.circular(6)),
+      white,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(sign, const Radius.circular(6)),
+      navy,
+    );
+    final text = TextPainter(
+      text: const TextSpan(
+        text: 'CAMPUS',
+        style: TextStyle(
+          color: AppColors.petInk,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          letterSpacing: .5,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    text.paint(canvas, Offset(sign.center.dx - text.width / 2, sign.top + 14));
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(sign.left + 14, sign.top + 37, 54, 4),
+        const Radius.circular(2),
+      ),
+      Paint()..color = AppColors.yellow,
     );
   }
 
   @override
-  bool shouldRepaint(_RoomPainter oldDelegate) =>
-      oldDelegate.windowTop != windowTop;
+  bool shouldRepaint(covariant _RoomPainter oldDelegate) => false;
 }
