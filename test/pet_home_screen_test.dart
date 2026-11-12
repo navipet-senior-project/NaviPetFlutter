@@ -410,11 +410,7 @@ void main() {
     tester,
   ) async {
     final state = _FakeAppState(onlineRunning: true);
-    await _pump(
-      tester,
-      state,
-      router: _router(initialLocation: '/pet/quests'),
-    );
+    await _pump(tester, state, router: _router(initialLocation: '/pet/quests'));
     expect(find.textContaining('Online session: 0:01'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
     expect(find.textContaining('Online session: 0:02'), findsOneWidget);
