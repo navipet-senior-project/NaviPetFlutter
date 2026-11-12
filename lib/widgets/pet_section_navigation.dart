@@ -88,11 +88,9 @@ class PetSectionBottomNavigation extends StatelessWidget {
   const PetSectionBottomNavigation({
     super.key,
     required this.active,
-    this.readyQuests = 0,
   });
 
   final PetSectionTab active;
-  final int readyQuests;
 
   static const _tabs = [
     (PetSectionTab.home, 'Home', Icons.home_outlined),
@@ -142,14 +140,10 @@ class PetSectionBottomNavigation extends StatelessWidget {
     required bool largeText,
   }) {
     final selected = active == tab;
-    final ready = tab == PetSectionTab.quests ? readyQuests : 0;
-    final semanticLabel = ready > 0
-        ? '$label, $ready reward${ready == 1 ? '' : 's'} ready'
-        : label;
     return Semantics(
       button: true,
       selected: selected,
-      label: semanticLabel,
+      label: label,
       child: InkWell(
         key: ValueKey('pet-tab-$label'),
         borderRadius: BorderRadius.circular(18),
@@ -196,30 +190,6 @@ class PetSectionBottomNavigation extends StatelessWidget {
                   ),
                 ],
               ),
-              if (ready > 0)
-                Positioned(
-                  top: 0,
-                  right: 8,
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: 20),
-                    height: 20,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.danger,
-                      border: Border.all(color: Colors.white, width: 2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      ready > 9 ? '9+' : '$ready',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
