@@ -10,15 +10,15 @@ includes:
 - Mapbox destination autocomplete and walking directions.
 - Pet Home with Elbee, verified gem balance, outfit actions, and class-based
   missions and upcoming classes. Level progress is derived from verified
-  completions; missions are claimed in Checklist. Pet Home uses the signed-in
+  completions; missions are claimed in Calendar. Pet Home uses the signed-in
   user's saved schedule and does not create mock classes or rewards.
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
 - During an active outdoor walk, an AR control explains that outdoor AR guidance
   is unavailable and returns to the map with the route still active.
 - Checklist, outfit customization, and Account screens. On Android (and on iOS
-  when a prebuilt UnityFramework is present, see `docs/ios-testing.md`), the Scan AR
-  button appears during navigation to a place with indoor AR once a fresh
+  when a prebuilt UnityFramework is present, see `docs/ios-testing.md`), Scan AR
+  appears during navigation to a place with indoor AR once a fresh
   location fix is at or within 2 m of the building footprint, regardless of GPS
   accuracy. It hides when the fix goes stale (10 s) or is clearly outside. It
   loads the selected place and sends its backend door pose, plus a
