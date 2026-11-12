@@ -106,6 +106,7 @@ class AppState extends ChangeNotifier {
   bool _checkingNearbyTasks = false;
   bool _classesBusy = false;
   String? _classesError;
+  int _classesRefreshId = 0;
   final Map<String, DateTime> _onlineSessionStarts = {};
   Future<void>? _profileFetch;
   String? _profileFetchUserId;
@@ -319,6 +320,7 @@ class AppState extends ChangeNotifier {
     final client = _supabase;
     final user = client?.auth.currentUser;
     if (client == null || user == null) return;
+    final refreshId = ++_classesRefreshId;
     _classesBusy = true;
     _classesError = null;
     notifyListeners();
@@ -342,12 +344,18 @@ class AppState extends ChangeNotifier {
       _completionCounts = counts;
       await refreshPoints();
     } on ClassesApiException catch (error) {
-      _errorMessage = _classesError = error.message;
+      if (refreshId == _classesRefreshId) {
+        _errorMessage = _classesError = error.message;
+      }
     } on PostgrestException catch (error) {
-      _errorMessage = _classesError = error.message;
+      if (refreshId == _classesRefreshId) {
+        _errorMessage = _classesError = error.message;
+      }
     } finally {
-      _classesBusy = false;
-      notifyListeners();
+      if (refreshId == _classesRefreshId) {
+        _classesBusy = false;
+        notifyListeners();
+      }
     }
   }
 
