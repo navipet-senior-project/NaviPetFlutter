@@ -321,11 +321,15 @@ class AppState extends ChangeNotifier {
     final user = client?.auth.currentUser;
     if (client == null || user == null) return;
     final refreshId = ++_classesRefreshId;
+    bool canCommit() =>
+        refreshId == _classesRefreshId &&
+        client.auth.currentUser?.id == user.id;
     _classesBusy = true;
     _classesError = null;
     notifyListeners();
     try {
-      _classes = await _fetchClasses(client, user.id);
+      final classes = await _fetchClasses(client, user.id);
+      if (!canCommit()) return;
       // Task completions only live in Supabase, whichever source served the
       // classes, so they must load on both paths.
       final completionRows = await client
@@ -340,19 +344,24 @@ class AppState extends ChangeNotifier {
         keys.add('$classId|${row['task_date']}|${row['task_kind']}');
         counts[classId] = (counts[classId] ?? 0) + 1;
       }
+      if (!canCommit()) return;
+      _classes = classes;
       _completionKeys = keys;
       _completionCounts = counts;
-      await refreshPoints();
+      await refreshPoints(canCommit: canCommit);
     } on ClassesApiException catch (error) {
-      if (refreshId == _classesRefreshId) {
+      if (canCommit()) {
         _errorMessage = _classesError = error.message;
       }
     } on PostgrestException catch (error) {
-      if (refreshId == _classesRefreshId) {
+      if (canCommit()) {
         _errorMessage = _classesError = error.message;
       }
+    } catch (error) {
+      if (canCommit()) _errorMessage = _classesError = error.toString();
+      rethrow;
     } finally {
-      if (refreshId == _classesRefreshId) {
+      if (canCommit()) {
         _classesBusy = false;
         notifyListeners();
       }
@@ -446,7 +455,7 @@ class AppState extends ChangeNotifier {
     await refreshClasses();
   }
 
-  Future<void> refreshPoints() async {
+  Future<void> refreshPoints({bool Function()? canCommit}) async {
     final client = _supabase;
     final userId = client?.auth.currentUser?.id;
     if (client == null || userId == null) return;
@@ -460,7 +469,7 @@ class AppState extends ChangeNotifier {
         .select('outfit_id')
         .eq('user_id', userId);
     final current = client.auth.currentUser?.id;
-    if (current != userId) return;
+    if (current != userId || (canCommit != null && !canCommit())) return;
     _points = (wallet?['balance'] as num?)?.toInt() ?? 0;
     _equippedOutfit = wallet?['equipped_outfit'] as String?;
     _ownedOutfits = (purchases as List<dynamic>)
