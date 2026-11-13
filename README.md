@@ -402,7 +402,8 @@ ignores the whole `android/unity-ar/` directory.
 5. Sign and run with [Physical iPhone](#physical-iphone). Use your free
    Personal Team. Do not commit a team id or a bundle-identifier change.
 
-That iOS bridge is not yet proven against a real `UnityFramework` on a phone.
+See [iPhone testing](docs/ios-testing.md#indoor-ar) for setup and validation
+status.
 
 ## Navigation behavior
 
