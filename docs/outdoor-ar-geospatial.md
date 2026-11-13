@@ -53,9 +53,11 @@ Request (JSON string, `lib/data/outdoor_ar_contract.dart`):
 `destination` is the WGS84 point the walking route ends at. No MultiSet token
 and no Google credential is sent.
 
-`route.waypoints` is the selected Mapbox walking route's polyline, ordered
-start to destination, WGS84. Flutter sends this route for the coordinated Unity
-implementation to render in the shared indoor/outdoor AR HUD:
+`route.waypoints` is the active walk's remaining route geometry, ordered from
+the current progress to the destination, WGS84. If remaining geometry is
+empty, Flutter sends the selected Mapbox walking route's full coordinates.
+Flutter sends this route for the coordinated Unity implementation to render in
+the shared indoor/outdoor AR HUD:
 
 - Douglas-Peucker simplification drops points within 2 m of the segment that
   replaces them. First and last points stay. If the result exceeds 1000 points,

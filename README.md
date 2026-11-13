@@ -16,11 +16,11 @@ includes:
   check-in is not proof of class attendance.
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
-- During an active outdoor walk, an AR control explains that outdoor AR guidance
-  is unavailable and returns to the map with the route still active. A build
-  that opts in hands the destination and selected walking route to an ARCore
-  Geospatial session. Unity's shared HUD integration is coordinated separately;
-  end-to-end behavior is unverified. See
+- During an active outdoor walk, builds with outdoor AR enabled hand the
+  destination and selected walking route to an ARCore Geospatial session.
+  Without the opt-in, the control explains that outdoor AR is unavailable and
+  leaves the route active on the map. Unity's shared HUD integration is
+  coordinated separately; end-to-end behavior is unverified. See
   [docs/outdoor-ar-geospatial.md](docs/outdoor-ar-geospatial.md).
 - Calendar, Pet Shop and Pack, and Account screens. On Android (and on iOS
   when a prebuilt UnityFramework is present, see `docs/ios-testing.md`), Scan AR
