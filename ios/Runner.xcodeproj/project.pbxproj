@@ -375,7 +375,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "SRC=\"${PROJECT_DIR}/unity-ar/UnityFramework.framework\"\nif [ ! -d \"$SRC\" ]; then exit 0; fi\nDEST=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\nrsync -a --delete \"$SRC\" \"$DEST/\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then\n  codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --preserve-metadata=identifier,entitlements \"$DEST/UnityFramework.framework\"\nfi\n";
+			shellScript = "SRC=\"${PROJECT_DIR}/unity-ar/UnityFramework.framework\"\nif [ ! -d \"$SRC\" ]; then exit 0; fi\nDEST=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\nrsync -a --delete \"$SRC\" \"$DEST/\"\n# Unity reads its data from the framework bundle and exits the app when the IL2CPP metadata is missing.\nif [ ! -s \"$DEST/UnityFramework.framework/Data/Managed/Metadata/global-metadata.dat\" ]; then\n  echo \"error: ios/unity-ar/UnityFramework.framework has no Data/Managed/Metadata/global-metadata.dat. Copy the Unity export's Data folder into the framework (docs/ios-testing.md).\" >&2\n  exit 1\nfi\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then\n  codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --preserve-metadata=identifier,entitlements \"$DEST/UnityFramework.framework\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
