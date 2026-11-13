@@ -722,7 +722,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               onPressed: () => widget.outdoorArEnabled
                   ? startOutdoorAr(
                       context,
-                      request: OutdoorArRequest.to(state.destination),
+                      request: OutdoorArRequest.to(
+                        state.destination,
+                        route: state.remainingGeometry.isEmpty
+                            ? state.plan.selected.coordinates
+                            : state.remainingGeometry,
+                      ),
                       launch:
                           widget.launchOutdoorAr ??
                           NativeIndoorArLauncher().launchOutdoor,

@@ -83,8 +83,12 @@ Future<(NavigationFlowController, List<OutdoorArRequest>)> pumpOutdoorAr(
     durationMs: 1,
   ),
   bool camera = true,
+  NavigationRoute? route,
+  bool openOutdoorAr = true,
 }) async {
-  final controller = harness.build();
+  final controller = harness.build(
+    routes: harness.FakeRouteGateway()..result = route,
+  );
   final requests = <OutdoorArRequest>[];
   await tester.pumpWidget(
     MultiProvider(
@@ -110,8 +114,10 @@ Future<(NavigationFlowController, List<OutdoorArRequest>)> pumpOutdoorAr(
   await controller.calculateRoute(continueWithUncertain: true);
   await controller.startRoute(continueWithUncertain: true);
   await tester.pump();
-  await tester.tap(find.byTooltip('Outdoor AR'));
-  await tester.pumpAndSettle();
+  if (openOutdoorAr) {
+    await tester.tap(find.byTooltip('Outdoor AR'));
+    await tester.pumpAndSettle();
+  }
   return (controller, requests);
 }
 
@@ -141,6 +147,86 @@ void main() {
     expect(controller.state, same(active));
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.byKey(const ValueKey('navipet-map')), findsOneWidget);
+  });
+
+  testWidgets('outdoor AR sends the selected walking route in order', (
+    tester,
+  ) async {
+    const path = [
+      NavigationCoordinate(latitude: 33.7800, longitude: -118.1100),
+      NavigationCoordinate(latitude: 33.7805, longitude: -118.1100),
+      NavigationCoordinate(latitude: 33.7805, longitude: -118.1105),
+      harness.hornCoordinate,
+    ];
+    final (_, requests) = await pumpOutdoorAr(
+      tester,
+      route: const NavigationRoute(
+        coordinates: path,
+        steps: [],
+        distanceMeters: 150,
+        durationSeconds: 110,
+      ),
+    );
+    await tester.tap(find.text('Agree and continue'));
+    await tester.pumpAndSettle();
+
+    expect(requests.single.toJson()['route'], {
+      'waypoints': [
+        for (final p in path)
+          {'latitude': p.latitude, 'longitude': p.longitude},
+      ],
+    });
+  });
+
+  testWidgets('outdoor AR starts from remaining route geometry', (
+    tester,
+  ) async {
+    const path = [
+      NavigationCoordinate(latitude: 33.7800, longitude: -118.1100),
+      NavigationCoordinate(latitude: 33.7805, longitude: -118.1100),
+      NavigationCoordinate(latitude: 33.7805, longitude: -118.1105),
+      harness.hornCoordinate,
+    ];
+    final (controller, requests) = await pumpOutdoorAr(
+      tester,
+      route: const NavigationRoute(
+        coordinates: path,
+        steps: [],
+        distanceMeters: 150,
+        durationSeconds: 110,
+      ),
+      openOutdoorAr: false,
+    );
+    await controller.onLiveLocation(path[2], accuracyMeters: 5);
+    await tester.pump();
+    final active = controller.state as FlowActiveNavigation;
+    expect(active.remainingGeometry.last.latitude, path.last.latitude);
+    expect(active.remainingGeometry.last.longitude, path.last.longitude);
+    expect(
+      active.remainingGeometry.first.latitude,
+      closeTo(path[2].latitude, 1e-9),
+    );
+    expect(
+      active.remainingGeometry.first.longitude,
+      closeTo(path[2].longitude, 1e-9),
+    );
+
+    await tester.tap(find.byTooltip('Outdoor AR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Agree and continue'));
+    await tester.pumpAndSettle();
+
+    expect(
+      requests.single.waypoints?.first.latitude,
+      closeTo(path[2].latitude, 1e-9),
+    );
+    expect(
+      requests.single.waypoints?.first.longitude,
+      closeTo(path[2].longitude, 1e-9),
+    );
+    expect(requests.single.waypoints?.last.latitude, path.last.latitude);
+    expect(requests.single.waypoints?.last.longitude, path.last.longitude);
+    expect(requests.single.waypoints, isNot(contains(path.first)));
   });
 
   testWidgets('outdoor AR does not launch without consent or camera', (
