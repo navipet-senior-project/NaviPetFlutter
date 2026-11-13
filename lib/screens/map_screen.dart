@@ -724,7 +724,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       context,
                       request: OutdoorArRequest.to(
                         state.destination,
-                        route: state.plan.selected.coordinates,
+                        route: state.remainingGeometry.isEmpty
+                            ? state.plan.selected.coordinates
+                            : state.remainingGeometry,
                       ),
                       launch:
                           widget.launchOutdoorAr ??

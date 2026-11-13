@@ -1,5 +1,6 @@
+import 'dart:math' as math;
+
 import 'navigation_models.dart';
-import 'route_progress.dart';
 
 /// Build flag: `--dart-define=NAVIPET_OUTDOOR_AR=true`. Set it only when the
 /// private Unity library includes the outdoor Geospatial scene. Off, the
@@ -15,7 +16,7 @@ const outdoorArBuildEnabled = bool.fromEnvironment('NAVIPET_OUTDOOR_AR');
 ///
 /// [route] is the active walking route's polyline. It is sent only when it is
 /// a valid path Unity will accept; otherwise [waypoints] is null and Unity
-/// shows direction-only guidance instead of claiming to follow a route.
+/// must not claim route-following guidance.
 class OutdoorArRequest {
   OutdoorArRequest.to(
     NaviDestination destination, {
@@ -58,14 +59,11 @@ class OutdoorArRequest {
 /// Unity rejects fewer than 2 or more than this many waypoints.
 const outdoorRouteMaxWaypoints = 1000;
 
-/// Points closer than this to the last kept one add nothing to the walk.
-const outdoorRouteMinSpacingMeters = 5.0;
-
 /// The route as Unity accepts it, or null when it cannot be sent honestly:
 /// fewer than 2 points, or any point that is not a real WGS84 coordinate.
-/// Near-duplicate points are dropped (first and last always stay). If a very
-/// long route still exceeds [outdoorRouteMaxWaypoints] the spacing widens
-/// until it fits, so the whole path is kept rather than cut short.
+/// Nearly straight intermediate points are dropped, preserving first and last
+/// points and every turn over 10 degrees. A route with more than
+/// [outdoorRouteMaxWaypoints] significant points is omitted rather than cut.
 List<NavigationCoordinate>? outdoorRouteWaypoints(
   List<NavigationCoordinate> route,
 ) {
@@ -76,12 +74,31 @@ List<NavigationCoordinate>? outdoorRouteWaypoints(
       c.longitude.abs() <= 180;
   if (route.length < 2 || !route.every(valid)) return null;
 
-  for (var spacing = outdoorRouteMinSpacingMeters; ; spacing *= 2) {
-    final kept = [route.first];
-    for (final point in route.skip(1).take(route.length - 2)) {
-      if (distanceMeters(kept.last, point) >= spacing) kept.add(point);
-    }
-    kept.add(route.last);
-    if (kept.length <= outdoorRouteMaxWaypoints) return kept;
+  bool nearlyCollinear(
+    NavigationCoordinate a,
+    NavigationCoordinate b,
+    NavigationCoordinate c,
+  ) {
+    final lonScale = math.cos(b.latitude * math.pi / 180);
+    final ax = (b.longitude - a.longitude) * lonScale;
+    final ay = b.latitude - a.latitude;
+    final bx = (c.longitude - b.longitude) * lonScale;
+    final by = c.latitude - b.latitude;
+    final dot = ax * bx + ay * by;
+    final cross = ax * by - ay * bx;
+    if ((ax == 0 && ay == 0) || (bx == 0 && by == 0)) return true;
+    if (dot <= 0) return false;
+    if (cross == 0) return true;
+    return math.atan2(cross.abs(), dot) <= math.pi / 18;
   }
+
+  final kept = <NavigationCoordinate>[];
+  for (final point in route) {
+    kept.add(point);
+    while (kept.length >= 3 &&
+        nearlyCollinear(kept[kept.length - 3], kept[kept.length - 2], point)) {
+      kept.removeAt(kept.length - 2);
+    }
+  }
+  return kept.length <= outdoorRouteMaxWaypoints ? kept : null;
 }

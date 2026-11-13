@@ -15,15 +15,30 @@ NavigationCoordinate _at(double northMeters) => NavigationCoordinate(
 
 void main() {
   group('outdoorRouteWaypoints', () {
-    test('keeps an ordered route with first and last point', () {
+    test('thins a straight route while keeping its endpoints', () {
       final route = [_at(0), _at(20), _at(40), _at(60)];
-      expect(outdoorRouteWaypoints(route), route);
+      expect(outdoorRouteWaypoints(route), [route.first, route.last]);
     });
 
-    test('drops near-duplicates but keeps both ends', () {
-      final route = [_at(0), _at(1), _at(2), _at(30), _at(31)];
-      expect(outdoorRouteWaypoints(route), [route[0], route[3], route[4]]);
-    });
+    test(
+      'preserves route corners even when segments are under five meters',
+      () {
+        const metersPerDegree = 111195.0;
+        final route = [
+          _at(0),
+          _at(3),
+          NavigationCoordinate(
+            latitude: 33.78 + 3 / metersPerDegree,
+            longitude: -118.11 + 3 / metersPerDegree,
+          ),
+          NavigationCoordinate(
+            latitude: 33.78,
+            longitude: -118.11 + 6 / metersPerDegree,
+          ),
+        ];
+        expect(outdoorRouteWaypoints(route), route);
+      },
+    );
 
     test('is absent without a route Unity can follow', () {
       expect(outdoorRouteWaypoints(const []), isNull);
@@ -44,13 +59,21 @@ void main() {
     test('fits a very long route without cutting it short', () {
       final route = [for (var i = 0; i <= 4000; i++) _at(i * 6.0)];
       final waypoints = outdoorRouteWaypoints(route)!;
-      expect(waypoints.length, lessThanOrEqualTo(outdoorRouteMaxWaypoints));
+      expect(waypoints, [route.first, route.last]);
       expect(waypoints.first, route.first);
       expect(waypoints.last, route.last);
-      // Still strictly ordered start to destination.
-      for (var i = 1; i < waypoints.length; i++) {
-        expect(waypoints[i].latitude, greaterThan(waypoints[i - 1].latitude));
-      }
+    });
+
+    test('omits geometry when significant turns exceed the waypoint cap', () {
+      const metersPerDegree = 111195.0;
+      final route = [
+        for (var i = 0; i <= outdoorRouteMaxWaypoints; i++)
+          NavigationCoordinate(
+            latitude: 33.78 + (i.isEven ? 0 : 1) / metersPerDegree,
+            longitude: -118.11 + i / metersPerDegree,
+          ),
+      ];
+      expect(outdoorRouteWaypoints(route), isNull);
     });
   });
 
