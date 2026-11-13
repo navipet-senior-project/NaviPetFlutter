@@ -59,11 +59,13 @@ class OutdoorArRequest {
 /// Unity rejects fewer than 2 or more than this many waypoints.
 const outdoorRouteMaxWaypoints = 1000;
 
+/// Maximum perpendicular error for the first route simplification pass.
+const outdoorRouteToleranceMeters = 2.0;
+
 /// The route as Unity accepts it, or null when it cannot be sent honestly:
 /// fewer than 2 points, or any point that is not a real WGS84 coordinate.
-/// Nearly straight intermediate points are dropped, preserving first and last
-/// points and every turn over 10 degrees. A route with more than
-/// [outdoorRouteMaxWaypoints] significant points is omitted rather than cut.
+/// Douglas-Peucker simplification preserves endpoints and route order. Its
+/// tolerance widens from [outdoorRouteToleranceMeters] only to meet the cap.
 List<NavigationCoordinate>? outdoorRouteWaypoints(
   List<NavigationCoordinate> route,
 ) {
@@ -74,31 +76,60 @@ List<NavigationCoordinate>? outdoorRouteWaypoints(
       c.longitude.abs() <= 180;
   if (route.length < 2 || !route.every(valid)) return null;
 
-  bool nearlyCollinear(
-    NavigationCoordinate a,
-    NavigationCoordinate b,
-    NavigationCoordinate c,
-  ) {
-    final lonScale = math.cos(b.latitude * math.pi / 180);
-    final ax = (b.longitude - a.longitude) * lonScale;
-    final ay = b.latitude - a.latitude;
-    final bx = (c.longitude - b.longitude) * lonScale;
-    final by = c.latitude - b.latitude;
-    final dot = ax * bx + ay * by;
-    final cross = ax * by - ay * bx;
-    if ((ax == 0 && ay == 0) || (bx == 0 && by == 0)) return true;
-    if (dot <= 0) return false;
-    if (cross == 0) return true;
-    return math.atan2(cross.abs(), dot) <= math.pi / 18;
+  final first = route.first;
+  final metersPerDegree = 111195 * math.cos(first.latitude * math.pi / 180);
+  final x = [
+    for (final point in route)
+      (point.longitude - first.longitude) * metersPerDegree,
+  ];
+  final y = [
+    for (final point in route) (point.latitude - first.latitude) * 111195,
+  ];
+
+  List<NavigationCoordinate> simplify(double tolerance) {
+    final keep = List<bool>.filled(route.length, false)
+      ..[0] = true
+      ..[route.length - 1] = true;
+    final segments = <int>[0, route.length - 1];
+    while (segments.isNotEmpty) {
+      final end = segments.removeLast();
+      final start = segments.removeLast();
+      final dx = x[end] - x[start];
+      final dy = y[end] - y[start];
+      final lengthSquared = dx * dx + dy * dy;
+      var maxDistance = tolerance;
+      var maxIndex = -1;
+      for (var i = start + 1; i < end; i++) {
+        final fraction = lengthSquared == 0
+            ? 0.0
+            : (((x[i] - x[start]) * dx + (y[i] - y[start]) * dy) /
+                      lengthSquared)
+                  .clamp(0.0, 1.0);
+        final offsetX = x[i] - x[start] - dx * fraction;
+        final offsetY = y[i] - y[start] - dy * fraction;
+        final distance = math.sqrt(offsetX * offsetX + offsetY * offsetY);
+        if (distance > maxDistance) {
+          maxDistance = distance;
+          maxIndex = i;
+        }
+      }
+      if (maxIndex >= 0) {
+        keep[maxIndex] = true;
+        segments
+          ..add(start)
+          ..add(maxIndex)
+          ..add(maxIndex)
+          ..add(end);
+      }
+    }
+    return [
+      for (var i = 0; i < route.length; i++)
+        if (keep[i]) route[i],
+    ];
   }
 
-  final kept = <NavigationCoordinate>[];
-  for (final point in route) {
-    kept.add(point);
-    while (kept.length >= 3 &&
-        nearlyCollinear(kept[kept.length - 3], kept[kept.length - 2], point)) {
-      kept.removeAt(kept.length - 2);
-    }
+  for (var tolerance = outdoorRouteToleranceMeters; ; tolerance *= 2) {
+    final waypoints = simplify(tolerance);
+    if (waypoints.length <= outdoorRouteMaxWaypoints) return waypoints;
   }
-  return kept.length <= outdoorRouteMaxWaypoints ? kept : null;
 }

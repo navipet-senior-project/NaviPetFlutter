@@ -57,10 +57,9 @@ and no Google credential is sent.
 start to destination, WGS84. Flutter sends this route for the coordinated Unity
 implementation to render in the shared indoor/outdoor AR HUD:
 
-- Nearly straight intermediate points (turns of 10 degrees or less) are
-  dropped; first and last points and larger turns stay. If safe thinning still
-  leaves more than 1000 points, Flutter omits the route rather than cutting it
-  short or flattening a significant turn.
+- Douglas-Peucker simplification drops points within 2 m of the segment that
+  replaces them. First and last points stay. If the result exceeds 1000 points,
+  Flutter widens the tolerance until the whole ordered route fits.
 - A route with fewer than 2 points, or any NaN or out-of-range coordinate, is
   not sent. `route` is then absent; Unity must not present route-following
   guidance without route geometry.
