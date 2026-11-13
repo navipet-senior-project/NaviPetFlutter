@@ -52,13 +52,21 @@ It is off by default. To turn it on:
    directory is gitignored. The xcconfig defines `UNITY_AR_ENABLED`, links
    the framework and adds its search path; the Runner's "Embed Unity AR" build
    phase copies and signs it into the app when present.
-3. Build and run as above. Camera access is requested through
+3. Copy the export's `Data` folder (`Builds/IndoorArIos/Data`, from the same
+   export the framework was built from) to
+   `ios/unity-ar/UnityFramework.framework/Data`. The export keeps `Data` in
+   its `Unity-iPhone` app target, so building the `UnityFramework` scheme
+   leaves it out, while the Runner tells Unity to read its data from the
+   framework. Without `Data/Managed/Metadata/global-metadata.dat` Unity exits
+   the whole app on the first AR launch, so the "Embed Unity AR" phase fails
+   the build when that file is missing.
+4. Build and run as above. Camera access is requested through
    `NSCameraUsageDescription`. Delete `ios/unity-ar/UnityAr.xcconfig` to go
    back to AR unavailable.
 
 The export may contain MultiSet credentials: share the framework privately and
 never commit it.
 
-This code path is not compiled against a real `UnityFramework` and has not been
-run on a device. Re-entering AR after Unity unloads (`runEmbedded` again) in
-particular needs checking on the phone.
+This code path builds and signs against a real `UnityFramework`, but an AR
+session has not been proven on a device. Re-entering AR after Unity unloads
+(`runEmbedded` again) in particular needs checking on the phone.

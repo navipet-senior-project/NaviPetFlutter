@@ -390,7 +390,9 @@ ignores the whole `android/unity-ar/` directory.
 ### iPhone
 
 1. Get `UnityFramework.framework` from the project maintainer who gave you access to this repository, in private.
-2. Copy it to `ios/unity-ar/UnityFramework.framework`.
+2. Copy it to `ios/unity-ar/UnityFramework.framework`. It must contain the
+   Unity export's `Data` folder (see `docs/ios-testing.md`); the build fails
+   without it.
 3. Copy `ios/UnityAr.xcconfig.template` to
    `ios/unity-ar/UnityAr.xcconfig`. That file is what turns the iOS Unity
    bridge on. Deleting `ios/unity-ar/UnityAr.xcconfig` turns it back off.
@@ -400,7 +402,8 @@ ignores the whole `android/unity-ar/` directory.
 5. Sign and run with [Physical iPhone](#physical-iphone). Use your free
    Personal Team. Do not commit a team id or a bundle-identifier change.
 
-That iOS bridge is not yet proven against a real `UnityFramework` on a phone.
+See [iPhone testing](docs/ios-testing.md#indoor-ar) for setup and validation
+status.
 
 ## Navigation behavior
 
