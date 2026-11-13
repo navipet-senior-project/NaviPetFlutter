@@ -4,12 +4,11 @@ During an active outdoor walk the map shows an outdoor AR control. Mapbox
 stays the default outdoor navigation and indoor AR stays on MultiSet; outdoor
 AR is an optional camera view opened on top of the walk.
 
-This is the Flutter half. The Unity outdoor scene from
-[NaviPetUnity#19](https://github.com/navipet-senior-project/NaviPetUnity/pull/19)
-is a prototype that the exported library does not include yet, so **no build
-can run outdoor AR end to end today**. Nothing here has been tested on a phone,
-on campus, or against the ARCore API. No coverage, accuracy or route quality
-is claimed.
+Flutter sends the active walk's destination and selected route to Unity.
+Unity's outdoor scene and shared HUD integration are coordinated separately.
+**End-to-end behavior remains unverified.** This Flutter handoff has not been
+tested on a phone, on campus, or against the ARCore API. No coverage, accuracy
+or route quality is claimed.
 
 ## Turning it on
 
@@ -19,10 +18,9 @@ Outdoor AR is off unless the app is built with:
 flutter run --dart-define=NAVIPET_OUTDOOR_AR=true
 ```
 
-Set the flag only when the private Unity library (see
-[Unity AR without installing Unity](../README.md#unity-ar-without-installing-unity))
-includes the outdoor scene. Without the flag the control says outdoor AR is
-unavailable and opens nothing, which is the behaviour of every current build.
+Set the flag only when the app's Unity library includes the coordinated outdoor
+scene integration. Without the flag the control says outdoor AR is unavailable
+and opens nothing.
 
 ## What the app does
 
@@ -35,9 +33,8 @@ unavailable and opens nothing, which is the behaviour of every current build.
 4. Returns to the map when Unity finishes. The route, the destination and the
    navigation state are never touched.
 
-Each of these keeps the walk on the map and explains why in a dialog: no Unity
-library, a Unity library without the outdoor scene (it answers `BAD_REQUEST`),
-camera access refused, or a session that fails.
+Each failure keeps the walk on the map and explains why in a dialog, including
+missing Unity support, camera access refusal, or a failed session.
 
 ## Bridge contract
 
@@ -57,15 +54,15 @@ Request (JSON string, `lib/data/outdoor_ar_contract.dart`):
 and no Google credential is sent.
 
 `route.waypoints` is the selected Mapbox walking route's polyline, ordered
-start to destination, WGS84. Unity accepts 2 to 1000 points and rejects
-anything else with `BAD_REQUEST`, so Flutter only sends a valid path:
+start to destination, WGS84. Flutter sends this route for the coordinated Unity
+implementation to render in the shared indoor/outdoor AR HUD:
 
 - Points less than 5 m from the last kept point are dropped; the first and last
   point always stay. A route still over 1000 points widens that spacing until
   it fits. It is never cut short.
 - A route with fewer than 2 points, or any NaN or out-of-range coordinate, is
-  not sent. `route` is then absent and Unity shows direction-only guidance
-  instead of claiming to follow a route.
+  not sent. `route` is then absent; Unity must not present route-following
+  guidance without route geometry.
 - Flutter does not reroute for Unity and sends the route once, at launch. The
   walk's own route stays authoritative on the map.
 
@@ -77,20 +74,27 @@ Result: the indoor result envelope, unchanged (`status`, `localizationQueries`,
 `localizationQueries: 0`. `cancelled` and `arrived` return silently; anything
 else shows the unavailable dialog.
 
-## What Unity still has to provide
+## Unity integration boundary
+
+The Unity implementation is a separate coordinated change. It must consume
+`mode: "outdoor"` and `route.waypoints` in the shared indoor/outdoor AR HUD.
+Flutter sends the selected route once at launch and keeps Mapbox navigation
+authoritative. End-to-end route guidance remains unverified.
+
+The Unity build also needs to:
 
 - Export the outdoor scene in the Android AAR and the iOS `UnityFramework`.
 - Start it for `mode: "outdoor"`, and deliver a result through the existing
   bridge.
 - Skip its own consent screen when `dataUseAccepted` is true.
-- Follow `route.waypoints` in the shared AR HUD, or say it is direction-only
-  when `route` is absent. Unity detects no obstacles; avoiding them is whatever
-  the Mapbox walking route already does.
+- Avoid claiming route following when `route` is absent. Unity detects no
+  obstacles; obstacle avoidance depends on the Mapbox walking route and remains
+  unverified.
 - Request precise location itself; Geospatial does not work with approximate
   location.
 - Carry the Google Play services dependencies and ProGuard rules that ARCore
   Extensions needs in `maven-deps.txt` and the AAR's consumer rules.
-- ARCore Extensions on iOS, which the prototype did not set up.
+- ARCore Extensions support on iOS.
 
 ## Google Cloud
 
