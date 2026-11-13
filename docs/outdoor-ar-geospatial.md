@@ -48,12 +48,29 @@ Request (JSON string, `lib/data/outdoor_ar_contract.dart`):
   "schemaVersion": 2,
   "mode": "outdoor",
   "destination": {"name": "Horn Center", "latitude": 33.78, "longitude": -118.11},
-  "dataUseAccepted": true
+  "dataUseAccepted": true,
+  "route": {"waypoints": [{"latitude": 33.779, "longitude": -118.113}, {"latitude": 33.78, "longitude": -118.11}]}
 }
 ```
 
 `destination` is the WGS84 point the walking route ends at. No MultiSet token
 and no Google credential is sent.
+
+`route.waypoints` is the selected Mapbox walking route's polyline, ordered
+start to destination, WGS84. Unity accepts 2 to 1000 points and rejects
+anything else with `BAD_REQUEST`, so Flutter only sends a valid path:
+
+- Points less than 5 m from the last kept point are dropped; the first and last
+  point always stay. A route still over 1000 points widens that spacing until
+  it fits. It is never cut short.
+- A route with fewer than 2 points, or any NaN or out-of-range coordinate, is
+  not sent. `route` is then absent and Unity shows direction-only guidance
+  instead of claiming to follow a route.
+- Flutter does not reroute for Unity and sends the route once, at launch. The
+  walk's own route stays authoritative on the map.
+
+The route is the same location data the walk already holds. It is sent only to
+the on-device Unity host, after the ARCore notice is accepted.
 
 Result: the indoor result envelope, unchanged (`status`, `localizationQueries`,
 `durationMs`, optional `errorCode`). Outdoor sessions report
@@ -66,6 +83,9 @@ else shows the unavailable dialog.
 - Start it for `mode: "outdoor"`, and deliver a result through the existing
   bridge.
 - Skip its own consent screen when `dataUseAccepted` is true.
+- Follow `route.waypoints` in the shared AR HUD, or say it is direction-only
+  when `route` is absent. Unity detects no obstacles; avoiding them is whatever
+  the Mapbox walking route already does.
 - Request precise location itself; Geospatial does not work with approximate
   location.
 - Carry the Google Play services dependencies and ProGuard rules that ARCore

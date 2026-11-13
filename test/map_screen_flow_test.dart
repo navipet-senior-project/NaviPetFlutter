@@ -83,8 +83,11 @@ Future<(NavigationFlowController, List<OutdoorArRequest>)> pumpOutdoorAr(
     durationMs: 1,
   ),
   bool camera = true,
+  NavigationRoute? route,
 }) async {
-  final controller = harness.build();
+  final controller = harness.build(
+    routes: harness.FakeRouteGateway()..result = route,
+  );
   final requests = <OutdoorArRequest>[];
   await tester.pumpWidget(
     MultiProvider(
@@ -141,6 +144,35 @@ void main() {
     expect(controller.state, same(active));
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.byKey(const ValueKey('navipet-map')), findsOneWidget);
+  });
+
+  testWidgets('outdoor AR sends the selected walking route in order', (
+    tester,
+  ) async {
+    const path = [
+      NavigationCoordinate(latitude: 33.7800, longitude: -118.1100),
+      NavigationCoordinate(latitude: 33.7805, longitude: -118.1100),
+      NavigationCoordinate(latitude: 33.7805, longitude: -118.1105),
+      harness.hornCoordinate,
+    ];
+    final (_, requests) = await pumpOutdoorAr(
+      tester,
+      route: const NavigationRoute(
+        coordinates: path,
+        steps: [],
+        distanceMeters: 150,
+        durationSeconds: 110,
+      ),
+    );
+    await tester.tap(find.text('Agree and continue'));
+    await tester.pumpAndSettle();
+
+    expect(requests.single.toJson()['route'], {
+      'waypoints': [
+        for (final p in path)
+          {'latitude': p.latitude, 'longitude': p.longitude},
+      ],
+    });
   });
 
   testWidgets('outdoor AR does not launch without consent or camera', (
