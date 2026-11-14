@@ -60,5 +60,6 @@ The export may contain MultiSet credentials: share the framework privately and
 never commit it.
 
 This code path is not compiled against a real `UnityFramework` and has not been
-run on a device. Re-entering AR after Unity unloads (`runEmbedded` again) in
-particular needs checking on the phone.
+run on a device. The host now keeps Unity started, pausing and hiding it on
+exit, then unpausing it on re-entry; this camera re-entry path still needs
+checking on the phone.

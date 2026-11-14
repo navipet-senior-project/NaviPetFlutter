@@ -29,7 +29,8 @@ and opens nothing.
 2. Asks for camera access. Location access is already held by the walk.
 3. Sends one request over the existing `navipet/indoor_ar` channel. The same
    native host runs indoor and outdoor AR, so only one AR session exists at a
-   time and no Kotlin or Swift changed.
+   time. On iOS the host keeps Unity started between sessions, pausing and
+   hiding it on exit and resuming it on re-entry.
 4. Returns to the map when Unity finishes. The route, the destination and the
    navigation state are never touched.
 
