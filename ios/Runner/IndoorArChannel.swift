@@ -5,6 +5,36 @@ import UIKit
 import UnityFramework
 #endif
 
+/// The few UnityFramework calls the player lifecycle needs, so the lifecycle
+/// can be tested without the framework.
+protocol ArPlayer: AnyObject {
+  var isStarted: Bool { get }
+  func start()
+  func setPaused(_ paused: Bool)
+  func show()
+  func hide()
+}
+
+/// Unity is started once per process and then only paused and hidden, never
+/// unloaded: re-entering a player that was unloaded left the ARKit session
+/// without camera frames on iPhone.
+enum ArPlayerLifecycle {
+  /// `configure` hands the request and listeners to Unity. A started player is
+  /// unpaused first, so IndoorArHost does not try to resume a player that was
+  /// never unloaded.
+  static func enter(_ player: ArPlayer, configure: () -> Void) {
+    if player.isStarted { player.setPaused(false) }
+    configure()
+    if !player.isStarted { player.start() }
+    player.show()
+  }
+
+  static func exit(_ player: ArPlayer) {
+    player.setPaused(true)
+    player.hide()
+  }
+}
+
 /// Starts the embedded Unity AR player for one request and answers the Dart
 /// call with the result JSON once Unity finishes. Always replies with a result
 /// string, never a platform error.
@@ -49,13 +79,13 @@ final class IndoorArChannel {
   private var pending: FlutterResult?
   private var startedAt = Date()
   private var flutterWindow: UIWindow?
-  private var unity: UnityFramework?
+  private var unity: UnityArPlayer?
   private lazy var listener = UnityListener(
     onUnload: { [weak self] in self?.finish("") }
   )
 
   private func launchUnity(request: String, result: @escaping FlutterResult) {
-    guard let ufw = loadUnity(), let host = NSClassFromString("IndoorArHost") as? NSObject.Type
+    guard let player = loadUnity(), let host = NSClassFromString("IndoorArHost") as? NSObject.Type
     else {
       result(IndoorArResults.unavailable())
       return
@@ -65,39 +95,38 @@ final class IndoorArChannel {
     flutterWindow = UIApplication.shared.connectedScenes
       .compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
 
-    // IndoorArHost lives in UnityFramework; call it by name so the build
-    // does not depend on the export exposing its header.
-    host.perform(NSSelectorFromString("setRequest:"), with: request)
-    let handler: @convention(block) (NSString) -> Void = { [weak self] json in
-      self?.finish(json as String)
+    ArPlayerLifecycle.enter(player) {
+      // IndoorArHost lives in UnityFramework; call it by name so the build
+      // does not depend on the export exposing its header.
+      host.perform(NSSelectorFromString("setRequest:"), with: request)
+      let handler: @convention(block) (NSString) -> Void = { [weak self] json in
+        self?.finish(json as String)
+      }
+      host.perform(
+        NSSelectorFromString("setResultHandler:"), with: unsafeBitCast(handler, to: AnyObject.self))
+      player.framework.register(listener)
     }
-    host.perform(
-      NSSelectorFromString("setResultHandler:"), with: unsafeBitCast(handler, to: AnyObject.self))
-
-    ufw.register(listener)
-    if ufw.appController() == nil {
-      ufw.setDataBundleId("com.unity3d.framework")
-      ufw.runEmbedded(withArgc: CommandLine.argc, argv: CommandLine.unsafeArgv, appLaunchOpts: nil)
-    }
-    ufw.showUnityWindow()
   }
 
-  private func loadUnity() -> UnityFramework? {
+  private func loadUnity() -> UnityArPlayer? {
     if let unity { return unity }
     let path = Bundle.main.bundlePath + "/Frameworks/UnityFramework.framework"
     guard let bundle = Bundle(path: path), bundle.isLoaded || bundle.load(),
       let ufw = (bundle.principalClass as? UnityFramework.Type)?.getInstance()
     else { return nil }
-    unity = ufw
-    return ufw
+    let player = UnityArPlayer(ufw)
+    unity = player
+    return player
   }
 
   /// Answers the pending call once, then hands the screen back to Flutter.
   private func finish(_ json: String) {
     guard let result = pending else { return }
     pending = nil
-    unity?.unregisterFrameworkListener(listener)
-    unity?.unloadApplication()
+    if let unity {
+      unity.framework.unregisterFrameworkListener(listener)
+      ArPlayerLifecycle.exit(unity)
+    }
     flutterWindow?.makeKeyAndVisible()
     flutterWindow = nil
     result(json.isEmpty ? exitedResult() : json)
@@ -111,6 +140,23 @@ final class IndoorArChannel {
 }
 
 #if UNITY_AR_ENABLED
+private final class UnityArPlayer: ArPlayer {
+  let framework: UnityFramework
+  init(_ framework: UnityFramework) { self.framework = framework }
+
+  var isStarted: Bool { framework.appController() != nil }
+
+  func start() {
+    framework.setDataBundleId("com.unity3d.framework")
+    framework.runEmbedded(
+      withArgc: CommandLine.argc, argv: CommandLine.unsafeArgv, appLaunchOpts: nil)
+  }
+
+  func setPaused(_ paused: Bool) { framework.pause(paused) }
+  func show() { framework.showUnityWindow() }
+  func hide() { framework.appController()?.window?.isHidden = true }
+}
+
 private final class UnityListener: NSObject, UnityFrameworkListener {
   private let onUnload: () -> Void
   init(onUnload: @escaping () -> Void) { self.onUnload = onUnload }
