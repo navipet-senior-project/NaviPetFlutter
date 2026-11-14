@@ -8,12 +8,14 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/mapbox_config.dart';
+import '../data/indoor_ar_launcher.dart';
 import '../data/indoor_building_catalog.dart';
 import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
 import '../data/indoor_floor_coverage.dart';
+import '../data/outdoor_ar_contract.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ar_mode_icon.dart';
 import '../widgets/bottom_nav_bar.dart';
@@ -28,10 +30,23 @@ import '../widgets/travel_mode_selector.dart';
 import '../widgets/outdoor_ar_entry_button.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, this.controller});
+  const MapScreen({
+    super.key,
+    this.controller,
+    this.outdoorArEnabled = outdoorArBuildEnabled,
+    this.launchOutdoorAr,
+    this.requestCamera = requestOutdoorArCamera,
+  });
 
   /// Injected by widget tests; in the app it comes from the provider tree.
   final NavigationFlowController? controller;
+
+  /// Off unless the build opts in; see [outdoorArBuildEnabled].
+  final bool outdoorArEnabled;
+
+  /// Injected by widget tests; the app uses the native AR channel.
+  final OutdoorArLaunch? launchOutdoorAr;
+  final Future<bool> Function() requestCamera;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -703,7 +718,22 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         children: [
           if (state is FlowActiveNavigation) ...[
             OutdoorArEntryButton(
-              onPressed: () => showOutdoorArUnavailableDialog(context),
+              available: widget.outdoorArEnabled,
+              onPressed: () => widget.outdoorArEnabled
+                  ? startOutdoorAr(
+                      context,
+                      request: OutdoorArRequest.to(
+                        state.destination,
+                        route: state.remainingGeometry.isEmpty
+                            ? state.plan.selected.coordinates
+                            : state.remainingGeometry,
+                      ),
+                      launch:
+                          widget.launchOutdoorAr ??
+                          NativeIndoorArLauncher().launchOutdoor,
+                      requestCamera: widget.requestCamera,
+                    )
+                  : showOutdoorArUnavailableDialog(context),
             ),
             const SizedBox(height: AppSpacing.sm),
           ],

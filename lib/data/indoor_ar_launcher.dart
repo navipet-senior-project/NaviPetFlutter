@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'indoor_ar_contract.dart';
+import 'outdoor_ar_contract.dart';
 
 /// Opens the fullscreen AR session for one destination and completes when
 /// the student is back in the app.
@@ -28,14 +29,19 @@ class NativeIndoorArLauncher implements IndoorArLauncher {
   final bool _isSupportedPlatform;
 
   @override
-  Future<IndoorArResult> launch(IndoorArRequest request) async {
+  Future<IndoorArResult> launch(IndoorArRequest request) =>
+      _launch(request.toJson());
+
+  /// Same channel and host as indoor AR, so only one AR session runs at a
+  /// time. A Unity library without the outdoor scene rejects the request.
+  Future<IndoorArResult> launchOutdoor(OutdoorArRequest request) =>
+      _launch(request.toJson());
+
+  Future<IndoorArResult> _launch(Map<String, Object?> request) async {
     if (!_isSupportedPlatform) return const IndoorArResult.unavailable();
     final Object? raw;
     try {
-      raw = await _channel.invokeMethod<Object?>(
-        'launch',
-        jsonEncode(request.toJson()),
-      );
+      raw = await _channel.invokeMethod<Object?>('launch', jsonEncode(request));
     } on MissingPluginException {
       return const IndoorArResult.unavailable();
     } on PlatformException {
