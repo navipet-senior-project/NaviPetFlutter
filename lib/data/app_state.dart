@@ -9,6 +9,7 @@ import 'course_class.dart';
 import 'classes_gateway.dart';
 import 'email_change.dart';
 import 'profile_gateway.dart';
+import 'pet_gems_gateway.dart';
 import 'registration_gateway.dart';
 import 'user_account.dart';
 
@@ -36,6 +37,7 @@ class AppState extends ChangeNotifier {
     Future<void> Function(String newPassword)? recoveryPasswordFallback,
     ClassesGateway? classesGateway,
     ProfileGateway? profileGateway,
+    PetGemsGateway? petGemsGateway,
     AuthTokenProvider? authTokenProvider,
     Future<void> Function()? sessionDiscarder,
   }) : this._(
@@ -47,6 +49,7 @@ class AppState extends ChangeNotifier {
          recoveryPasswordFallback,
          classesGateway,
          profileGateway,
+         petGemsGateway,
          authTokenProvider,
          sessionDiscarder,
        );
@@ -60,6 +63,7 @@ class AppState extends ChangeNotifier {
     this._recoveryPasswordFallback,
     this._classesGateway,
     this._profileGateway,
+    this._petGemsGateway,
     this._authTokenProvider,
     this._sessionDiscarder,
   ) {
@@ -75,6 +79,7 @@ class AppState extends ChangeNotifier {
   final RegistrationGateway? _registrationGateway;
   final ClassesGateway? _classesGateway;
   final ProfileGateway? _profileGateway;
+  final PetGemsGateway? _petGemsGateway;
   final Future<void> Function(RegistrationVerificationSuccess tokens)?
   _verificationSessionHandler;
   final Future<void> Function(String email)? _signupCodeResender;
@@ -103,6 +108,9 @@ class AppState extends ChangeNotifier {
   int _points = 0;
   Set<String> _ownedOutfits = const {};
   String? _equippedOutfit;
+  List<PetCostume> _costumes = const [];
+  bool _petBusy = false;
+  String? _petError;
   bool _checkingNearbyTasks = false;
   bool _classesBusy = false;
   String? _classesError;
@@ -135,6 +143,58 @@ class AppState extends ChangeNotifier {
   int get points => _points;
   Set<String> get ownedOutfits => Set.unmodifiable(_ownedOutfits);
   String? get equippedOutfit => _equippedOutfit;
+  List<PetCostume> get costumes => List.unmodifiable(_costumes);
+  bool get hasPetBackend => _petGemsGateway != null;
+
+  Future<void> claimDailyLoginGems() async {
+    final gateway = _petGemsGateway;
+    if (gateway == null || _activeUser == null) return;
+    try {
+      await gateway.claimDailyLogin();
+      await refreshPoints();
+    } catch (_) {
+      // Login remains usable when the optional reward service is unavailable.
+    }
+  }
+
+  Future<String?> startNavigationGems(
+    String destinationId,
+    double latitude,
+    double longitude,
+  ) async {
+    try {
+      return await _petGemsGateway?.startNavigation(
+        destinationId,
+        latitude,
+        longitude,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<int> finishNavigationGems(
+    String tripId,
+    double latitude,
+    double longitude,
+  ) async {
+    try {
+      final earned =
+          await _petGemsGateway?.finishNavigation(
+            tripId,
+            latitude,
+            longitude,
+          ) ??
+          0;
+      await refreshPoints();
+      return earned;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  bool get petBusy => _petBusy;
+  String? get petError => _petError;
   bool get hasPendingPasswordRecovery => _pendingRecoverySession != null;
 
   /// Null when the backend is not configured.
@@ -456,6 +516,40 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> refreshPoints({bool Function()? canCommit}) async {
+    final gateway = _petGemsGateway;
+    if (gateway != null) {
+      final userId = _activeUser?.id;
+      if (userId == null) return;
+      _petBusy = true;
+      _petError = null;
+      notifyListeners();
+      try {
+        final results = await Future.wait<Object>([
+          gateway.getGems(),
+          gateway.getCostumes(),
+        ]);
+        if (_activeUser?.id != userId || (canCommit != null && !canCommit())) {
+          return;
+        }
+        final wallet = results[0] as PetWallet;
+        _points = wallet.balance;
+        _equippedOutfit = wallet.equippedOutfit;
+        _ownedOutfits = wallet.ownedOutfits;
+        _costumes = results[1] as List<PetCostume>;
+        notifyListeners();
+      } catch (error) {
+        if (_activeUser?.id == userId) {
+          _petError = error.toString();
+          notifyListeners();
+        }
+      } finally {
+        if (_activeUser?.id == userId) {
+          _petBusy = false;
+          notifyListeners();
+        }
+      }
+      return;
+    }
     final client = _supabase;
     final userId = client?.auth.currentUser?.id;
     if (client == null || userId == null) return;
@@ -479,12 +573,30 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> buyOutfit(String outfitId) async {
+    final gateway = _petGemsGateway;
+    if (gateway != null) {
+      final wallet = await gateway.buy(outfitId);
+      _points = wallet.balance;
+      _equippedOutfit = wallet.equippedOutfit;
+      _ownedOutfits = {..._ownedOutfits, outfitId};
+      notifyListeners();
+      await refreshPoints();
+      return;
+    }
     await _requireClient().rpc('buy_outfit', params: {'p_outfit_id': outfitId});
     await refreshPoints();
   }
 
   Future<void> equipOutfit(String outfitId) async {
     if (!_ownedOutfits.contains(outfitId)) return;
+    final gateway = _petGemsGateway;
+    if (gateway != null) {
+      final wallet = await gateway.equip(outfitId);
+      _points = wallet.balance;
+      _equippedOutfit = wallet.equippedOutfit;
+      notifyListeners();
+      return;
+    }
     await _requireClient().rpc(
       'equip_outfit',
       params: {'p_outfit_id': outfitId},
@@ -1118,6 +1230,7 @@ class AppState extends ChangeNotifier {
       _points = 0;
       _ownedOutfits = const {};
       _equippedOutfit = null;
+      _costumes = const [];
       notifyListeners();
       return;
     }
@@ -1133,6 +1246,7 @@ class AppState extends ChangeNotifier {
       _points = 0;
       _ownedOutfits = const {};
       _equippedOutfit = null;
+      _costumes = const [];
     }
     _activeUser = UserAccount.fromSupabase(
       user,
@@ -1142,6 +1256,7 @@ class AppState extends ChangeNotifier {
     unawaited(_hydrateUserProfile(user));
     unawaited(refreshClasses());
     unawaited(refreshProfile());
+    if (!sameUser) unawaited(claimDailyLoginGems());
   }
 
   void _resetProfileFetchState() {
