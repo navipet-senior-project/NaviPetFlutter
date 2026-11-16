@@ -15,6 +15,11 @@ class _Auth implements AuthTokenProvider {
   }
 }
 
+class _NoSession implements AuthTokenProvider {
+  @override
+  Future<String?> token({bool forceRefresh = false}) async => null;
+}
+
 http.Response _json(Object value, int status) =>
     http.Response(jsonEncode(value), status);
 
@@ -76,6 +81,55 @@ void main() {
           'shortfall',
           7,
         ),
+      ),
+    );
+  });
+
+  test('a malformed success body becomes a PetGemsException', () async {
+    final gateway = HttpPetGemsGateway(
+      baseUrl: 'https://api.test',
+      auth: _Auth(),
+      client: MockClient((request) async => _json({'balance': 'many'}, 200)),
+    );
+    await expectLater(
+      gateway.getGems(),
+      throwsA(
+        isA<PetGemsException>().having(
+          (error) => error.message,
+          'message',
+          'The pet server returned an invalid response.',
+        ),
+      ),
+    );
+  });
+
+  test('buy and equip read the balance and equipped outfit', () async {
+    final gateway = HttpPetGemsGateway(
+      baseUrl: 'https://api.test',
+      auth: _Auth(),
+      client: MockClient(
+        (request) async => _json({'balance': 12, 'equippedOutfit': 'hat'}, 200),
+      ),
+    );
+    for (final wallet in [
+      await gateway.buy('hat', equip: true),
+      await gateway.equip('hat'),
+    ]) {
+      expect(wallet.balance, 12);
+      expect(wallet.equippedOutfit, 'hat');
+    }
+  });
+
+  test('a signed-out user never reaches the network', () async {
+    final gateway = HttpPetGemsGateway(
+      baseUrl: 'https://api.test',
+      auth: _NoSession(),
+      client: MockClient((request) async => fail('no request expected')),
+    );
+    await expectLater(
+      gateway.getGems(),
+      throwsA(
+        isA<PetGemsException>().having((e) => e.statusCode, 'status', 401),
       ),
     );
   });

@@ -110,6 +110,8 @@ class AppState extends ChangeNotifier {
   String? _equippedOutfit;
   List<PetCostume> _costumes = const [];
   bool _petBusy = false;
+  bool _petLoaded = false;
+  int _petRefreshId = 0;
   String? _petError;
   bool _checkingNearbyTasks = false;
   bool _classesBusy = false;
@@ -146,15 +148,20 @@ class AppState extends ChangeNotifier {
   List<PetCostume> get costumes => List.unmodifiable(_costumes);
   bool get hasPetBackend => _petGemsGateway != null;
 
+  /// Loads the live wallet and catalogue, and claims the daily login reward.
+  /// The wallet load must not depend on the optional reward service.
   Future<void> claimDailyLoginGems() async {
     final gateway = _petGemsGateway;
-    if (gateway == null || _activeUser == null) return;
+    if (gateway == null || activeUser == null) return;
+    final wallet = refreshPoints();
+    var earned = 0;
     try {
-      await gateway.claimDailyLogin();
-      await refreshPoints();
+      earned = await gateway.claimDailyLogin();
     } catch (_) {
       // Login remains usable when the optional reward service is unavailable.
     }
+    await wallet;
+    if (earned > 0) await refreshPoints();
   }
 
   Future<String?> startNavigationGems(
@@ -195,6 +202,9 @@ class AppState extends ChangeNotifier {
 
   bool get petBusy => _petBusy;
   String? get petError => _petError;
+
+  /// True once the wallet has been read from the server for this account.
+  bool get petLoaded => _petLoaded;
   bool get hasPendingPasswordRecovery => _pendingRecoverySession != null;
 
   /// Null when the backend is not configured.
@@ -518,8 +528,12 @@ class AppState extends ChangeNotifier {
   Future<void> refreshPoints({bool Function()? canCommit}) async {
     final gateway = _petGemsGateway;
     if (gateway != null) {
-      final userId = _activeUser?.id;
+      final userId = activeUser?.id;
       if (userId == null) return;
+      // The newest refresh wins, so an older response cannot overwrite a
+      // balance that a purchase or a later refresh has already updated.
+      final refreshId = ++_petRefreshId;
+      bool current() => refreshId == _petRefreshId && activeUser?.id == userId;
       _petBusy = true;
       _petError = null;
       notifyListeners();
@@ -528,22 +542,21 @@ class AppState extends ChangeNotifier {
           gateway.getGems(),
           gateway.getCostumes(),
         ]);
-        if (_activeUser?.id != userId || (canCommit != null && !canCommit())) {
-          return;
-        }
+        if (!current() || (canCommit != null && !canCommit())) return;
         final wallet = results[0] as PetWallet;
         _points = wallet.balance;
         _equippedOutfit = wallet.equippedOutfit;
         _ownedOutfits = wallet.ownedOutfits;
         _costumes = results[1] as List<PetCostume>;
+        _petLoaded = true;
         notifyListeners();
       } catch (error) {
-        if (_activeUser?.id == userId) {
+        if (current()) {
           _petError = error.toString();
           notifyListeners();
         }
       } finally {
-        if (_activeUser?.id == userId) {
+        if (current()) {
           _petBusy = false;
           notifyListeners();
         }
@@ -575,7 +588,13 @@ class AppState extends ChangeNotifier {
   Future<void> buyOutfit(String outfitId) async {
     final gateway = _petGemsGateway;
     if (gateway != null) {
-      final wallet = await gateway.buy(outfitId);
+      final PetWallet wallet;
+      try {
+        wallet = await gateway.buy(outfitId);
+      } on PetGemsException catch (error) {
+        _refreshAfterConflict(error);
+        rethrow;
+      }
       _points = wallet.balance;
       _equippedOutfit = wallet.equippedOutfit;
       _ownedOutfits = {..._ownedOutfits, outfitId};
@@ -587,11 +606,25 @@ class AppState extends ChangeNotifier {
     await refreshPoints();
   }
 
+  /// A 409 (not enough gems) or 404 (unknown or unowned costume) means the
+  /// local wallet disagrees with the server, so reload it.
+  void _refreshAfterConflict(PetGemsException error) {
+    if (error.statusCode == 409 || error.statusCode == 404) {
+      unawaited(refreshPoints());
+    }
+  }
+
   Future<void> equipOutfit(String outfitId) async {
     if (!_ownedOutfits.contains(outfitId)) return;
     final gateway = _petGemsGateway;
     if (gateway != null) {
-      final wallet = await gateway.equip(outfitId);
+      final PetWallet wallet;
+      try {
+        wallet = await gateway.equip(outfitId);
+      } on PetGemsException catch (error) {
+        _refreshAfterConflict(error);
+        rethrow;
+      }
       _points = wallet.balance;
       _equippedOutfit = wallet.equippedOutfit;
       notifyListeners();
@@ -1231,6 +1264,7 @@ class AppState extends ChangeNotifier {
       _ownedOutfits = const {};
       _equippedOutfit = null;
       _costumes = const [];
+      _resetPetLoad();
       notifyListeners();
       return;
     }
@@ -1247,6 +1281,7 @@ class AppState extends ChangeNotifier {
       _ownedOutfits = const {};
       _equippedOutfit = null;
       _costumes = const [];
+      _resetPetLoad();
     }
     _activeUser = UserAccount.fromSupabase(
       user,
@@ -1257,6 +1292,15 @@ class AppState extends ChangeNotifier {
     unawaited(refreshClasses());
     unawaited(refreshProfile());
     if (!sameUser) unawaited(claimDailyLoginGems());
+  }
+
+  /// Drops any in-flight wallet refresh so a previous account's response, or
+  /// its busy flag, cannot leak into the next session.
+  void _resetPetLoad() {
+    _petRefreshId++;
+    _petBusy = false;
+    _petLoaded = false;
+    _petError = null;
   }
 
   void _resetProfileFetchState() {

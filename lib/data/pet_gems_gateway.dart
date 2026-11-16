@@ -85,49 +85,47 @@ class HttpPetGemsGateway implements PetGemsGateway {
   final http.Client _client;
 
   @override
-  Future<PetWallet> getGems() async =>
-      PetWallet.fromJson(await _request('GET', '/pet/gems'));
+  Future<PetWallet> getGems() =>
+      _request('GET', '/pet/gems', PetWallet.fromJson);
 
   @override
   Future<List<PetCostume>> getCostumes() async {
-    final data = await _request('GET', '/pet/costumes');
-    return (data['costumes'] as List)
-        .map((item) => PetCostume.fromJson(item as Map<String, dynamic>))
-        .toList();
+    return _request(
+      'GET',
+      '/pet/costumes',
+      (data) => (data['costumes'] as List)
+          .map((item) => PetCostume.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
   }
 
   @override
   Future<PetWallet> buy(String outfitId, {bool equip = false}) async {
-    final data = await _request(
+    return _request(
       'POST',
       '/pet/costumes/buy',
+      _balanceOnly,
       body: {'outfitId': outfitId, 'equip': equip},
-    );
-    return PetWallet(
-      (data['balance'] as num).toInt(),
-      data['equippedOutfit'] as String?,
-      const {},
     );
   }
 
   @override
   Future<PetWallet> equip(String outfitId) async {
-    final data = await _request(
+    return _request(
       'POST',
       '/pet/costumes/equip',
+      _balanceOnly,
       body: {'outfitId': outfitId},
-    );
-    return PetWallet(
-      (data['balance'] as num).toInt(),
-      data['equippedOutfit'] as String?,
-      const {},
     );
   }
 
   @override
   Future<int> claimDailyLogin() async {
-    final data = await _request('POST', '/pet/rewards/daily-login');
-    return (data['earned'] as num).toInt();
+    return _request(
+      'POST',
+      '/pet/rewards/daily-login',
+      (data) => (data['earned'] as num).toInt(),
+    );
   }
 
   @override
@@ -136,16 +134,16 @@ class HttpPetGemsGateway implements PetGemsGateway {
     double latitude,
     double longitude,
   ) async {
-    final data = await _request(
+    return _request(
       'POST',
       '/pet/rewards/navigation/start',
+      (data) => data['tripId'] as String,
       body: {
         'destinationId': destinationId,
         'latitude': latitude,
         'longitude': longitude,
       },
     );
-    return data['tripId'] as String;
   }
 
   @override
@@ -154,17 +152,25 @@ class HttpPetGemsGateway implements PetGemsGateway {
     double latitude,
     double longitude,
   ) async {
-    final data = await _request(
+    return _request(
       'POST',
       '/pet/rewards/navigation/finish',
+      (data) => (data['earned'] as num).toInt(),
       body: {'tripId': tripId, 'latitude': latitude, 'longitude': longitude},
     );
-    return (data['earned'] as num).toInt();
   }
 
-  Future<Map<String, dynamic>> _request(
+  // buy/equip answer with the balance and equipped outfit only.
+  static PetWallet _balanceOnly(Map<String, dynamic> data) => PetWallet(
+    (data['balance'] as num).toInt(),
+    data['equippedOutfit'] as String?,
+    const {},
+  );
+
+  Future<T> _request<T>(
     String method,
-    String path, {
+    String path,
+    T Function(Map<String, dynamic> data) parse, {
     Map<String, dynamic>? body,
   }) async {
     Future<http.Response> send(bool refresh) async {
@@ -219,6 +225,13 @@ class HttpPetGemsGateway implements PetGemsGateway {
         shortfall: shortfall is num ? shortfall.toInt() : null,
       );
     }
-    return data;
+    try {
+      return parse(data);
+    } catch (_) {
+      throw PetGemsException(
+        'The pet server returned an invalid response.',
+        response.statusCode,
+      );
+    }
   }
 }

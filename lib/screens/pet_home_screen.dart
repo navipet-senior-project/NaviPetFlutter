@@ -48,6 +48,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
     final loading = state.classesBusy && state.classes.isEmpty;
+    // Do not show a made-up 0 before the live balance has arrived.
+    final walletLoading =
+        state.hasPetBackend && !state.petLoaded && state.petError == null;
     final error =
         state.classesError ??
         (_refreshFailed
@@ -91,7 +94,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                   right: 16,
                   child: _hud(
                     PetLevel(completions),
-                    gems: loading ? null : state.points,
+                    gems: loading || walletLoading ? null : state.points,
                     compact: hudCompact,
                   ),
                 ),
