@@ -566,8 +566,6 @@ class _FloorMapPainter extends CustomPainter {
   static const List<Rect> _floorThreeUnlabeledRooms = [
     Rect.fromLTWH(.33, .03, .18, .27),
     Rect.fromLTWH(.51, .03, .25, .14),
-    Rect.fromLTWH(.51, .17, .25, .13),
-    Rect.fromLTWH(.48, .63, .14, .34),
   ];
   static const Map<String, Rect> _floorFourRooms = {
     '402': Rect.fromLTWH(.18, .03, .15, .40),
@@ -581,17 +579,15 @@ class _FloorMapPainter extends CustomPainter {
   static const List<Rect> _floorFourUnlabeledRooms = [
     Rect.fromLTWH(.02, .03, .16, .40),
     Rect.fromLTWH(.33, .03, .32, .14),
-    Rect.fromLTWH(.33, .17, .32, .13),
     Rect.fromLTWH(.65, .03, .05, .40),
     Rect.fromLTWH(.70, .03, .06, .40),
-    Rect.fromLTWH(.48, .63, .14, .34),
     Rect.fromLTWH(.74, .63, .04, .34),
   ];
   static const Map<String, Rect> _floorFiveRooms = {
     '510': Rect.fromLTWH(.02, .10, .31, .33),
-    '514': Rect.fromLTWH(.64, .03, .06, .40),
-    '515': Rect.fromLTWH(.70, .03, .06, .40),
-    '516': Rect.fromLTWH(.76, .03, .23, .40),
+    '514': Rect.fromLTWH(.66, .03, .06, .40),
+    '515': Rect.fromLTWH(.72, .03, .06, .40),
+    '516': Rect.fromLTWH(.78, .03, .21, .40),
     '518': Rect.fromLTWH(.09, .63, .16, .34),
     '519': Rect.fromLTWH(.25, .63, .16, .34),
     '523': Rect.fromLTWH(.59, .63, .19, .34),
@@ -600,7 +596,6 @@ class _FloorMapPainter extends CustomPainter {
     Rect.fromLTWH(.33, .10, .31, .14),
     Rect.fromLTWH(.33, .24, .31, .15),
     Rect.fromLTWH(.39, .25, .21, .14),
-    Rect.fromLTWH(.48, .63, .11, .34),
     Rect.fromLTWH(.78, .63, .12, .34),
     Rect.fromLTWH(.90, .63, .09, .20),
   ];
@@ -763,25 +758,27 @@ class _FloorMapPainter extends CustomPainter {
         (Offset(.04, .52), 'E', const Color(0xFF5B9CB0)),
         (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
         (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
-        (Offset(.455, .72), 'L', const Color(0xFF55958C)),
-        (Offset(.455, .88), 'L', const Color(0xFF55958C)),
-        (Offset(.57, .35), 'R', const Color(0xFF8D83AA)),
-        (Offset(.67, .35), 'R', const Color(0xFF8D83AA)),
+        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
+        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
+        (Offset(.58, .355), 'R', const Color(0xFF8D83AA)),
+        (Offset(.685, .355), 'R', const Color(0xFF8D83AA)),
       ],
       4 => <(Offset, String, Color)>[
         (Offset(.04, .52), 'E', const Color(0xFF5B9CB0)),
         (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
         (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
-        (Offset(.455, .72), 'L', const Color(0xFF55958C)),
-        (Offset(.455, .88), 'L', const Color(0xFF55958C)),
-        (Offset(.47, .35), 'R', const Color(0xFF8D83AA)),
-        (Offset(.58, .35), 'R', const Color(0xFF8D83AA)),
+        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
+        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
+        (Offset(.465, .355), 'R', const Color(0xFF8D83AA)),
+        (Offset(.57, .355), 'R', const Color(0xFF8D83AA)),
       ],
       _ => <(Offset, String, Color)>[
         (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
         (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
-        (Offset(.455, .72), 'L', const Color(0xFF55958C)),
-        (Offset(.455, .88), 'L', const Color(0xFF55958C)),
+        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
+        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
+        (Offset(.43, .32), 'R', const Color(0xFF8D83AA)),
+        (Offset(.535, .32), 'R', const Color(0xFF8D83AA)),
       ],
     };
     for (final (position, label, color) in features) {
@@ -791,8 +788,14 @@ class _FloorMapPainter extends CustomPainter {
       );
       final marker = Rect.fromCenter(
         center: center,
-        width: size.width * (label == 'R' ? .065 : .052),
-        height: size.height * (label == 'R' ? .11 : .11),
+        width: size.width * (label == 'R' ? .09 : .075),
+        height:
+            size.height *
+            (label == 'L'
+                ? .16
+                : label == 'R'
+                ? .11
+                : .065),
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(marker, Radius.circular(size.width * .008)),
