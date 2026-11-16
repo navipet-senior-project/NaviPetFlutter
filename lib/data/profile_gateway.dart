@@ -34,31 +34,17 @@ class RemoteProfile {
   final String? avatarUrl;
 }
 
-/// A temporary avatar that stays pending until a profile update commits it.
-class AvatarUpload {
-  const AvatarUpload({required this.uploadId, required this.avatarUrl});
-  final String uploadId;
-  final String avatarUrl;
-}
-
 abstract interface class ProfileGateway {
   Future<RemoteProfile> fetchProfile();
 
-  Future<AvatarUpload> uploadAvatar({
-    required List<int> bytes,
-    required String filename,
-  });
-
   /// Saves the given fields; omitted (`null`) fields keep their values.
+  /// [avatarBytes] (JPEG, PNG or WebP, at most 5 MB) becomes the avatar in
+  /// the same request.
   Future<RemoteProfile> updateProfile({
     String? displayName,
-    String? avatarUploadId,
     String? role,
+    List<int>? avatarBytes,
   });
-
-  /// Deletes a pending upload. An upload that is already gone counts as
-  /// discarded. Never call this for an upload a profile update committed.
-  Future<void> discardAvatarUpload(String uploadId);
 }
 
 class HttpProfileGateway implements ProfileGateway {
@@ -88,61 +74,30 @@ class HttpProfileGateway implements ProfileGateway {
   }
 
   @override
-  Future<AvatarUpload> uploadAvatar({
-    required List<int> bytes,
-    required String filename,
+  Future<RemoteProfile> updateProfile({
+    String? displayName,
+    String? role,
+    List<int>? avatarBytes,
   }) async {
-    // fromBytes rather than fromPath: it works on every platform, and a
-    // picked avatar is small enough to hold in memory.
-    final response = await _send(
-      () => http.MultipartRequest('POST', _uri('/profiles/me/avatar'))
+    final response = await _send(() {
+      if (avatarBytes == null) {
+        return http.Request('PATCH', _uri('/profiles/me'))
+          ..headers['Content-Type'] = 'application/json'
+          ..body = jsonEncode({'displayName': ?displayName, 'role': ?role});
+      }
+      // fromBytes rather than fromPath: it works on every platform, and a
+      // cropped avatar is small enough to hold in memory.
+      return http.MultipartRequest('PATCH', _uri('/profiles/me'))
+        ..fields.addAll({'displayName': ?displayName, 'role': ?role})
         ..files.add(
           http.MultipartFile.fromBytes(
             avatarFieldName,
-            bytes,
-            filename: filename,
+            avatarBytes,
+            filename: 'avatar.png',
           ),
-        ),
-      timeout: _uploadTimeout,
-    );
-    final body = _decode(response);
-    final uploadId = body?['uploadId'];
-    final avatarUrl = body?['avatarUrl'];
-    if (uploadId is! String || uploadId.isEmpty || avatarUrl is! String) {
-      throw _malformed(response.statusCode);
-    }
-    return AvatarUpload(uploadId: uploadId, avatarUrl: avatarUrl);
-  }
-
-  @override
-  Future<RemoteProfile> updateProfile({
-    String? displayName,
-    String? avatarUploadId,
-    String? role,
-  }) async {
-    final body = jsonEncode({
-      'displayName': ?displayName,
-      'avatarUploadId': ?avatarUploadId,
-      'role': ?role,
-    });
-    final response = await _send(
-      () => http.Request('PATCH', _uri('/profiles/me'))
-        ..headers['Content-Type'] = 'application/json'
-        ..body = body,
-    );
+        );
+    }, timeout: avatarBytes == null ? _timeout : _uploadTimeout);
     return _profileFrom(response);
-  }
-
-  @override
-  Future<void> discardAvatarUpload(String uploadId) async {
-    await _send(
-      () => http.Request(
-        'DELETE',
-        _uri('/profiles/me/avatar/${Uri.encodeComponent(uploadId)}'),
-      ),
-      expectedStatus: 204,
-      alsoAccept: 404,
-    );
   }
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');

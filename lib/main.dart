@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -13,6 +14,8 @@ import 'data/app_state.dart';
 import 'data/auth_token_provider.dart';
 import 'data/campus_search_controller.dart';
 import 'data/campus_search_gateway.dart';
+import 'data/elbee_gateway.dart';
+import 'data/indoor_ar_token_gateway.dart';
 import 'data/location_service.dart';
 import 'data/mapbox_config.dart';
 import 'data/mapbox_navigation_service.dart';
@@ -100,15 +103,34 @@ class NaviPetApp extends StatefulWidget {
   State<NaviPetApp> createState() => _NaviPetAppState();
 }
 
+/// Debug builds only: `--dart-define=NAVIPET_DEV_ROUTE=/dev/indoor-ar-spike`
+/// opens that route on start. The auth redirect still applies.
+const _devStartRoute = String.fromEnvironment('NAVIPET_DEV_ROUTE');
+
 class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
   /// Signed avatar URLs last about an hour; a resume after a long background
   /// stint reloads the URL before the old one expires on screen.
   static const _avatarUrlMaxAge = Duration(minutes: 10);
+  Timer? _nearbyTaskTimer;
+  bool _foreground = true;
 
-  late final _router = createAppRouter(widget.appState);
-  late final _accessibility =
-      widget.accessibilityPreferences ?? NavigationAccessibilityPreferences();
+  late final _router = createAppRouter(
+    widget.appState,
+    indoorArTokenGateway: widget.authTokenProvider == null
+        ? null
+        : HttpIndoorArTokenGateway(
+            baseUrl: AppConfig.backendBaseUrl,
+            auth: widget.authTokenProvider!,
+          ),
+    initialLocation: kDebugMode && _devStartRoute.isNotEmpty
+        ? _devStartRoute
+        : null,
+  );
   late final NavigationFlowController _flow = _buildFlow();
+  late final ElbeeGateway _elbee = HttpElbeeGateway(
+    baseUrl: AppConfig.backendBaseUrl,
+    auth: widget.authTokenProvider ?? AnonymousAuthTokenProvider(),
+  );
 
   /// The signed-in identity the flow currently reflects, so a later change
   /// (sign-out, sign-in, or a different user signing in on the same device)
@@ -124,12 +146,17 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
     _flowIdentity = widget.appState.activeUser?.id;
     widget.appState.addListener(_onAppStateChanged);
     WidgetsBinding.instance.addObserver(this);
+    _nearbyTaskTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_foreground) unawaited(widget.appState.completeNearbyTasks());
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.resumed) {
       unawaited(widget.appState.refreshProfile(maxAge: _avatarUrlMaxAge));
+      unawaited(widget.appState.completeNearbyTasks());
     }
   }
 
@@ -138,6 +165,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
     if (identity == _flowIdentity) return;
     _flowIdentity = identity;
     _flow.resetForNewIdentity();
+    if (identity != null) unawaited(widget.appState.completeNearbyTasks());
   }
 
   NavigationFlowController _buildFlow() {
@@ -176,6 +204,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _nearbyTaskTimer?.cancel();
     widget.appState.removeListener(_onAppStateChanged);
     _router.dispose();
     widget.appState.dispose();
@@ -189,7 +218,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
       providers: [
         ChangeNotifierProvider.value(value: widget.appState),
         ChangeNotifierProvider.value(value: _flow),
-        ChangeNotifierProvider.value(value: _accessibility),
+        Provider<ElbeeGateway>.value(value: _elbee),
       ],
       child: MaterialApp.router(
         title: 'NaviPet',

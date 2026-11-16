@@ -1,7 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../data/app_state.dart';
 import '../data/course_class.dart';
 import '../theme/app_theme.dart';
+import 'class_editor_sheet.dart';
+
+/// Opens the details for [course]; Edit class swaps to the editor.
+void showClassDetailSheet(BuildContext context, CourseClass course) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    backgroundColor: AppColors.surface,
+    builder: (sheetContext) => ClassDetailSheet(
+      course: course,
+      completions: context.read<AppState>().completionCountFor(course.id),
+      onEdit: () {
+        Navigator.pop(sheetContext);
+        showClassEditorSheet(context, course);
+      },
+    ),
+  );
+}
 
 /// The details a calendar block leaves out: when the class meets, where,
 /// and achievement progress, with a way into the editor.

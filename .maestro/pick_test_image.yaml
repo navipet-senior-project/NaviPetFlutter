@@ -1,0 +1,10 @@
+appId: com.navipet.navipet
+---
+# Picker loads slowly on the emulator.
+- extendedWaitUntil:
+    visible:
+      id: "com.google.android.providers.media.module:id/icon_thumbnail"
+    timeout: 30000
+- tapOn:
+    id: "com.google.android.providers.media.module:id/icon_thumbnail"
+    index: 0

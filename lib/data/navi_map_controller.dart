@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' show Colors;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../theme/app_theme.dart';
+import 'building_highlight.dart';
 import 'navigation_models.dart';
 
 /// Visual settings shared by preview and live guidance.
@@ -52,6 +53,8 @@ abstract interface class NaviMapController {
     NavigationCoordinate coordinate, {
     required String label,
     required double bottomInset,
+    NaviDestination? destination,
+    bool fitFootprint = true,
   });
 
   Future<void> showRoute(
@@ -89,12 +92,16 @@ class MapboxNaviMapController implements NaviMapController {
        // ignore: prefer_initializing_formals
        _markers = markers,
        // ignore: prefer_initializing_formals
-       _arrowMarkers = arrowMarkers;
+       _arrowMarkers = arrowMarkers,
+       _highlight = BuildingHighlight(map.style);
 
   final MapboxMap _map;
   final PolylineAnnotationManager _routes;
   final PointAnnotationManager _markers;
   final PointAnnotationManager _arrowMarkers;
+  final BuildingHighlight _highlight;
+
+  Future<void> restoreStyle() => _highlight.restore();
   bool _guidanceActive = false;
   double _pitch = 0;
   int _pitchRevision = 0;
@@ -123,9 +130,33 @@ class MapboxNaviMapController implements NaviMapController {
     NavigationCoordinate coordinate, {
     required String label,
     required double bottomInset,
+    NaviDestination? destination,
+    bool fitFootprint = true,
   }) async {
-    await clear();
-    await _markers.create(_marker(coordinate, label));
+    await _clearAnnotations();
+    await _leaveGuidance();
+    if (destination != null) {
+      await _showDestination(destination);
+    } else {
+      await _markers.create(_marker(coordinate, label));
+    }
+    final footprint = destination?.footprint;
+    if (footprint != null && fitFootprint) {
+      final camera = await _map.cameraForCoordinatesPadding(
+        footprint.coordinates.map(_point).toList(),
+        routeCameraOptions(bottomInset: bottomInset, pitch: _pitch),
+        null,
+        18,
+        null,
+      );
+      // Malformed or oversized server geometry can make Mapbox fit the entire
+      // world. Keep the footprint highlight, but fall back to the known place
+      // pin unless the calculated camera remains building-level.
+      if (camera.zoom != null && camera.zoom! >= 14) {
+        await _map.easeTo(camera, MapAnimationOptions(duration: 600));
+        return;
+      }
+    }
     await _map.easeTo(
       CameraOptions(
         center: _point(coordinate),
@@ -149,7 +180,8 @@ class MapboxNaviMapController implements NaviMapController {
     required NaviDestination destination,
     required double bottomInset,
   }) async {
-    await clear();
+    await _clearAnnotations();
+    await _leaveGuidance();
 
     // Alternates first so the selected route draws on top of them.
     for (var index = 0; index < plan.routes.length; index++) {
@@ -164,7 +196,10 @@ class MapboxNaviMapController implements NaviMapController {
     final coordinates = plan.selected.coordinates;
     if (coordinates.isEmpty) return;
     final camera = await _map.cameraForCoordinatesPadding(
-      coordinates.map(_point).toList(),
+      [
+        ...coordinates,
+        ...?destination.footprint?.coordinates,
+      ].map(_point).toList(),
       routeCameraOptions(bottomInset: bottomInset, pitch: _pitch),
       null,
       17,
@@ -225,6 +260,7 @@ class MapboxNaviMapController implements NaviMapController {
   }
 
   Future<void> _showDestination(NaviDestination destination) async {
+    await _highlight.show(destination.footprint);
     await _markers.create(destinationPinOptions(destination.coordinate));
     await _markers.create(
       _marker(
@@ -238,6 +274,11 @@ class MapboxNaviMapController implements NaviMapController {
   @override
   Future<void> clear() async {
     await _clearAnnotations();
+    await _highlight.show(null);
+    await _leaveGuidance();
+  }
+
+  Future<void> _leaveGuidance() async {
     if (_guidanceActive) {
       _guidanceActive = false;
       await _map.location.updateSettings(

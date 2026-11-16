@@ -109,7 +109,13 @@ class AppState extends ChangeNotifier {
   List<CourseClass> _classes = const [];
   Set<String> _completionKeys = const {};
   Map<String, int> _completionCounts = const {};
+  int _points = 0;
+  Set<String> _ownedOutfits = const {};
+  String? _equippedOutfit;
+  bool _checkingNearbyTasks = false;
   bool _classesBusy = false;
+  String? _classesError;
+  int _classesRefreshId = 0;
   final Map<String, DateTime> _onlineSessionStarts = {};
   final Map<String, DateTime> _onlineSessionEnds = {};
   final Map<String, Duration> _completedOnlineSessionDurations = {};
@@ -135,6 +141,12 @@ class AppState extends ChangeNotifier {
   UserAccount? get activeUser => _activeUser;
   List<CourseClass> get classes => List.unmodifiable(_classes);
   bool get classesBusy => _classesBusy;
+
+  /// Why the last [refreshClasses] failed; null once one succeeds.
+  String? get classesError => _classesError;
+  int get points => _points;
+  Set<String> get ownedOutfits => Set.unmodifiable(_ownedOutfits);
+  String? get equippedOutfit => _equippedOutfit;
   bool get hasPendingPasswordRecovery => _pendingRecoverySession != null;
 
   /// Null when the backend is not configured.
@@ -152,6 +164,28 @@ class AppState extends ChangeNotifier {
       _registrationGateway != null &&
       _activeUser != null &&
       !_activeUser!.isAnonymous;
+
+  /// Notifies only when a redirect input changes. [GoRouter] re-applies the
+  /// last imperative push on every refresh, so profile updates must not.
+  final _RouteRefresh _redirect = _RouteRefresh();
+  Listenable get redirectListenable => _redirect;
+  bool _sawAuth = false;
+  bool _sawRecovery = false;
+  bool _sawEmail = false;
+
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    final auth = isAuthenticated;
+    final recovery = hasPendingPasswordRecovery;
+    final email = canChangeEmail;
+    final changed =
+        auth != _sawAuth || recovery != _sawRecovery || email != _sawEmail;
+    _sawAuth = auth;
+    _sawRecovery = recovery;
+    _sawEmail = email;
+    if (changed) _redirect.ping();
+  }
 
   /// Reloads the signed avatar URL from the backend. The URL expires after
   /// about an hour, so this runs on sign-in, token refresh, and app resume.
@@ -210,12 +244,12 @@ class AppState extends ChangeNotifier {
   }
 
   /// Saves profile edits through the backend and applies the response.
-  /// Throws [ProfileApiException]; a 404 with [avatarUploadId] means that
-  /// upload no longer exists.
+  /// [avatarBytes] becomes the avatar in the same request. Throws
+  /// [ProfileApiException].
   Future<void> saveProfile({
     String? displayName,
-    String? avatarUploadId,
     String? role,
+    List<int>? avatarBytes,
   }) async {
     final gateway = _profileGateway;
     final user = _activeUser;
@@ -224,8 +258,8 @@ class AppState extends ChangeNotifier {
     }
     final profile = await gateway.updateProfile(
       displayName: displayName,
-      avatarUploadId: avatarUploadId,
       role: role,
+      avatarBytes: avatarBytes,
     );
     final current = _activeUser;
     if (current == null || current.id != user.id) return;
@@ -365,10 +399,17 @@ class AppState extends ChangeNotifier {
     final client = _supabase;
     final user = client?.auth.currentUser;
     if (client == null || user == null) return;
+    final refreshId = ++_classesRefreshId;
+    bool canCommit() =>
+        refreshId == _classesRefreshId &&
+        client.auth.currentUser?.id == user.id;
     _classesBusy = true;
+    _classesError = null;
     notifyListeners();
     try {
-      _classes = await _fetchClasses(client, user.id);
+      final classes = await _fetchClasses(client, user.id);
+      if (!canCommit()) return;
+      _classes = classes;
       // Task completions only live in Supabase, whichever source served the
       // classes, so they must load on both paths.
       final completionRows = await client
@@ -383,15 +424,26 @@ class AppState extends ChangeNotifier {
         keys.add('$classId|${row['task_date']}|${row['task_kind']}');
         counts[classId] = (counts[classId] ?? 0) + 1;
       }
+      if (!canCommit()) return;
       _completionKeys = keys;
       _completionCounts = counts;
+      await refreshPoints(canCommit: canCommit);
     } on ClassesApiException catch (error) {
-      _errorMessage = error.message;
+      if (canCommit()) {
+        _errorMessage = _classesError = error.message;
+      }
     } on PostgrestException catch (error) {
-      _errorMessage = error.message;
+      if (canCommit()) {
+        _errorMessage = _classesError = error.message;
+      }
+    } catch (error) {
+      if (canCommit()) _errorMessage = _classesError = error.toString();
+      rethrow;
     } finally {
-      _classesBusy = false;
-      notifyListeners();
+      if (canCommit()) {
+        _classesBusy = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -465,42 +517,134 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> toggleTask(DailyClassTask task, DateTime date) async {
-    final client = _requireClient();
-    final user = client.auth.currentUser;
-    if (user == null) return;
-    final dateText =
-        '${date.year.toString().padLeft(4, '0')}-'
-        '${date.month.toString().padLeft(2, '0')}-'
-        '${date.day.toString().padLeft(2, '0')}';
-    if (task.done) {
-      await client
-          .from('task_completions')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('class_id', task.course.id)
-          .eq('task_date', dateText)
-          .eq('task_kind', task.kind);
-    } else {
-      await client.from('task_completions').insert({
-        'user_id': user.id,
-        'class_id': task.course.id,
-        'task_date': dateText,
-        'task_kind': task.kind,
-      });
+    if (task.done) return;
+    if (task.kind == 'attend') {
+      await verifyAndToggleTask(task, date);
+      return;
     }
+    await _requireClient().rpc(
+      'claim_daily_task',
+      params: {
+        'p_class_id': task.course.id,
+        'p_kind': task.kind,
+        'p_latitude': null,
+        'p_longitude': null,
+      },
+    );
     await refreshClasses();
+  }
+
+  Future<void> refreshPoints({bool Function()? canCommit}) async {
+    final client = _supabase;
+    final userId = client?.auth.currentUser?.id;
+    if (client == null || userId == null) return;
+    final wallet = await client
+        .from('point_wallets')
+        .select('balance, equipped_outfit')
+        .eq('user_id', userId)
+        .maybeSingle();
+    final purchases = await client
+        .from('outfit_purchases')
+        .select('outfit_id')
+        .eq('user_id', userId);
+    final current = client.auth.currentUser?.id;
+    if (current != userId || (canCommit != null && !canCommit())) return;
+    _points = (wallet?['balance'] as num?)?.toInt() ?? 0;
+    _equippedOutfit = wallet?['equipped_outfit'] as String?;
+    _ownedOutfits = (purchases as List<dynamic>)
+        .map((row) => (row as Map<String, dynamic>)['outfit_id'].toString())
+        .toSet();
+    notifyListeners();
+  }
+
+  Future<void> buyOutfit(String outfitId) async {
+    await _requireClient().rpc('buy_outfit', params: {'p_outfit_id': outfitId});
+    await refreshPoints();
+  }
+
+  Future<void> equipOutfit(String outfitId) async {
+    if (!_ownedOutfits.contains(outfitId)) return;
+    await _requireClient().rpc(
+      'equip_outfit',
+      params: {'p_outfit_id': outfitId},
+    );
+    _equippedOutfit = outfitId;
+    notifyListeners();
+  }
+
+  /// Called periodically while the app is visible. The database repeats the
+  /// distance and schedule checks before it credits any points.
+  Future<void> completeNearbyTasks() async {
+    if (_checkingNearbyTasks || _supabase?.auth.currentUser == null) return;
+    final tasks = dailyTasks()
+        .where((task) => task.kind == 'attend' && !task.done)
+        .toList();
+    if (tasks.isEmpty) return;
+    _checkingNearbyTasks = true;
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      var claimed = false;
+      for (final task in tasks) {
+        if (position.accuracy > 150 ||
+            Geolocator.distanceBetween(
+                  position.latitude,
+                  position.longitude,
+                  task.course.latitude,
+                  task.course.longitude,
+                ) >
+                150) {
+          continue;
+        }
+        try {
+          await _claimTask(task, position.latitude, position.longitude);
+          claimed = true;
+        } on PostgrestException {
+          // A nearby class may not be in its check-in window yet.
+        }
+      }
+      if (claimed) await refreshClasses();
+    } on Object {
+      // Location and network access are optional during foreground polling.
+    } finally {
+      _checkingNearbyTasks = false;
+    }
+  }
+
+  Future<void> _claimTask(
+    DailyClassTask task,
+    double? latitude,
+    double? longitude,
+  ) async {
+    await _requireClient().rpc(
+      'claim_daily_task',
+      params: {
+        'p_class_id': task.course.id,
+        'p_kind': task.kind,
+        'p_latitude': latitude,
+        'p_longitude': longitude,
+      },
+    );
   }
 
   /// Claims a daily task after checking it may be claimed now: only on the
   /// day it belongs to, and for attendance, near the class building
-  /// (in person) or after at least 30 minutes (online). Un-checking a
-  /// completed task is always allowed.
+  /// (in person) or after a long enough session (online). A completed task
+  /// stays completed so points cannot be earned again.
   Future<TaskClaimResult> verifyAndToggleTask(
     DailyClassTask task,
     DateTime date,
   ) async {
     if (task.done) {
-      await toggleTask(task, date);
       return TaskClaimResult.claimed;
     }
     if (!_isSameDay(date, DateTime.now())) {
@@ -512,7 +656,7 @@ class AppState extends ChangeNotifier {
         return TaskClaimResult.sessionTooShort;
       }
       await toggleTask(task, date);
-      _clearOnlineSession(task.course.id);
+      stopOnlineSession(task.course.id);
       return TaskClaimResult.claimed;
     }
     if (task.kind != 'attend') {
@@ -546,8 +690,9 @@ class AppState extends ChangeNotifier {
       task.course.latitude,
       task.course.longitude,
     );
-    if (meters > 150) return TaskClaimResult.tooFar;
-    await toggleTask(task, date);
+    if (position.accuracy > 150 || meters > 150) return TaskClaimResult.tooFar;
+    await _claimTask(task, position.latitude, position.longitude);
+    await refreshClasses();
     return TaskClaimResult.claimed;
   }
 
@@ -1046,8 +1191,12 @@ class AppState extends ChangeNotifier {
       _activeUser = null;
       _resetProfileFetchState();
       _classes = const [];
+      _classesError = null;
       _completionKeys = const {};
       _completionCounts = const {};
+      _points = 0;
+      _ownedOutfits = const {};
+      _equippedOutfit = null;
       notifyListeners();
       return;
     }
@@ -1058,7 +1207,12 @@ class AppState extends ChangeNotifier {
     // it does not flash back to initials while the new URL loads.
     final previous = _activeUser;
     final sameUser = previous?.id == user.id;
-    if (!sameUser) _resetProfileFetchState();
+    if (!sameUser) {
+      _resetProfileFetchState();
+      _points = 0;
+      _ownedOutfits = const {};
+      _equippedOutfit = null;
+    }
     _activeUser = UserAccount.fromSupabase(
       user,
       avatarUrl: sameUser ? previous?.avatarUrl : null,
@@ -1116,8 +1270,13 @@ class AppState extends ChangeNotifier {
     }
     _onlineSessionEndTimers.clear();
     _authSubscription?.cancel();
+    _redirect.dispose();
     super.dispose();
   }
+}
+
+class _RouteRefresh extends ChangeNotifier {
+  void ping() => notifyListeners();
 }
 
 enum AuthActionStatus {

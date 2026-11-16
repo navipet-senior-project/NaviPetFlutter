@@ -29,6 +29,51 @@ double distanceMeters(NavigationCoordinate a, NavigationCoordinate b) {
   return 2 * radius * math.asin(math.sqrt(h.clamp(0, 1)));
 }
 
+bool _insideRing(
+  List<NavigationCoordinate> ring,
+  NavigationCoordinate position,
+) {
+  var inside = false;
+  for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    final a = ring[i];
+    final b = ring[j];
+    if ((a.latitude > position.latitude) != (b.latitude > position.latitude) &&
+        position.longitude <
+            (b.longitude - a.longitude) *
+                    (position.latitude - a.latitude) /
+                    (b.latitude - a.latitude) +
+                a.longitude) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/// Positive within a building, negative outside (including holes), zero on walls.
+double signedFootprintDistanceMeters(
+  BuildingFootprint footprint,
+  NavigationCoordinate position,
+) {
+  var inside = false;
+  var gap = double.infinity;
+  for (final polygon in footprint.polygons) {
+    if (_insideRing(polygon.first, position) &&
+        !polygon.skip(1).any((hole) => _insideRing(hole, position))) {
+      inside = true;
+    }
+    for (final ring in polygon) {
+      gap = math.min(gap, projectOntoRoute(ring, position).offRouteMeters);
+    }
+  }
+  return inside ? gap : -gap;
+}
+
+/// Distance to the occupied building area; holes remain outside.
+double distanceToFootprintMeters(
+  BuildingFootprint footprint,
+  NavigationCoordinate position,
+) => math.max(0, -signedFootprintDistanceMeters(footprint, position));
+
 RouteProgress projectOntoRoute(
   List<NavigationCoordinate> points,
   NavigationCoordinate position, {

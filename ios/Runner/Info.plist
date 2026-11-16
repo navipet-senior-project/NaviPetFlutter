@@ -4,8 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>NaviPet uses your camera for indoor and outdoor AR navigation.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>NaviPet uses your location to show where you are on the campus map.</string>
+	<string>NaviPet uses your location to show where you are on the campus map and to position outdoor AR guidance.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>NaviPet counts the steps you take while navigating to a destination.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

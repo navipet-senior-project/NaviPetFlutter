@@ -10,7 +10,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **displayName** | **String** |  | [optional] 
 **role** | **String** |  | [optional] 
-**avatarUploadId** | **String** | The uploadId returned by POST /profiles/me/avatar. Supplying it commits that temporary avatar when the profile is saved. | [optional] 
+**avatar** | [**MultipartFile**](MultipartFile.md) | Optional JPEG, PNG, or WebP file, up to 5 MB. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

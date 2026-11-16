@@ -10,6 +10,20 @@ import '../data/mapbox_navigation_service.dart';
 import '../data/navigation_models.dart';
 import '../theme/app_theme.dart';
 
+/// Opens the editor for [course], or for a new class when it is null.
+void showClassEditorSheet(BuildContext context, [CourseClass? course]) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: AppColors.surface,
+    builder: (_) => ChangeNotifierProvider.value(
+      value: context.read<AppState>(),
+      child: ClassEditorSheet(course: course),
+    ),
+  );
+}
+
 class ClassEditorSheet extends StatefulWidget {
   const ClassEditorSheet({super.key, this.course});
 

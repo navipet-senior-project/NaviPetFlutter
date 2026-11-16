@@ -1,13 +1,29 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../data/app_state.dart';
+import '../data/pet_home.dart';
 import '../theme/app_theme.dart';
-import '../widgets/bottom_nav_bar.dart';
-import '../widgets/account_button.dart';
+import '../widgets/pet_section_navigation.dart';
 
-/// Pet Customization screen, cloned from the Figma "Pet cuztomization" frame
-/// (node 17:3). Shows the dressed mascot, quick-action pills and a wardrobe
-/// bento grid of outfits. The Menu tab in the shared bottom nav routes to the
-/// Class Checklist (matching the prototype wiring).
+class PetOutfit {
+  const PetOutfit(this.id, this.label, this.icon, this.price);
+  final String id;
+  final String label;
+  final IconData icon;
+  final int price;
+}
+
+const petOutfits = [
+  PetOutfit('csulb_tee', 'CSULB Tee', Icons.checkroom, 20),
+  PetOutfit('grad_cap', 'Grad Cap', Icons.school_outlined, 30),
+  PetOutfit('shades', 'Shades', Icons.remove_red_eye_outlined, 15),
+  PetOutfit('beach_hat', 'Beach Hat', Icons.beach_access_outlined, 25),
+];
+
 class PetCustomizationScreen extends StatefulWidget {
   const PetCustomizationScreen({super.key});
 
@@ -15,40 +31,66 @@ class PetCustomizationScreen extends StatefulWidget {
   State<PetCustomizationScreen> createState() => _PetCustomizationScreenState();
 }
 
-class _Outfit {
-  const _Outfit(this.label, this.icon);
-  final String label;
-  final IconData icon;
-}
-
 class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
-  // Grid order matches the Figma layout: tee (active), cap, shades, hat.
-  static const _outfits = [
-    _Outfit('CSULB Tee', Icons.checkroom),
-    _Outfit('Grad Cap', Icons.school_outlined),
-    _Outfit('Shades', Icons.remove_red_eye_outlined),
-    _Outfit('Beach Hat', Icons.beach_access_outlined),
-  ];
-
-  int _selected = 0;
+  String? _buyingId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => petTextScaleCap(_build);
+
+  Widget _build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.5;
     return Scaffold(
       backgroundColor: AppColors.screenBg,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            _header(),
+            PetSectionHeader(title: 'Shop', trailing: _gemBadge(state.points)),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.xl),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _mascot(),
-                    const SizedBox(height: AppSpacing.xl),
-                    _outfitsSection(),
+                    LayoutBuilder(
+                      builder: (context, constraints) => _stage(
+                        state.equippedOutfit,
+                        height: math.min(
+                          220.0,
+                          math.max(176.0, constraints.maxHeight * .34),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Outfits',
+                      style: TextStyle(
+                        color: AppColors.petInk,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: petOutfits.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        mainAxisExtent: largeText ? 252 : 178,
+                      ),
+                      itemBuilder: (context, index) => _outfitCard(
+                        petOutfits[index],
+                        owned: state.ownedOutfits.contains(
+                          petOutfits[index].id,
+                        ),
+                        balance: state.points,
+                        largeText: largeText,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -56,225 +98,195 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const NaviBottomNav(active: NaviTab.pets),
+      bottomNavigationBar: const PetSectionBottomNavigation(
+        active: PetSectionTab.shop,
+      ),
     );
   }
 
-  Widget _header() {
+  Widget _stage(String? equippedId, {required double height}) {
+    final outfit = petOutfits
+        .where((item) => item.id == equippedId)
+        .firstOrNull;
     return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x0D000000),
-            offset: Offset(0, 1),
-            blurRadius: 1,
-          ),
-        ],
+      height: height,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.accentSoft,
+        border: Border.all(color: AppColors.petInk, width: 2),
+        borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Row(
-            children: const [
-              Icon(
-                Icons.sentiment_satisfied_outlined,
-                size: 20,
-                color: AppColors.petInk,
-              ),
-              SizedBox(width: AppSpacing.sm),
-              Text(
-                'Elbee',
-                style: TextStyle(fontSize: 16, color: AppColors.petInk),
-              ),
-            ],
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 58,
+            child: ColoredBox(color: Color(0xFFF3E2B0)),
           ),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F3F4),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(
-                      Icons.diamond_outlined,
-                      size: 14,
-                      color: AppColors.blue,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '\$1,250',
-                      style: TextStyle(fontSize: 16, color: AppColors.petInk),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              const AccountButton(),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mascot() {
-    return Column(
-      children: [
-        Container(
-          width: 192,
-          height: 192,
-          decoration: const BoxDecoration(
-            color: Color(0xFFEEEEEE),
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Image.asset('assets/images/shark_dressed.png', width: 176),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _pill(label: 'Current Look', filled: true, onTap: () {}),
-            const SizedBox(width: AppSpacing.sm),
-            _pill(label: 'Save Outfit', filled: false, onTap: () {}),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _pill({
-    required String label,
-    required bool filled,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(
-          color: filled ? AppColors.yellow : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: filled ? null : Border.all(color: AppColors.petInk, width: 2),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0D000000),
-              offset: Offset(0, 1),
-              blurRadius: 1,
-            ),
-          ],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 16,
-            color: filled ? AppColors.yellowInk : AppColors.petInk,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _outfitsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
-              'OUTFITS',
-              style: TextStyle(fontSize: 16, color: AppColors.petInk),
-            ),
-            Text(
-              'See All',
-              style: TextStyle(fontSize: 16, color: AppColors.fieldIcon),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: AppSpacing.lg,
-          crossAxisSpacing: AppSpacing.lg,
-          childAspectRatio: 1.02,
-          children: [for (var i = 0; i < _outfits.length; i++) _outfitCard(i)],
-        ),
-      ],
-    );
-  }
-
-  Widget _outfitCard(int index) {
-    final outfit = _outfits[index];
-    final active = _selected == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selected = index),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: active ? AppColors.yellow : AppColors.cardBorder,
-            width: active ? 2 : 1,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0D000000),
-              offset: Offset(0, 1),
-              blurRadius: 1,
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Center(
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(outfit.icon, size: 34, color: AppColors.petInk),
-                  const SizedBox(height: AppSpacing.sm),
+                  Expanded(
+                    child: Image.asset(
+                      petImageFor(equippedId),
+                      key: const ValueKey('shop-stage-elbee'),
+                    ),
+                  ),
                   Text(
-                    outfit.label,
+                    'Elbee · ${outfit?.label ?? 'No outfit'}',
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
-                      fontSize: 16,
                       color: AppColors.petInk,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
               ),
             ),
-            if (active)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: const BoxDecoration(
-                    color: AppColors.yellow,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check,
-                    size: 14,
-                    color: AppColors.petInk,
-                  ),
-                ),
+          ),
+          if (outfit != null &&
+              outfit.id != 'grad_cap' &&
+              outfit.id != 'csulb_tee')
+            Align(
+              alignment: const Alignment(.55, .18),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.yellow,
+                child: Icon(outfit.icon, color: AppColors.petInk, size: 19),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
+  }
+
+  Widget _outfitCard(
+    PetOutfit outfit, {
+    required bool owned,
+    required int balance,
+    required bool largeText,
+  }) {
+    final shortfall = math.max(0, outfit.price - balance);
+    final buying = _buyingId == outfit.id;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.cardBorder, width: 2),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(outfit.icon, size: largeText ? 28 : 34, color: AppColors.petInk),
+          Text(
+            outfit.label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.petInk,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(
+            height: largeText ? 68 : 44,
+            width: double.infinity,
+            child: FilledButton(
+              key: ValueKey('shop-${outfit.id}'),
+              onPressed: owned
+                  ? () => _openPack()
+                  : buying || shortfall > 0
+                  ? null
+                  : () => _buy(outfit),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.yellow,
+                foregroundColor: AppColors.petInk,
+                disabledBackgroundColor: const Color(0xFFF2F4F7),
+                disabledForegroundColor: AppColors.muted,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: shortfall > 0 && !owned
+                        ? const Color(0xFFD0D5DD)
+                        : AppColors.petInk,
+                    width: 2,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+              ),
+              child: buying
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      owned
+                          ? 'In Pack'
+                          : shortfall > 0
+                          ? 'Need $shortfall more${largeText ? '\ngems' : ' gems'}'
+                          : 'Buy ${outfit.price} gems',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: largeText ? 10 : 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _gemBadge(int balance) => Container(
+    constraints: const BoxConstraints(minHeight: 44),
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: AppColors.petInk, width: 2),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.diamond, color: AppColors.blue, size: 18),
+        const SizedBox(width: 4),
+        Text('$balance', style: const TextStyle(fontWeight: FontWeight.w800)),
+      ],
+    ),
+  );
+
+  void _openPack() {
+    context.pushReplacement(
+      petSectionLocation(
+        PetSectionTab.pack,
+        GoRouterState.of(context).uri.queryParameters['from'],
+      ),
+    );
+  }
+
+  Future<void> _buy(PetOutfit outfit) async {
+    if (_buyingId != null) return;
+    setState(() => _buyingId = outfit.id);
+    try {
+      await context.read<AppState>().buyOutfit(outfit.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${outfit.label} added to your Pack.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not buy ${outfit.label}: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _buyingId = null);
+    }
   }
 }

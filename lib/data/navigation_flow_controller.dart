@@ -10,6 +10,8 @@ import 'campus_bounds.dart';
 import 'campus_place.dart';
 import 'campus_search_controller.dart';
 import 'campus_search_gateway.dart';
+import 'indoor_floor_coverage.dart';
+import 'destination_presence.dart';
 import 'location_service.dart';
 import 'navi_map_controller.dart';
 import 'navigation_flow_state.dart';
@@ -43,14 +45,81 @@ class NavigationFlowController extends ChangeNotifier {
   /// Height reserved for the bottom sheet when framing the map.
   static const placeSheetInset = 280.0;
   static const routeSheetInset = 320.0;
-  static const _arrivalRadiusMeters = 100 * 0.3048;
+  static const approachRadius = ArrivalPolicy.approachMeters;
+  static const _minimumArrivalRadiusMeters = 200 * 0.3048;
 
-  /// Distance at which the "Arriving soon" state is emitted. App-wide, not
-  /// per destination; skipped when the arrival radius is at least this large.
-  static const approachRadius = 15.0;
+  final DestinationPresenceTracker _presence = DestinationPresenceTracker();
+  int? _presenceCheckGeneration;
+  bool _awaitingPresenceChoice = false;
+  LocationReading? _arLocationValue;
+  Timer? _arStaleTimer;
+  LocationReading? get _arLocation => _arLocationValue;
+  set _arLocation(LocationReading? reading) {
+    _arLocationValue = reading;
+    _arStaleTimer?.cancel();
+    _arStaleTimer = null;
+    final timestamp = reading?.timestamp;
+    if (timestamp == null) return;
+    final remaining = timestamp
+        .add(ArrivalPolicy.maximumAge)
+        .difference(DateTime.now());
+    if (remaining.isNegative) return;
+    _arStaleTimer = Timer(remaining + const Duration(milliseconds: 50), () {
+      _arStaleTimer = null;
+      notifyListeners();
+    });
+  }
 
-  /// Largest GPS accuracy ever required for an arrival fix.
-  static const _arrivalAccuracyCap = 20.0;
+  bool get canScanAr {
+    final destination = _destination;
+    final reading = _arLocation;
+    final point = reading?.coordinate;
+    final timestamp = reading?.timestamp;
+    final accuracy = reading?.accuracyMeters;
+    final now = DateTime.now();
+    return destination?.hasIndoorNavigation == true &&
+        indoorScanCovered(
+          destination?.buildingCode,
+          destination?.floorNumber,
+        ) &&
+        destination?.id?.trim().isNotEmpty == true &&
+        destination?.footprint != null &&
+        reading?.usable == true &&
+        reading?.isApproximate == false &&
+        point != null &&
+        point.latitude.isFinite &&
+        point.longitude.isFinite &&
+        point.latitude.abs() <= 90 &&
+        point.longitude.abs() <= 180 &&
+        timestamp != null &&
+        !timestamp.isAfter(now) &&
+        now.difference(timestamp) <= ArrivalPolicy.maximumAge &&
+        accuracy != null &&
+        accuracy.isFinite &&
+        accuracy >= 0 &&
+        distanceToFootprintMeters(destination!.footprint!, point) <=
+            ArrivalPolicy.boundaryHysteresisMeters;
+  }
+
+  bool get awaitingPresenceChoice => _awaitingPresenceChoice;
+  bool get checkingPresence => _presenceCheckGeneration == _generation;
+  DestinationPresence get destinationPresence =>
+      _presence.valueAt(DateTime.now());
+  NavigationStatus get status => _state.status;
+
+  NaviDestination? get destination => _destination;
+
+  NaviDestination? get _destination => switch (_state) {
+    FlowPlacePreview(:final destination) => destination,
+    FlowConfiguringRoute(:final destination) ||
+    FlowCalculatingRoute(:final destination) ||
+    FlowRoutePreview(:final destination) ||
+    FlowRouteSteps(:final destination) ||
+    FlowActiveNavigation(:final destination) ||
+    FlowArrived(:final destination) ||
+    FlowIndoorHandoff(:final destination) => destination,
+    _ => null,
+  };
 
   final CampusSearchController search;
   final CampusSearchGateway searchGateway;
@@ -77,7 +146,6 @@ class NavigationFlowController extends ChangeNotifier {
   double _tripDistanceMeters = 0;
   double _routeProgressMeters = 0;
   int _offRouteFixes = 0;
-  int _arrivalFixes = 0;
   bool _approachAnnounced = false;
   DateTime? _lastRerouteAt;
   bool _rerouteInFlight = false;
@@ -158,6 +226,7 @@ class NavigationFlowController extends ChangeNotifier {
           () => _map.showPlace(
             destination.coordinate,
             label: destination.name,
+            destination: destination,
             bottomInset: placeSheetInset,
           ),
         );
@@ -189,6 +258,16 @@ class NavigationFlowController extends ChangeNotifier {
                 : remainingGeometry,
             position: coordinate,
             destination: destination,
+          ),
+        );
+      case FlowError(previous: FlowConfiguringRoute(:final destination)):
+        await _queueMap(
+          () => _map.showPlace(
+            destination.coordinate,
+            label: destination.name,
+            bottomInset: placeSheetInset,
+            destination: destination,
+            fitFootprint: false,
           ),
         );
       case FlowIdle():
@@ -350,6 +429,8 @@ class NavigationFlowController extends ChangeNotifier {
         ? null
         : resolved.toDestination();
 
+    // Keep selection and footprint preview visible. Presence is confirmed at
+    // Start Route, using the same server geometry as live arrival.
     // Picking an origin (rather than an ordinary destination search)
     // restores the interrupted route configuration with the new origin
     // instead of falling through to a plain place preview, which would
@@ -391,6 +472,7 @@ class NavigationFlowController extends ChangeNotifier {
         () => _map.showPlace(
           destination.coordinate,
           label: destination.name,
+          destination: destination,
           bottomInset: placeSheetInset,
         ),
         stillCurrent: () {
@@ -457,6 +539,7 @@ class NavigationFlowController extends ChangeNotifier {
     final generation = ++_generation;
     final reading = await location.current();
     if (generation != _generation) return;
+    _presence.add(destination.footprint, reading, DateTime.now());
 
     final origin = reading.usable
         ? CurrentLocationOrigin(
@@ -519,15 +602,27 @@ class NavigationFlowController extends ChangeNotifier {
         place: place,
       ),
     );
-    await calculateRoute();
+    await calculateRoute(continueWithUncertain: true);
   }
 
-  Future<void> calculateRoute() async {
+  Future<void> calculateRoute({bool continueWithUncertain = false}) async {
     final current = _state;
     if (current is! FlowConfiguringRoute) return;
     final origin = current.origin.coordinate;
     if (origin == null) return;
 
+    if (checkingPresence) return;
+    final presenceGeneration = _generation;
+    if (current.origin.canStartGuidance &&
+        !await _checkStartPresence(
+          current.destination,
+          continueWithUncertain: continueWithUncertain,
+        )) {
+      return;
+    }
+    if (presenceGeneration != _generation || !identical(_state, current)) {
+      return;
+    }
     final generation = ++_generation;
     _set(
       FlowCalculatingRoute(
@@ -564,7 +659,20 @@ class NavigationFlowController extends ChangeNotifier {
       );
     } on RouteFailure catch (error) {
       if (generation != _generation) return;
-      _set(FlowError(message: error.message, previous: current));
+      final errorState = FlowError(message: error.message, previous: current);
+      _set(errorState);
+      unawaited(
+        _queueMap(
+          () => _map.showPlace(
+            current.destination.coordinate,
+            label: current.destination.name,
+            bottomInset: placeSheetInset,
+            destination: current.destination,
+            fitFootprint: false,
+          ),
+          stillCurrent: () => identical(_state, errorState),
+        ).catchError((_) {}),
+      );
     }
   }
 
@@ -618,7 +726,7 @@ class NavigationFlowController extends ChangeNotifier {
     );
   }
 
-  Future<void> startRoute() async {
+  Future<void> startRoute({bool continueWithUncertain = false}) async {
     final current = _state;
     final (destination, origin, plan, place) = switch (current) {
       FlowRoutePreview(
@@ -640,11 +748,22 @@ class NavigationFlowController extends ChangeNotifier {
     if (destination == null || origin == null || plan == null) return;
 
     // Guidance is only offered when the route starts where the user is.
-    if (!origin.canStartGuidance) return;
+    if (!origin.canStartGuidance || checkingPresence) return;
+    final presenceGeneration = _generation;
+    if (!await _checkStartPresence(
+      destination,
+      continueWithUncertain: continueWithUncertain,
+    )) {
+      return;
+    }
+    if (presenceGeneration != _generation || !identical(_state, current)) {
+      return;
+    }
 
     // Invalidate any preview camera operation that is still queued. The
     // guidance camera must be the next camera state the user sees.
     _generation++;
+    _presence.reset();
     _tripStartedAt = DateTime.now();
     _tripDistanceMeters = 0;
     _lastDistanceAlertMeters = 0;
@@ -652,7 +771,6 @@ class NavigationFlowController extends ChangeNotifier {
     _lastTripPosition = null;
     _routeProgressMeters = 0;
     _offRouteFixes = 0;
-    _arrivalFixes = 0;
     _approachAnnounced = false;
     _lastRerouteAt = null;
     _rerouteInFlight = false;
@@ -679,6 +797,109 @@ class NavigationFlowController extends ChangeNotifier {
     }
   }
 
+  Future<bool> _checkStartPresence(
+    NaviDestination destination, {
+    required bool continueWithUncertain,
+  }) async {
+    if (destination.footprint == null) {
+      _awaitingPresenceChoice = false;
+      return true;
+    }
+    if (continueWithUncertain) {
+      _awaitingPresenceChoice = false;
+      if (destinationPresence == DestinationPresence.inside) {
+        await _completeOutdoor(destination, DateTime.now());
+        return false;
+      }
+      return true;
+    }
+    final generation = _generation;
+    _presenceCheckGeneration = generation;
+    _awaitingPresenceChoice = true;
+    notifyListeners();
+    var presence = DestinationPresence.uncertain;
+    try {
+      await () async {
+        for (var attempt = 0; ; attempt++) {
+          final reading = await location.current();
+          if (generation != _generation) return;
+          _arLocation = reading;
+          presence = _presence.add(
+            destination.footprint,
+            reading,
+            DateTime.now(),
+          );
+          if (presence != DestinationPresence.uncertain ||
+              !reading.usable ||
+              attempt >= ArrivalPolicy.startExtraReadings) {
+            return;
+          }
+          await Future<void>.delayed(ArrivalPolicy.startPollInterval);
+          if (generation != _generation) return;
+        }
+      }().timeout(ArrivalPolicy.maximumAge);
+    } on Object {
+      presence = DestinationPresence.uncertain;
+    } finally {
+      if (_presenceCheckGeneration == generation) {
+        _presenceCheckGeneration = null;
+      }
+    }
+    if (generation != _generation) return false;
+    final now = DateTime.now();
+    if (presence == DestinationPresence.inside) {
+      _awaitingPresenceChoice = false;
+      await _completeOutdoor(destination, now);
+      return false;
+    }
+    _awaitingPresenceChoice = presence == DestinationPresence.uncertain;
+    notifyListeners();
+    return !_awaitingPresenceChoice;
+  }
+
+  Future<void> refreshPresence() =>
+      _state is FlowConfiguringRoute ? calculateRoute() : startRoute();
+  Future<void> continueRoute() {
+    if (checkingPresence) {
+      // Explicit continuation cancels this lookup without waiting for GPS.
+      _generation++;
+      _presenceCheckGeneration = null;
+    }
+    return _state is FlowConfiguringRoute
+        ? calculateRoute(continueWithUncertain: true)
+        : startRoute(continueWithUncertain: true);
+  }
+
+  Future<void> _completeOutdoor(
+    NaviDestination destination,
+    DateTime now,
+  ) async {
+    if (_state is FlowArrived || _state is FlowIndoorHandoff) return;
+    final wasNavigating = _state is FlowActiveNavigation;
+    _generation++;
+    final room =
+        destination.type == CampusDestinationType.room ||
+        destination.roomNumber?.trim().isNotEmpty == true;
+    _set(
+      room
+          ? FlowIndoorHandoff(destination: destination)
+          : FlowArrived(
+              destination: destination,
+              summary: NavigationTripSummary(
+                elapsed:
+                    wasNavigating &&
+                        _tripStartedAt != null &&
+                        now.isAfter(_tripStartedAt!)
+                    ? now.difference(_tripStartedAt!)
+                    : Duration.zero,
+                walkingSteps: null,
+                distanceMeters: wasNavigating ? _tripDistanceMeters : 0,
+              ),
+            ),
+    );
+    await _queueMap(() => _map.clear());
+  }
+
   /// Receives fresh GPS fixes from the map screen while guidance is active.
   Future<void> onLiveLocation(
     NavigationCoordinate coordinate, {
@@ -686,10 +907,30 @@ class NavigationFlowController extends ChangeNotifier {
     double? bearing,
     DateTime? timestamp,
   }) async {
+    final destination = _destination;
+    if (destination == null ||
+        _state is FlowArrived ||
+        _state is FlowIndoorHandoff) {
+      return;
+    }
+    final now = DateTime.now();
+    final reading = LocationReading(
+      availability: LocationAvailability.available,
+      coordinate: coordinate,
+      accuracyMeters: accuracyMeters,
+      timestamp: timestamp,
+    );
+    _arLocation = reading;
+    final presence = _presence.add(destination.footprint, reading, now);
     final current = _state;
-    if (current is! FlowActiveNavigation) return;
-    final reliable = accuracyMeters.isFinite && accuracyMeters <= 20;
-    final now = timestamp ?? DateTime.now();
+    if (current is! FlowActiveNavigation) {
+      notifyListeners();
+      return;
+    }
+    final reliable =
+        accuracyMeters.isFinite &&
+        accuracyMeters >= 0 &&
+        accuracyMeters <= ArrivalPolicy.maximumAccuracyMeters;
     if (reliable) {
       final previous = _lastTripPosition;
       if (previous != null) {
@@ -698,48 +939,31 @@ class NavigationFlowController extends ChangeNotifier {
       }
       _lastTripPosition = coordinate;
     }
-    final destinationGap = distanceMeters(
-      coordinate,
-      current.destination.coordinate,
-    );
-    final routeProjection = projectOntoRoute(
-      current.plan.selected.coordinates,
-      coordinate,
-    );
-    final routeGap = routeProjection.remainingMeters;
-    const arrivalRadius = _arrivalRadiusMeters;
-    final arrivalAccuracyLimit = math.min(arrivalRadius, _arrivalAccuracyCap);
-    final accurate =
-        accuracyMeters.isFinite && accuracyMeters <= arrivalAccuracyLimit;
-    _arrivalFixes =
-        accurate &&
-            (destinationGap <= arrivalRadius ||
-                (routeGap <= arrivalRadius &&
-                    routeProjection.offRouteMeters <= 20))
-        ? 1
-        : 0;
-    if (accurate &&
-        !_approachAnnounced &&
-        current.destination.arrivalRadius < approachRadius &&
-        destinationGap <= approachRadius) {
+    if (presence == DestinationPresence.inside) {
+      await _completeOutdoor(destination, now);
+      return;
+    }
+    final footprint = destination.footprint;
+    if (footprint != null &&
+        reliable &&
+        distanceToFootprintMeters(footprint, coordinate) <= approachRadius) {
       _approachAnnounced = true;
     }
-    if (_arrivalFixes >= 1) {
-      _generation++;
-      _set(
-        FlowArrived(
-          destination: current.destination,
-          summary: NavigationTripSummary(
-            elapsed: now.isAfter(_tripStartedAt ?? now)
-                ? now.difference(_tripStartedAt!)
-                : Duration.zero,
-            walkingSteps: null,
-            distanceMeters: _tripDistanceMeters,
-          ),
-        ),
+    if (footprint == null && reliable) {
+      final radius = math.max(
+        destination.arrivalRadius.toDouble(),
+        _minimumArrivalRadiusMeters,
       );
-      await _queueMap(() => _map.clear());
-      return;
+      final routeEnd = projectOntoRoute(
+        current.plan.selected.coordinates,
+        coordinate,
+      );
+      if (distanceMeters(coordinate, destination.coordinate) <= radius ||
+          (routeEnd.remainingMeters <= radius &&
+              routeEnd.offRouteMeters <= 20)) {
+        await _completeOutdoor(destination, now);
+        return;
+      }
     }
 
     final points = current.plan.selected.coordinates;
@@ -975,7 +1199,9 @@ class NavigationFlowController extends ChangeNotifier {
     if (current is! FlowError) return;
     final previous = current.previous;
     _set(previous);
-    if (previous is FlowConfiguringRoute) await calculateRoute();
+    if (previous is FlowConfiguringRoute) {
+      await calculateRoute(continueWithUncertain: true);
+    }
   }
 
   void back() {
@@ -1037,6 +1263,7 @@ class NavigationFlowController extends ChangeNotifier {
             () => _map.showPlace(
               destination.coordinate,
               label: destination.name,
+              destination: destination,
               bottomInset: placeSheetInset,
             ),
             stillCurrent: () {
@@ -1092,7 +1319,14 @@ class NavigationFlowController extends ChangeNotifier {
   }
 
   void _set(NavigationFlowState next) {
+    final previousDestination = _destination;
     _state = next;
+    final destination = _destination;
+    if (!identical(previousDestination, destination)) {
+      _presence.reset();
+      _arLocation = null;
+    }
+    _awaitingPresenceChoice = false;
     notifyListeners();
   }
 
@@ -1126,12 +1360,15 @@ class NavigationFlowController extends ChangeNotifier {
     floorNumber: destination.floorNumber,
     outdoorDestination: destination.coordinate,
     indoorDestinationId: destination.indoorDestinationId,
+    footprint: destination.footprint,
+    entranceCoordinate: destination.entranceCoordinate,
   );
 
   @override
   void dispose() {
     // A reroute still in flight must not write to a disposed controller.
     _generation++;
+    _arStaleTimer?.cancel();
     search.removeListener(notifyListeners);
     unawaited(
       _speech.stop().then<void>((_) {}).catchError((Object _) {}),
@@ -1155,6 +1392,8 @@ class _NoOpMapController implements NaviMapController {
     NavigationCoordinate coordinate, {
     required String label,
     required double bottomInset,
+    NaviDestination? destination,
+    bool fitFootprint = true,
   }) async {}
 
   @override

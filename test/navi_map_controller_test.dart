@@ -11,6 +11,8 @@ class RecordingMapController implements NaviMapController {
     NavigationCoordinate coordinate, {
     required String label,
     required double bottomInset,
+    NaviDestination? destination,
+    bool fitFootprint = true,
   }) async => calls.add('showPlace:$label:$bottomInset');
 
   @override

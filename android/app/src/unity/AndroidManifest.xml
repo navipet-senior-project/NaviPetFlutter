@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- Own process: Unity ends its process when it quits, which must not
+             take the Flutter engine with it. Config changes copied from
+             Unity's own activity so rotation does not restart the player. -->
+        <activity
+            android:name=".UnityHostActivity"
+            android:process=":unity"
+            android:exported="false"
+            android:theme="@style/UnityThemeSelector"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale|layoutDirection|density"
+            android:hardwareAccelerated="false" />
+        <!-- The Unity library declares its own launcher activity; the host
+             activity replaces it, so the app keeps a single launcher icon. -->
+        <activity
+            android:name="com.unity3d.player.UnityPlayerActivity"
+            tools:node="remove" />
+    </application>
+</manifest>

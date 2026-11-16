@@ -6,11 +6,16 @@ import 'package:navipet/data/app_state.dart';
 import 'package:navipet/router/app_router.dart';
 import 'package:navipet/screens/account_settings_screen.dart';
 import 'package:navipet/screens/change_email_screen.dart';
+import 'package:navipet/screens/indoor_ar_spike_screen.dart';
 import 'package:navipet/screens/verify_email_screen.dart';
 
 import 'email_change_test_support.dart';
 import 'package:navipet/screens/reset_password_screen.dart';
 import 'package:navipet/screens/sign_in_screen.dart';
+import 'package:navipet/screens/pet_customization_screen.dart';
+import 'package:navipet/screens/pet_home_screen.dart';
+import 'package:navipet/screens/pet_pack_screen.dart';
+import 'package:navipet/screens/pet_quests_screen.dart';
 
 class _RouterAppState extends AppState {
   _RouterAppState({
@@ -86,6 +91,86 @@ void main() {
       expect(find.byType(ResetPasswordScreen), findsOneWidget);
     },
   );
+
+  testWidgets('opens the debug indoor AR spike route when signed in', (
+    tester,
+  ) async {
+    final appState = _RouterAppState(
+      authenticated: true,
+      passwordRecovery: false,
+    );
+    final router = createAppRouter(
+      appState,
+      initialLocation: '/dev/indoor-ar-spike',
+    );
+    addTearDown(router.dispose);
+    addTearDown(appState.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>.value(
+        value: appState,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IndoorArSpikeScreen), findsOneWidget);
+  });
+
+  testWidgets('redirects a guest from the indoor AR spike route to sign in', (
+    tester,
+  ) async {
+    final appState = _RouterAppState(
+      authenticated: false,
+      passwordRecovery: false,
+    );
+    final router = createAppRouter(
+      appState,
+      initialLocation: '/dev/indoor-ar-spike',
+    );
+    addTearDown(router.dispose);
+    addTearDown(appState.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>.value(
+        value: appState,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IndoorArSpikeScreen), findsNothing);
+    expect(find.byType(SignInScreen), findsOneWidget);
+  });
+  testWidgets('Pet section routes Home, Pack, Shop and Quests', (tester) async {
+    final appState = _RouterAppState(
+      authenticated: true,
+      passwordRecovery: false,
+    );
+    final router = createAppRouter(appState, initialLocation: '/pet');
+    addTearDown(router.dispose);
+    addTearDown(appState.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>.value(
+        value: appState,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(PetHomeScreen), findsOneWidget);
+
+    for (final (path, screen) in [
+      ('/pet/pack', PetPackScreen),
+      ('/pet/shop', PetCustomizationScreen),
+      ('/pet/quests', PetQuestsScreen),
+    ]) {
+      router.go(path);
+      await tester.pumpAndSettle();
+      expect(find.byType(screen), findsOneWidget, reason: path);
+    }
+  });
+
   group('email change routes', () {
     Future<void> open(
       WidgetTester tester,

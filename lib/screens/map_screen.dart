@@ -8,24 +8,45 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/mapbox_config.dart';
+import '../data/indoor_ar_launcher.dart';
+import '../data/indoor_building_catalog.dart';
 import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
 import '../data/navigation_models.dart';
+import '../data/indoor_floor_coverage.dart';
+import '../data/outdoor_ar_contract.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ar_mode_icon.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/elbee_sheet.dart';
+import '../widgets/indoor_handoff_sheet.dart';
 import '../widgets/place_preview_sheet.dart';
 import '../widgets/account_button.dart';
 import '../widgets/route_preview_sheet.dart';
 import '../widgets/search_bar_field.dart';
 import '../widgets/search_overlay.dart';
 import '../widgets/travel_mode_selector.dart';
+import '../widgets/outdoor_ar_entry_button.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, this.controller});
+  const MapScreen({
+    super.key,
+    this.controller,
+    this.outdoorArEnabled = outdoorArBuildEnabled,
+    this.launchOutdoorAr,
+    this.requestCamera = requestOutdoorArCamera,
+  });
 
   /// Injected by widget tests; in the app it comes from the provider tree.
   final NavigationFlowController? controller;
+
+  /// Off unless the build opts in; see [outdoorArBuildEnabled].
+  final bool outdoorArEnabled;
+
+  /// Injected by widget tests; the app uses the native AR channel.
+  final OutdoorArLaunch? launchOutdoorAr;
+  final Future<bool> Function() requestCamera;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -43,6 +64,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   MapboxMap? _map;
   CameraViewportState? _initialMapViewport;
   MapboxNaviMapController? _naviMap;
+  PointAnnotationManager? _indoorBuildingMarkers;
+  Cancelable? _indoorBuildingMarkerTap;
+  bool _openingVecIndoorMap = false;
   bool _is3d = false;
   bool _raisedBuildings = true;
   bool _bicycling = false;
@@ -81,7 +105,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshLivePosition() async {
-    if (_flow.state is! FlowActiveNavigation) return;
     try {
       final position = await geo.Geolocator.getCurrentPosition(
         locationSettings: const geo.LocationSettings(
@@ -97,7 +120,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _passLivePosition(geo.Position position) async {
-    if (_flow.state is! FlowActiveNavigation) return;
     await _flow.onLiveLocation(
       NavigationCoordinate(
         latitude: position.latitude,
@@ -113,6 +135,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
+    _indoorBuildingMarkerTap?.cancel();
     // MapScreen remounts every time NaviBottomNav routes away and back
     // (e.g. to /checklist or /pet) while the flow itself — app-scoped —
     // keeps whatever state it was in. Detaching here means a route
@@ -127,6 +150,30 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
+    final indoorMarkers = await mapboxMap.annotations
+        .createPointAnnotationManager();
+    _indoorBuildingMarkers = indoorMarkers;
+    await indoorMarkers.setTextAllowOverlap(true);
+    _indoorBuildingMarkerTap = indoorMarkers.tapEvents(
+      onTap: (_) {
+        unawaited(_openVecIndoorMap());
+      },
+    );
+    await indoorMarkers.create(
+      PointAnnotationOptions(
+        geometry: Point(
+          coordinates: Position(
+            IndoorBuildingCatalog.vecAnchor.longitude,
+            IndoorBuildingCatalog.vecAnchor.latitude,
+          ),
+        ),
+        textField: 'VEC · Indoor map',
+        textColor: AppColors.navy.toARGB32(),
+        textHaloColor: Colors.white.toARGB32(),
+        textHaloWidth: 2.5,
+        textSize: 14,
+      ),
+    );
     await markers.setTextAllowOverlap(true);
     final arrowMarkers = await mapboxMap.annotations
         .createPointAnnotationManager();
@@ -152,6 +199,25 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     await _lastLocationReady;
     if (_flow.state is FlowIdle) await _centerOnBestKnownLocation();
     await _initializeLocation();
+  }
+
+  Future<void> _restoreMapStyle() async {
+    final controller = _naviMap;
+    if (!mounted || controller == null) return;
+    try {
+      await controller.restoreStyle();
+      if (!mounted || !identical(controller, _naviMap)) return;
+      await _flow.attachMap(controller);
+      await _applyRaisedBuildings();
+    } on Object catch (error) {
+      if (mounted) {
+        setState(
+          () => _locationMessage =
+              'Map is refreshing. Try changing the map view again.',
+        );
+      }
+      debugPrint('Map style restore failed: $error');
+    }
   }
 
   Future<void> _loadLastKnownLocation() async {
@@ -252,6 +318,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       }
     }
 
+    await _positionSubscription?.cancel();
+    if (!mounted) return;
     _positionSubscription =
         geo.Geolocator.getPositionStream(locationSettings: settings).listen(
           (position) {
@@ -330,7 +398,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             body: Stack(
               children: [
                 _mapWidget(),
-                if (state is FlowIdle) _searchBar(context, padding),
+                if (state is FlowIdle || state is FlowError) ...[
+                  _searchBar(context, padding),
+                  _elbeeButton(padding),
+                ],
                 if (locationMessage != null && state is! FlowSearching)
                   _locationBanner(padding, state, locationMessage),
                 if (_showsRecenterButton(state))
@@ -406,7 +477,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 if (state is FlowActiveNavigation)
                   _activeNavigation(state, flow, padding),
-                if (state is FlowArrived) _arrivalSummary(state, flow, padding),
+                if (state is FlowArrived) _arrivalActions(flow, padding),
+                if (state is FlowIndoorHandoff)
+                  _indoorHandoff(state, flow, padding),
+                if (flow.awaitingPresenceChoice) _presenceChoice(flow, padding),
                 if (state is FlowError) _error(state, flow),
               ],
             ),
@@ -430,7 +504,20 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       styleUri: _mapStyle,
       viewport: _initialMapViewport,
       onMapCreated: _onMapCreated,
+      onStyleLoadedListener: (_) => unawaited(_restoreMapStyle()),
     );
+  }
+
+  Future<void> _openVecIndoorMap() async {
+    if (!mounted || _openingVecIndoorMap || _indoorBuildingMarkers == null) {
+      return;
+    }
+    _openingVecIndoorMap = true;
+    try {
+      await context.push<void>('/buildings/vec');
+    } finally {
+      _openingVecIndoorMap = false;
+    }
   }
 
   Widget _mapTypeControls() => Column(
@@ -618,7 +705,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         state is FlowRoutePreview) {
       bottom = 294;
     } else if (state is FlowArrived) {
-      bottom = 320 + padding.bottom;
+      bottom = 88 + padding.bottom;
     } else {
       bottom = 24;
     }
@@ -626,8 +713,79 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       right: 16,
       bottom: bottom,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (state is FlowActiveNavigation) ...[
+            OutdoorArEntryButton(
+              available: widget.outdoorArEnabled,
+              onPressed: () => widget.outdoorArEnabled
+                  ? startOutdoorAr(
+                      context,
+                      request: OutdoorArRequest.to(
+                        state.destination,
+                        route: state.remainingGeometry.isEmpty
+                            ? state.plan.selected.coordinates
+                            : state.remainingGeometry,
+                      ),
+                      launch:
+                          widget.launchOutdoorAr ??
+                          NativeIndoorArLauncher().launchOutdoor,
+                      requestCamera: widget.requestCamera,
+                    )
+                  : showOutdoorArUnavailableDialog(context),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          if (state is FlowArrived &&
+              indoorScanCovered(
+                state.destination.buildingCode,
+                state.destination.floorNumber,
+              )) ...[
+            MergeSemantics(
+              child: Semantics(
+                label: 'AR mode',
+                button: true,
+                child: SizedBox.square(
+                  dimension: 48,
+                  child: FloatingActionButton(
+                    heroTag: 'ar-mode',
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.navy,
+                    onPressed: () => context.push(
+                      Uri(
+                        path: '/ar',
+                        queryParameters: {
+                          if (state.destination.id != null)
+                            'destination': state.destination.id!,
+                        },
+                      ).toString(),
+                    ),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ArModeIcon(color: AppColors.navy, size: 22),
+                          ExcludeSemantics(
+                            child: Text(
+                              'AR',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           _mapTypeControls(),
           const SizedBox(height: AppSpacing.sm),
           Semantics(
@@ -721,6 +879,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             ListTile(
               leading: const Icon(Icons.place_outlined, color: AppColors.navy),
               title: Text(state.destination.name),
+              trailing: TextButton(
+                onPressed: flow.openSearch,
+                child: const Text('Change'),
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             TravelModeSelector(selected: state.mode, onChanged: flow.setMode),
@@ -759,11 +921,25 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(child: Text(state.message)),
-            if (state.retryable)
-              TextButton(onPressed: flow.retry, child: const Text('Retry')),
+            Text(state.message),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: flow.openSearch,
+                  icon: const Icon(Icons.search),
+                  label: const Text('Choose another destination'),
+                ),
+                if (state.retryable)
+                  TextButton(onPressed: flow.retry, child: const Text('Retry')),
+              ],
+            ),
           ],
         ),
       ),
@@ -833,6 +1009,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
+                  if (flow.canScanAr)
+                    IconButton(
+                      tooltip: 'Scan AR',
+                      onPressed: () => _scanAr(state.destination),
+                      icon: const Icon(Icons.view_in_ar_outlined),
+                    ),
                   TextButton(
                     onPressed: flow.back,
                     child: const Text('Overview'),
@@ -871,46 +1053,103 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return '$minutes min';
   }
 
-  Widget _arrivalSummary(
-    FlowArrived state,
+  Widget _presenceChoice(
     NavigationFlowController flow,
     EdgeInsets padding,
   ) => Positioned(
-    left: AppSpacing.lg,
-    right: AppSpacing.lg,
-    bottom: padding.bottom + AppSpacing.lg,
-    child: Card(
+    left: 0,
+    right: 0,
+    bottom: 0,
+    child: Material(
+      color: AppColors.surface,
+      elevation: 10,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadius.lg),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: EdgeInsets.fromLTRB(24, 24, 24, padding.bottom + 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'You’ve arrived!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+              'Confirm your location',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
             ),
-            const SizedBox(height: 8),
-            Text(state.destination.name),
-            const SizedBox(height: 16),
-            Text('Time: ${state.summary.elapsedLabel}'),
-            Text('Distance traveled: ${state.summary.distanceLabel}'),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => context.push('/ar'),
-              icon: const Icon(Icons.view_in_ar_outlined),
-              label: const Text('AR mode'),
+            const SizedBox(height: 12),
+            const Text(
+              'We cannot confirm whether you are inside the building. Refresh your location or continue with walking directions.',
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            if (flow.canScanAr)
+              FilledButton(
+                onPressed: () => _scanAr(flow.destination!),
+                child: const Text('Scan AR'),
+              ),
+            OutlinedButton(
+              onPressed: flow.checkingPresence ? null : flow.refreshPresence,
+              child: Text(
+                flow.checkingPresence ? 'Refreshing…' : 'Refresh location',
+              ),
+            ),
             FilledButton(
-              onPressed: flow.dismissArrival,
-              child: const Text('Return to map'),
+              onPressed: flow.continueRoute,
+              child: const Text('Continue with directions'),
             ),
+            TextButton(onPressed: flow.back, child: const Text('Back')),
           ],
         ),
       ),
     ),
   );
+
+  Widget _elbeeButton(EdgeInsets padding) => Positioned(
+    left: 16,
+    top: padding.top + 72,
+    child: Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: TextButton(onPressed: _openElbee, child: const Text('Ask Elbee')),
+    ),
+  );
+
+  Future<void> _openElbee() => showElbeeSheet(context, flow: _flow);
+
+  Widget _indoorHandoff(
+    FlowIndoorHandoff state,
+    NavigationFlowController flow,
+    EdgeInsets padding,
+  ) => Positioned(
+    left: 0,
+    right: 0,
+    bottom: 0,
+    child: IndoorHandoffSheet(
+      destination: state.destination,
+      padding: padding,
+      onScan: () => _scanAr(state.destination),
+      onBack: flow.back,
+    ),
+  );
+
+  void _scanAr(NaviDestination destination) {
+    context.push(
+      Uri(
+        path: '/ar',
+        queryParameters: {'destination': destination.id},
+      ).toString(),
+    );
+  }
+
+  Widget _arrivalActions(NavigationFlowController flow, EdgeInsets padding) =>
+      Positioned(
+        left: AppSpacing.lg,
+        right: AppSpacing.lg,
+        bottom: padding.bottom + AppSpacing.lg,
+        child: FilledButton(
+          onPressed: flow.dismissArrival,
+          child: const Text('Return to map'),
+        ),
+      );
 
   Future<void> _confirmEnd(NavigationFlowController flow) async {
     final confirmed = await showDialog<bool>(

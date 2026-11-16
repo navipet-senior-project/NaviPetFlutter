@@ -43,6 +43,106 @@ int? validArrivalRadiusMeters(Object? value) {
   return value;
 }
 
+/// Complete GeoJSON footprint: polygons, rings, then longitude/latitude points.
+class BuildingFootprint {
+  const BuildingFootprint(this.polygons, {this.isMultiPolygon = false});
+
+  final bool isMultiPolygon;
+
+  final List<List<List<NavigationCoordinate>>> polygons;
+
+  Iterable<NavigationCoordinate> get coordinates =>
+      polygons.expand((polygon) => polygon.expand((ring) => ring));
+}
+
+NavigationCoordinate? validCoordinate(Object? value) {
+  if (value is! Map) return null;
+  final latitude = value['latitude'];
+  final longitude = value['longitude'];
+  if (latitude is! num ||
+      longitude is! num ||
+      !latitude.isFinite ||
+      !longitude.isFinite ||
+      latitude.abs() > 90 ||
+      longitude.abs() > 180) {
+    return null;
+  }
+  return NavigationCoordinate(
+    latitude: latitude.toDouble(),
+    longitude: longitude.toDouble(),
+  );
+}
+
+/// Invalid geometry stays absent; never infer a footprint from a map pin.
+BuildingFootprint? validFootprint(Object? value) {
+  if (value is! Map) return null;
+  final raw = value['coordinates'];
+  if (raw is! List || raw.isEmpty) return null;
+  final List components;
+  switch (value['type']) {
+    case 'Polygon':
+      components = [raw];
+    case 'MultiPolygon':
+      components = raw;
+    default:
+      return null;
+  }
+  final polygons = <List<List<NavigationCoordinate>>>[];
+  for (final component in components) {
+    if (component is! List || component.isEmpty) return null;
+    final rings = <List<NavigationCoordinate>>[];
+    for (final ring in component) {
+      if (ring is! List || ring.length < 4) return null;
+      final points = <NavigationCoordinate>[];
+      for (final position in ring) {
+        if (position is! List || position.length < 2) return null;
+        final point = validCoordinate({
+          'longitude': position[0],
+          'latitude': position[1],
+        });
+        if (point == null) return null;
+        points.add(point);
+      }
+      final first = points.first;
+      final last = points.last;
+      if (first.latitude != last.latitude ||
+          first.longitude != last.longitude) {
+        return null;
+      }
+      var area = 0.0;
+      for (var i = 1; i < points.length; i++) {
+        final a = points[i - 1];
+        final b = points[i];
+        area +=
+            (a.longitude - first.longitude) * (b.latitude - first.latitude) -
+            (b.longitude - first.longitude) * (a.latitude - first.latitude);
+      }
+      if (area.abs() < 1e-14) return null;
+      rings.add(List.unmodifiable(points));
+    }
+    polygons.add(List.unmodifiable(rings));
+  }
+  return BuildingFootprint(
+    List.unmodifiable(polygons),
+    isMultiPolygon: value['type'] == 'MultiPolygon',
+  );
+}
+
+Map<String, Object> footprintToGeoJson(BuildingFootprint footprint) {
+  final polygons = [
+    for (final polygon in footprint.polygons)
+      [
+        for (final ring in polygon)
+          [
+            for (final point in ring) [point.longitude, point.latitude],
+          ],
+      ],
+  ];
+  return !footprint.isMultiPolygon && footprint.polygons.length == 1
+      ? {'type': 'Polygon', 'coordinates': polygons.single}
+      : {'type': 'MultiPolygon', 'coordinates': polygons};
+}
+
 class NaviDestination {
   const NaviDestination({
     required this.name,
@@ -58,6 +158,8 @@ class NaviDestination {
     this.attribution,
     this.isBuildingAlternative = false,
     this.arrivalRadiusMeters,
+    this.footprint,
+    this.entranceCoordinate,
   });
 
   final String name;
@@ -75,6 +177,15 @@ class NaviDestination {
 
   /// Server-configured arrival radius, or null when none was supplied.
   final int? arrivalRadiusMeters;
+
+  /// Complete building geometry from the server, including holes and parts.
+  final BuildingFootprint? footprint;
+
+  /// An explicitly supplied entrance, never the generic outdoor marker.
+  final NavigationCoordinate? entranceCoordinate;
+
+  NavigationCoordinate get routingCoordinate =>
+      entranceCoordinate ?? coordinate;
 
   /// Distance at which arrival is detected: the server value when it is in
   /// range, otherwise [defaultArrivalRadiusMeters].

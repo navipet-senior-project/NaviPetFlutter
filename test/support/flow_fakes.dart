@@ -172,6 +172,7 @@ class FakeRouteGateway implements OutdoorRouteGateway {
   int calls = 0;
   NavigationRoute? result;
   NavigationCoordinate? lastOrigin;
+  NavigationCoordinate? lastDestination;
 
   Completer<void>? _blocked;
 
@@ -193,6 +194,7 @@ class FakeRouteGateway implements OutdoorRouteGateway {
   }) async {
     calls++;
     lastOrigin = origin;
+    lastDestination = destination;
     final gate = _blocked;
     if (gate != null) await gate.future;
     final failure = error;
@@ -239,6 +241,8 @@ class RecordingMap implements NaviMapController {
     NavigationCoordinate coordinate, {
     required String label,
     required double bottomInset,
+    NaviDestination? destination,
+    bool fitFootprint = true,
   }) async {
     final gate = _blockedShowPlace;
     if (gate != null) await gate.future;

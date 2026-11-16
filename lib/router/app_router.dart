@@ -1,14 +1,25 @@
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
+import '../data/indoor_ar_contract.dart';
+import '../data/indoor_ar_launcher.dart';
+import '../data/indoor_ar_token_gateway.dart';
+import '../data/navigation_flow_controller.dart';
 import '../screens/account_settings_screen.dart';
-import '../screens/ar_navigation_screen.dart';
 import '../screens/change_email_screen.dart';
 import '../screens/checklist_screen.dart';
 import '../screens/email_sent_screen.dart';
 import '../screens/forgot_password_screen.dart';
+import '../screens/indoor_ar_launch_screen.dart';
+import '../screens/indoor_ar_spike_screen.dart';
 import '../screens/map_screen.dart';
+import '../screens/indoor_building_map_screen.dart';
 import '../screens/pet_customization_screen.dart';
+import '../screens/pet_home_screen.dart';
+import '../screens/pet_pack_screen.dart';
+import '../screens/pet_quests_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/reset_password_screen.dart';
 import '../screens/sign_in_screen.dart';
@@ -16,13 +27,18 @@ import '../screens/verify_email_screen.dart';
 
 /// [initialLocation] overrides the start route. Production leaves it null;
 /// tests use it to open a route without building the map first.
+///
+/// The router listens only to [AppState.redirectListenable]. A profile save
+/// also notifies [AppState], and go_router re-applies the last push when its
+/// refresh listenable fires, which put Edit Profile back on screen after pop.
 GoRouter createAppRouter(
   AppState appState, {
   String? initialLocation,
+  IndoorArTokenGateway? indoorArTokenGateway,
 }) => GoRouter(
   initialLocation:
       initialLocation ?? (appState.isAuthenticated ? '/map' : '/signin'),
-  refreshListenable: appState,
+  refreshListenable: appState.redirectListenable,
   redirect: (context, state) {
     final location = state.matchedLocation;
     final onPublicRoute = <String>{
@@ -76,8 +92,26 @@ GoRouter createAppRouter(
     ),
     GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
     GoRoute(
+      path: '/buildings/vec',
+      builder: (context, state) => const IndoorBuildingMapScreen(),
+    ),
+    GoRoute(
       path: '/pet',
-      builder: (context, state) => const PetCustomizationScreen(),
+      builder: (context, state) => const PetHomeScreen(),
+      routes: [
+        GoRoute(
+          path: 'shop',
+          builder: (context, state) => const PetCustomizationScreen(),
+        ),
+        GoRoute(
+          path: 'pack',
+          builder: (context, state) => const PetPackScreen(),
+        ),
+        GoRoute(
+          path: 'quests',
+          builder: (context, state) => const PetQuestsScreen(),
+        ),
+      ],
     ),
     GoRoute(
       path: '/checklist',
@@ -124,7 +158,22 @@ GoRouter createAppRouter(
     ),
     GoRoute(
       path: '/ar',
-      builder: (context, state) => const ArNavigationScreen(),
+      builder: (context, state) => IndoorArLaunchScreen(
+        launcher: NativeIndoorArLauncher(),
+        destinationId: state.uri.queryParameters['destination'],
+        request: state.extra is IndoorArRequest
+            ? state.extra as IndoorArRequest
+            : null,
+        gateway: context.read<NavigationFlowController>().searchGateway,
+        tokenGateway: indoorArTokenGateway,
+      ),
     ),
+    // #41 transport spike; removed with the real launch screen (build step 3).
+    if (kDebugMode)
+      GoRoute(
+        path: '/dev/indoor-ar-spike',
+        builder: (context, state) =>
+            IndoorArSpikeScreen(launcher: NativeIndoorArLauncher()),
+      ),
   ],
 );

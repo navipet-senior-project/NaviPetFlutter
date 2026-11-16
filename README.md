@@ -8,10 +8,35 @@ includes:
   sessions, and profile data.
 - A native Mapbox map with live device location.
 - Mapbox destination autocomplete and walking directions.
+- A 2D Pet section with Elbee Home, Pack, Shop, and Quests. Home shows the
+  signed-in user's saved classes and verified point balance (shown as gems);
+  Quests uses the existing server-verified claim flow, Shop uses the existing
+  purchase RPC, and Pack only equips owned outfits. Pet level and message are
+  derived locally; classes, inventory, and rewards are not mocked. A campus
+  check-in is not proof of class attendance.
 - A route line, destination marker, ETA/distance preview, maneuver guidance,
   spoken instructions, arrival detection, and basic off-route recalculation.
-- Existing Pet, Checklist, Account, and prototype AR screens. The 3D/Multiset
-  integration is intentionally deferred and is not exposed from the map.
+- During an active outdoor walk, builds with outdoor AR enabled hand the
+  destination and selected walking route to an ARCore Geospatial session.
+  Without the opt-in, the control explains that outdoor AR is unavailable and
+  leaves the route active on the map. Unity's shared HUD integration is
+  coordinated separately; end-to-end behavior is unverified. See
+  [docs/outdoor-ar-geospatial.md](docs/outdoor-ar-geospatial.md).
+- Calendar, Pet Shop and Pack, and Account screens. On Android (and on iOS
+  when a prebuilt UnityFramework is present, see `docs/ios-testing.md`), Scan AR
+  appears during navigation to a place with indoor AR once a fresh
+  location fix is at or within 2 m of the building footprint, regardless of GPS
+  accuracy. It hides when the fix goes stale (10 s) or is clearly outside. It
+  loads the selected place and sends its backend door pose, plus a
+  short-lived MultiSet token fetched from the backend (`POST /indoor/ar-token`),
+  to Unity. Without a saved door pose, it starts a localization scan without
+  inventing a destination. Indoor AR points toward a room; it does not provide
+  turn-by-turn indoor routing. The MultiSet secret never ships in the app.
+  Unity AR still requires verification on a physical phone.
+- Ask Elbee about CSULB buildings and rooms from the map. Elbee returns
+  verified places that open existing navigation; schedule access requires
+  consent for each request. It can also explain official parking rules. Elbee
+  is NaviPet's campus pet, separate from the university parking chatbot.
 
 ## Project structure
 
@@ -120,6 +145,16 @@ Supabase Auth owns passwords and sessions. `profiles` stores app-facing account
 data, `classes` stores each user's schedule and locations, and
 `task_completions` stores daily progress. Owner-only policies protect each row.
 
+The points feature also requires [`docs/points_schema.sql`](docs/points_schema.sql)
+to be applied to the same Supabase project before this Flutter release. It adds
+wallets, a transaction ledger, owned outfits, and atomic RPCs for claims and
+purchases. In-person tasks award 10 points once per class per day when the
+device is within 150 meters of the saved class location during its scheduled
+time (with a 15-minute margin). Online attendance and preparation award 5
+points. The app checks nearby classes every 30 seconds while in the foreground;
+location permission must already be granted for automatic check-ins. The pet
+store prices are defined in the SQL migration so the client cannot set them.
+
 ## Authentication flow
 
 NaviPet uses the Fastify authentication endpoints and then hands successful
@@ -194,6 +229,27 @@ flutter run
 The first build can take several minutes. The app will request location access
 when the map opens; precise location is needed for route guidance and rerouting.
 
+### Android terminal commands
+
+With an emulator running or a phone connected, list targets and select the ID
+shown by Flutter. `adb devices` shows Android device serials.
+
+```bash
+flutter devices
+adb devices
+flutter run -d <flutter-device-id>
+```
+
+Alternatively, build and install the debug APK. Use the serial from `adb devices`
+when more than one Android target is connected:
+
+```bash
+flutter build apk --debug
+adb -s <android-serial> install -r build/app/outputs/flutter-apk/app-debug.apk
+adb -s <android-serial> shell am start -n com.navipet.navipet/.MainActivity
+adb -s <android-serial> logcat
+```
+
 ## Run on an iPhone
 
 iPhone builds require **macOS and Xcode**. They cannot be compiled or installed
@@ -245,9 +301,12 @@ preview, but a physical iPhone is better for testing live GPS navigation.
    ```
 
 5. In Xcode, select **Runner > Signing & Capabilities**:
-   - Choose your Apple development team.
+   - Choose your Apple development team. A free Apple ID (Personal Team) is
+     enough for development testing. The committed project uses automatic
+     signing and contains no team id. Do not commit a team id.
    - If Xcode reports that the bundle identifier is unavailable, replace it with
-     a unique value such as `com.yourname.navipet`.
+     a unique value such as `com.yourname.navipet`. That edit is local: discard
+     it before committing.
    - Let Xcode create or update the development signing certificate.
 6. Select the connected iPhone once in Xcode and allow any requested device
    preparation to finish.
@@ -264,6 +323,91 @@ preview, but a physical iPhone is better for testing live GPS navigation.
 A free Apple ID can be used for development testing, although its signing has
 more restrictions. App Store or TestFlight distribution requires membership in
 the Apple Developer Program.
+
+### iOS terminal commands
+
+After completing the signing and device preparation above, list the phone with
+Flutter and CoreDevice. Their identifiers can differ.
+
+```bash
+flutter devices
+xcrun devicectl list devices
+flutter run -d <flutter-device-id>
+```
+
+To build and install separately, use the CoreDevice identifier and the bundle
+identifier configured in Xcode:
+
+```bash
+flutter build ios --debug
+xcrun devicectl device install app --device <coredevice-id> build/ios/iphoneos/Runner.app
+xcrun devicectl device process launch --device <coredevice-id> <bundle-id>
+```
+
+For a simulator, choose an available device ID and build its separate app bundle:
+
+```bash
+xcrun simctl list devices available
+xcrun simctl boot <simulator-id>
+flutter build ios --debug --simulator
+xcrun simctl install <simulator-id> build/ios/iphonesimulator/Runner.app
+xcrun simctl launch <simulator-id> <bundle-id>
+```
+
+Skip the boot command if the simulator is already running. The default bundle ID
+is `com.navipet.navipet`; use your locally configured ID if you changed it.
+
+## Unity AR without installing Unity
+
+You do not need Unity installed to build or run NaviPet. No prebuilt Unity
+library is in this repository, and neither
+[NaviPetFlutter](https://github.com/navipet-senior-project/NaviPetFlutter) nor
+[NaviPetUnity](https://github.com/navipet-senior-project/NaviPetUnity) publishes
+one as a GitHub release. The Android AAR and the iOS `UnityFramework` can hold
+MultiSet credentials, so they stay out of git. Ask the project maintainer who gave you
+access to this repository (see [Collaborators](#collaborators)) for a private
+copy. Do not commit that copy, and do not post it anywhere public.
+
+Without that private copy, follow [Run on Android](#run-on-android) or
+[Run on an iPhone](#run-on-an-iphone). Leave `android/unity-ar/` absent. The
+rest of the app still builds. Without the library, Scan AR reports that AR is
+unavailable on the device.
+
+### Android
+
+Gradle in
+`android/app/build.gradle.kts` turns Unity on only when
+`android/unity-ar/unityLibrary-release.aar` is a file. `android/.gitignore`
+ignores the whole `android/unity-ar/` directory.
+
+1. Get the `android/unity-ar/` directory from the project maintainer who gave you access to this repository, in private. Keep
+   every file in it, including `unityLibrary-release.aar`, any other `.aar`
+   files, and `maven-deps.txt` when that file is present.
+2. Place that directory at `android/unity-ar/` in your checkout. Confirm git
+   does not see it (`git check-ignore -v android/unity-ar/unityLibrary-release.aar`
+   should name `android/.gitignore`).
+3. Use a physical arm64 Android phone running API 26 or newer. With the AAR
+   present, the build raises `minSdk` to at least 26 and ships only
+   `arm64-v8a`.
+4. Build and install with the steps in [Physical Android phone](#physical-android-phone).
+
+### iPhone
+
+1. Get `UnityFramework.framework` from the project maintainer who gave you access to this repository, in private.
+2. Copy it to `ios/unity-ar/UnityFramework.framework`. It must contain the
+   Unity export's `Data` folder (see `docs/ios-testing.md`); the build fails
+   without it.
+3. Copy `ios/UnityAr.xcconfig.template` to
+   `ios/unity-ar/UnityAr.xcconfig`. That file is what turns the iOS Unity
+   bridge on. Deleting `ios/unity-ar/UnityAr.xcconfig` turns it back off.
+4. Git ignores `/ios/unity-ar/`. Confirm with
+   `git check-ignore -v ios/unity-ar/UnityFramework.framework` before you
+   commit anything else. Do not commit the framework.
+5. Sign and run with [Physical iPhone](#physical-iphone). Use your free
+   Personal Team. Do not commit a team id or a bundle-identifier change.
+
+See [iPhone testing](docs/ios-testing.md#indoor-ar) for setup and validation
+status.
 
 ## Navigation behavior
 
@@ -330,7 +474,9 @@ asset. No real keys are used in CI.
 | `cmdline-tools` is missing | Install Android SDK Command-line Tools in Android Studio, then run `flutter doctor --android-licenses`. |
 | No Android emulators are listed | Open Android Studio's Device Manager, create a virtual device, start it, then run `flutter devices`. |
 | No iPhones or simulators are listed | Open Xcode, install an iOS runtime in **Xcode > Settings > Platforms**, then run `open -a Simulator` and `flutter devices`. |
-| Xcode reports a signing error | Select a development team under **Runner > Signing & Capabilities** and use a unique bundle identifier. |
+| Xcode reports a signing error | Select a development team under **Runner > Signing & Capabilities** and use a unique bundle identifier. Do not commit the team id or that bundle-identifier edit. |
+| Android says "AR is not included in this build." | No private `android/unity-ar/unityLibrary-release.aar` is present. The rest of the app still runs. See [Unity AR without installing Unity](#unity-ar-without-installing-unity). |
+| iPhone says "AR mode isn't available on this device." | The private framework or its configuration is missing. See [Unity AR without installing Unity](#unity-ar-without-installing-unity). |
 | iOS reports resource-fork/Finder metadata errors | Move the repository out of an iCloud-synced Desktop or Documents folder, then run `flutter clean` and try again. |
 
 The Kotlin Gradle Plugin warning currently emitted by Mapbox/Flutter TTS is a
@@ -349,5 +495,5 @@ the pinned Flutter/Mapbox versions in this repository.
 
 - The Dart client lives in `packages/navipet_api` and is generated from `openapi/navipet-api.json` (the backend's OpenAPI spec).
 - Regenerate with `tool/generate_api_client.sh --fetch` to re-download the spec and regenerate. Requires Java and Node.js (`npx`).
-- Before generating, `tool/normalize_openapi.jq` collapses TypeBox literal unions (`anyOf` of single-value enums, `anyOf` with `null`) into plain enums and `nullable` fields, which the `dart` generator cannot model otherwise. The committed spec stays unmodified.
+- Before generating, `tool/normalize_openapi.jq` collapses TypeBox literal unions (`anyOf` of single-value enums, `anyOf` with `null`) into plain enums and `nullable` fields. It also converts homogeneous coordinate tuples into fixed-length arrays supported by the `dart` generator. The committed spec stays unmodified.
 - Never hand-edit generated files. Change the spec or the script instead, then regenerate.

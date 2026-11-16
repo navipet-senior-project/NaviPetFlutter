@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 /// A circular avatar that shows the profile photo at [imageUrl] when there is
@@ -10,6 +12,7 @@ class ProfileAvatar extends StatelessWidget {
     required this.color,
     required this.size,
     this.imageUrl,
+    this.imageBytes,
     this.initialStyle,
     this.onImageError,
   });
@@ -20,6 +23,9 @@ class ProfileAvatar extends StatelessWidget {
 
   /// A signed URL from the NaviPet backend; `null` shows the initial.
   final String? imageUrl;
+
+  /// A picked photo that is not saved yet; shown instead of [imageUrl].
+  final Uint8List? imageBytes;
   final TextStyle? initialStyle;
 
   /// Called with the failing URL, e.g. so an expired signed URL is refreshed.
@@ -46,7 +52,14 @@ class ProfileAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       clipBehavior: Clip.antiAlias,
-      child: url == null
+      child: imageBytes != null
+          ? Image.memory(
+              imageBytes!,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+            )
+          : url == null
           ? initial
           : Image.network(
               url,

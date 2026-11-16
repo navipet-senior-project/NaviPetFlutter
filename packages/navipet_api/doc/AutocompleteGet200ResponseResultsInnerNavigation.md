@@ -9,6 +9,8 @@ import 'package:navipet_api/api.dart';
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **outdoorDestination** | [**AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination**](AutocompleteGet200ResponseResultsInnerNavigationOutdoorDestination.md) |  | [optional] 
+**arrivalRadiusMeters** | **int** |  | [optional] 
+**footprint** | [**AutocompleteGet200ResponseResultsInnerNavigationFootprint**](AutocompleteGet200ResponseResultsInnerNavigationFootprint.md) |  | [optional] 
 **indoorDestinationId** | **String** |  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
