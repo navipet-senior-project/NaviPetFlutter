@@ -322,8 +322,7 @@ preview, but a physical iPhone is better for testing live GPS navigation.
 
 A free Apple ID can be used for development testing, although its signing has
 more restrictions. App Store or TestFlight distribution requires membership in
-the Apple Developer Program. For distributing a build to a partner, see
-[Share an iPhone build with a tester](docs/ios-testing.md#share-an-iphone-build-with-a-tester).
+the Apple Developer Program.
 
 ### iOS terminal commands
 

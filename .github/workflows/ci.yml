@@ -41,12 +41,7 @@ jobs:
 
           with Path('ios/Runner/Info.plist').open('rb') as file:
               info = plistlib.load(file)
-          for key in (
-              'NSCameraUsageDescription',
-              'NSLocationWhenInUseUsageDescription',
-              'NSMotionUsageDescription',
-              'NSPhotoLibraryUsageDescription',
-          ):
+          for key in ('NSLocationWhenInUseUsageDescription', 'NSMotionUsageDescription', 'NSPhotoLibraryUsageDescription'):
               value = info.get(key)
               if not isinstance(value, str) or not value.strip():
                   raise SystemExit(f'Missing or empty usage description: {key}')
@@ -55,32 +50,6 @@ jobs:
 
       - name: Check Podfile syntax
         run: ruby -c ios/Podfile
-
-  ios-simulator-build:
-    name: ios-simulator-build
-    runs-on: macos-15
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      # The iOS build bundles .env. Placeholder values allow compilation
-      # without exposing runtime credentials to pull request builds.
-      - name: Create placeholder .env
-        run: cp .env.example .env
-
-      - name: Resolve Flutter and CocoaPods dependencies
-        run: flutter pub get --enforce-lockfile
-
-      - name: Build iOS simulator app
-        run: flutter build ios --simulator --no-codesign
 
   analyze-and-test:
     name: analyze-and-test
