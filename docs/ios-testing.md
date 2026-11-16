@@ -27,10 +27,38 @@ minimum target is iOS 15. No distribution account is needed.
    developer account and trust it, then launch again. Follow any additional
    verification prompt on the phone. Allow location access for navigation.
 
-A free Personal Team can sign development builds for the owner's devices;
-provisioning profiles expire after seven days and must be renewed through Xcode. To check compilation
-without signing, run `flutter build ios --no-codesign`. To build for a simulator,
-run `flutter build ios --simulator`.
+A free Personal Team can sign development builds for devices registered to the
+team; provisioning profiles expire after seven days and must be renewed through
+Xcode. To check compilation without signing, run `flutter build ios --no-codesign`.
+To build for a simulator, run `flutter build ios --simulator`.
+
+## Share an iPhone build with a tester
+
+For a partner to install the app without connecting their phone to your Mac,
+distribute it through TestFlight. This requires an active Apple Developer
+Program membership and an App Store Connect app record.
+
+1. In the Apple Developer account, register the bundle identifier used by the
+   Runner target (`com.navipet.navipet`, or the unique identifier you chose).
+   Create the matching app in App Store Connect.
+2. On a Mac with this checkout and the runtime `.env` configured, open
+   `ios/Runner.xcworkspace` in Xcode. Under **Runner > Signing & Capabilities**,
+   choose the paid developer team and enable automatic signing.
+3. Select **Any iOS Device (arm64)**, then choose **Product > Archive**. In the
+   Organizer, choose **Distribute App > App Store Connect > Upload** and finish
+   the signing/upload prompts.
+4. In App Store Connect, wait for the build to finish processing. Add your
+   partner under **TestFlight > Internal Testing** if they are an App Store
+   Connect user, or create an **External Testing** group and invite their Apple
+   ID email address. Apple may require a beta app review before external
+   testing starts.
+5. Your partner installs Apple's TestFlight app, accepts the invitation, and
+   installs NaviPet from TestFlight.
+
+Do not commit signing certificates, provisioning profiles, the `.env` file, or
+the private Unity framework. The app's normal iOS screens, campus search, map,
+and routing are included. Indoor AR requires the separately supplied iOS
+`UnityFramework`; outdoor AR is not currently available on iOS.
 
 ## Indoor AR
 
