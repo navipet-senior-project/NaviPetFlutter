@@ -21,6 +21,15 @@ enum TaskClaimResult {
   tooFar,
 }
 
+enum OnlineSessionStartResult {
+  started,
+  alreadyRunning,
+  notToday,
+  notScheduled,
+  outsideClassPeriod,
+  notOnline,
+}
+
 /// App-wide authentication and profile state backed by Supabase.
 class AppState extends ChangeNotifier {
   AppState({
@@ -108,6 +117,9 @@ class AppState extends ChangeNotifier {
   String? _classesError;
   int _classesRefreshId = 0;
   final Map<String, DateTime> _onlineSessionStarts = {};
+  final Map<String, DateTime> _onlineSessionEnds = {};
+  final Map<String, Duration> _completedOnlineSessionDurations = {};
+  final Map<String, Timer> _onlineSessionEndTimers = {};
   Future<void>? _profileFetch;
   String? _profileFetchUserId;
   DateTime? _profileFetchedAt;
@@ -263,29 +275,96 @@ class AppState extends ChangeNotifier {
 
   Duration onlineSessionDuration(String classId) {
     final started = _onlineSessionStarts[classId];
-    return started == null ? Duration.zero : DateTime.now().difference(started);
+    if (started == null) {
+      return _completedOnlineSessionDurations[classId] ?? Duration.zero;
+    }
+    final end = _onlineSessionEnds[classId];
+    final elapsed = DateTime.now().difference(started);
+    return end == null || DateTime.now().isBefore(end)
+        ? elapsed
+        : end.difference(started);
   }
 
-  Duration onlineSessionRequirement(CourseClass course) {
-    final start = _timeMinutes(course.startTime);
-    final end = _timeMinutes(course.endTime);
-    final minutes = end - start;
-    return Duration(minutes: minutes > 0 ? minutes : 15);
-  }
+  Duration onlineSessionRequirement(CourseClass _) =>
+      const Duration(minutes: 30);
 
   bool get hasRunningOnlineSession => _onlineSessionStarts.isNotEmpty;
 
   bool onlineSessionRunning(String classId) =>
       _onlineSessionStarts.containsKey(classId);
 
-  void startOnlineSession(String classId) {
-    _onlineSessionStarts[classId] ??= DateTime.now();
+  bool onlineSessionHasEnded(String classId) =>
+      _completedOnlineSessionDurations.containsKey(classId);
+
+  bool onlineSessionCanClaim(String classId, CourseClass course) =>
+      onlineSessionDuration(classId) >= onlineSessionRequirement(course);
+
+  OnlineSessionStartResult startOnlineSession(
+    String classId, {
+    CourseClass? course,
+    DateTime? date,
+    DateTime? now,
+  }) {
+    final current = now ?? DateTime.now();
+    if (course == null || date == null || course.id != classId) {
+      return OnlineSessionStartResult.notOnline;
+    }
+    if (!course.isOnline) return OnlineSessionStartResult.notOnline;
+    if (_onlineSessionStarts.containsKey(classId)) {
+      return OnlineSessionStartResult.alreadyRunning;
+    }
+    if (!_isSameDay(date, current)) return OnlineSessionStartResult.notToday;
+    if (!course.occursOn(date.weekday)) {
+      return OnlineSessionStartResult.notScheduled;
+    }
+    final classStart = _timeOnDate(date, course.startTime);
+    final classEnd = _timeOnDate(date, course.endTime);
+    if (current.isBefore(classStart) || !current.isBefore(classEnd)) {
+      return OnlineSessionStartResult.outsideClassPeriod;
+    }
+
+    _completedOnlineSessionDurations.remove(classId);
+    _onlineSessionStarts[classId] = current;
+    _onlineSessionEnds[classId] = classEnd;
+    _onlineSessionEndTimers[classId] = Timer(
+      classEnd.difference(current),
+      () => _expireOnlineSession(classId),
+    );
     notifyListeners();
+    return OnlineSessionStartResult.started;
   }
 
   void stopOnlineSession(String classId) {
-    _onlineSessionStarts.remove(classId);
+    final started = _onlineSessionStarts.remove(classId);
+    final end = _onlineSessionEnds.remove(classId);
+    _onlineSessionEndTimers.remove(classId)?.cancel();
+    if (started != null) {
+      final stopAt = DateTime.now();
+      final cappedStop = end != null && end.isBefore(stopAt) ? end : stopAt;
+      _completedOnlineSessionDurations[classId] = cappedStop.difference(started);
+    }
     notifyListeners();
+  }
+
+  void _expireOnlineSession(String classId) {
+    final started = _onlineSessionStarts.remove(classId);
+    final end = _onlineSessionEnds.remove(classId);
+    _onlineSessionEndTimers.remove(classId);
+    if (started == null || end == null) return;
+    _completedOnlineSessionDurations[classId] = end.difference(started);
+    notifyListeners();
+  }
+
+  void _clearOnlineSession(String classId) {
+    _onlineSessionStarts.remove(classId);
+    _onlineSessionEnds.remove(classId);
+    _onlineSessionEndTimers.remove(classId)?.cancel();
+    _completedOnlineSessionDurations.remove(classId);
+  }
+
+  DateTime _timeOnDate(DateTime date, String value) {
+    final minutes = _timeMinutes(value);
+    return DateTime(date.year, date.month, date.day, minutes ~/ 60, minutes % 60);
   }
 
   List<DailyClassTask> dailyTasks([DateTime? day]) {
@@ -1186,6 +1265,10 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    for (final timer in _onlineSessionEndTimers.values) {
+      timer.cancel();
+    }
+    _onlineSessionEndTimers.clear();
     _authSubscription?.cancel();
     _redirect.dispose();
     super.dispose();
