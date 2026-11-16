@@ -265,7 +265,7 @@ void main() {
   testWidgets('Pet Home shows Elbee, progress, gems, class and Guide', (
     tester,
   ) async {
-    await _pump(tester, _FakeAppState());
+    await _pump(tester, _FakeAppState(fakeClasses: const [_inPerson]));
 
     expect(find.byType(PetHomeScreen), findsOneWidget);
     expect(find.text('Elbee · Lv 2'), findsOneWidget);
@@ -285,7 +285,7 @@ void main() {
   testWidgets('tapping the next-class icon opens class details', (
     tester,
   ) async {
-    await _pump(tester, _FakeAppState());
+    await _pump(tester, _FakeAppState(fakeClasses: const [_inPerson]));
     await tester.tap(find.byIcon(Icons.location_on_outlined));
     await tester.pumpAndSettle();
     expect(find.text('Senior Project'), findsOneWidget);
@@ -294,7 +294,7 @@ void main() {
   testWidgets('tapping next-class card padding opens class details', (
     tester,
   ) async {
-    await _pump(tester, _FakeAppState());
+    await _pump(tester, _FakeAppState(fakeClasses: const [_inPerson]));
     final card = tester.getRect(find.byKey(const ValueKey('pet-today-card')));
     await tester.tapAt(Offset(card.left + 6, card.top + 6));
     await tester.pumpAndSettle();
@@ -361,7 +361,13 @@ void main() {
     await tester.pump();
     expect(failedRefresh.refreshes, 1);
 
-    await _pump(tester, _FakeAppState(error: 'Temporary connection issue'));
+    await _pump(
+      tester,
+      _FakeAppState(
+        fakeClasses: const [_inPerson],
+        error: 'Temporary connection issue',
+      ),
+    );
     expect(find.text('CECS 491A'), findsOneWidget);
     expect(find.text('Guide'), findsOneWidget);
     expect(find.textContaining('Temporary connection issue'), findsOneWidget);

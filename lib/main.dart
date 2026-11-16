@@ -19,7 +19,10 @@ import 'data/location_service.dart';
 import 'data/mapbox_config.dart';
 import 'data/mapbox_navigation_service.dart';
 import 'data/navigation_flow_controller.dart';
+import 'data/navigation_flow_state.dart';
+import 'data/navigation_models.dart';
 import 'data/profile_gateway.dart';
+import 'data/pet_gems_gateway.dart';
 import 'data/recent_searches_gateway.dart';
 import 'data/registration_gateway.dart';
 import 'data/route_repository.dart';
@@ -72,6 +75,12 @@ Future<void> main() async {
         // expose the /classes route and returns 422 for these requests.
         classesGateway: null,
         profileGateway: profileGateway,
+        petGemsGateway: AppConfig.hasBackend && authTokenProvider != null
+            ? HttpPetGemsGateway(
+                baseUrl: AppConfig.backendBaseUrl,
+                auth: authTokenProvider,
+              )
+            : null,
         authTokenProvider: authTokenProvider,
       ),
       authTokenProvider: authTokenProvider,
@@ -128,12 +137,16 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
   /// would briefly see the previous one's destination, origin, and recent
   /// searches until something happened to overwrite it.
   String? _flowIdentity;
+  String? _rewardDestinationId;
+  NavigationCoordinate? _lastRewardPosition;
+  Future<String?>? _rewardTrip;
 
   @override
   void initState() {
     super.initState();
     _flowIdentity = widget.appState.activeUser?.id;
     widget.appState.addListener(_onAppStateChanged);
+    _flow.addListener(_onFlowChanged);
     WidgetsBinding.instance.addObserver(this);
     _nearbyTaskTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (_foreground) unawaited(widget.appState.completeNearbyTasks());
@@ -146,6 +159,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(widget.appState.refreshProfile(maxAge: _avatarUrlMaxAge));
       unawaited(widget.appState.completeNearbyTasks());
+      unawaited(widget.appState.claimDailyLoginGems());
     }
   }
 
@@ -153,8 +167,61 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
     final identity = widget.appState.activeUser?.id;
     if (identity == _flowIdentity) return;
     _flowIdentity = identity;
+    _rewardDestinationId = null;
+    _rewardTrip = null;
+    _lastRewardPosition = null;
     _flow.resetForNewIdentity();
     if (identity != null) unawaited(widget.appState.completeNearbyTasks());
+  }
+
+  void _onFlowChanged() {
+    if (!widget.appState.hasPetBackend || !widget.appState.isAuthenticated) {
+      return;
+    }
+    final state = _flow.state;
+    if (state is FlowActiveNavigation) {
+      final destinationId = state.destination.id;
+      if (destinationId == null) return;
+      if (_rewardDestinationId != destinationId) {
+        _rewardDestinationId = destinationId;
+        _rewardTrip = null;
+      }
+      final position = state.position;
+      if (position != null) {
+        _lastRewardPosition = position;
+        _rewardTrip ??= widget.appState.startNavigationGems(
+          destinationId,
+          position.latitude,
+          position.longitude,
+        );
+      }
+    } else if (state is FlowArrived) {
+      final position = _lastRewardPosition;
+      final trip = _rewardTrip;
+      if (trip != null &&
+          position != null &&
+          _rewardDestinationId == state.destination.id) {
+        _rewardTrip = null;
+        unawaited(_finishNavigationGems(trip, position));
+      }
+    } else if (state is FlowIdle || state is FlowPlacePreview) {
+      _rewardDestinationId = null;
+      _rewardTrip = null;
+      _lastRewardPosition = null;
+    }
+  }
+
+  Future<void> _finishNavigationGems(
+    Future<String?> trip,
+    NavigationCoordinate position,
+  ) async {
+    final tripId = await trip;
+    if (tripId == null) return;
+    await widget.appState.finishNavigationGems(
+      tripId,
+      position.latitude,
+      position.longitude,
+    );
   }
 
   NavigationFlowController _buildFlow() {
@@ -193,6 +260,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _nearbyTaskTimer?.cancel();
     widget.appState.removeListener(_onAppStateChanged);
+    _flow.removeListener(_onFlowChanged);
     _router.dispose();
     widget.appState.dispose();
     _flow.dispose();

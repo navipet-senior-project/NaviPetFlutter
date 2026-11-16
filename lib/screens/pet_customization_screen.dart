@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
+import '../data/pet_gems_gateway.dart';
 import '../data/pet_home.dart';
 import '../theme/app_theme.dart';
 import '../widgets/pet_section_navigation.dart';
@@ -24,6 +25,21 @@ const petOutfits = [
   PetOutfit('beach_hat', 'Beach Hat', Icons.beach_access_outlined, 25),
 ];
 
+IconData _costumeIcon(String id) => switch (id) {
+  'csulb_tee' => Icons.checkroom,
+  'grad_cap' => Icons.school_outlined,
+  'shades' => Icons.remove_red_eye_outlined,
+  'beach_hat' => Icons.beach_access_outlined,
+  _ => Icons.checkroom_outlined,
+};
+
+List<PetOutfit> visiblePetOutfits(AppState state) => state.hasPetBackend
+    ? [
+        for (final PetCostume item in state.costumes)
+          PetOutfit(item.id, item.name, _costumeIcon(item.id), item.price),
+      ]
+    : petOutfits;
+
 class PetCustomizationScreen extends StatefulWidget {
   const PetCustomizationScreen({super.key});
 
@@ -39,6 +55,7 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
 
   Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
+    final outfits = visiblePetOutfits(state);
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.5;
     return Scaffold(
       backgroundColor: AppColors.screenBg,
@@ -72,10 +89,17 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    if (state.petError != null)
+                      TextButton(
+                        onPressed: () => state.refreshPoints(),
+                        child: const Text('Could not load costumes. Retry'),
+                      ),
+                    if (state.petBusy && outfits.isEmpty)
+                      const Center(child: CircularProgressIndicator()),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: petOutfits.length,
+                      itemCount: outfits.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
@@ -83,10 +107,8 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
                         mainAxisExtent: largeText ? 252 : 178,
                       ),
                       itemBuilder: (context, index) => _outfitCard(
-                        petOutfits[index],
-                        owned: state.ownedOutfits.contains(
-                          petOutfits[index].id,
-                        ),
+                        outfits[index],
+                        owned: state.ownedOutfits.contains(outfits[index].id),
                         balance: state.points,
                         largeText: largeText,
                       ),
@@ -105,9 +127,9 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
   }
 
   Widget _stage(String? equippedId, {required double height}) {
-    final outfit = petOutfits
-        .where((item) => item.id == equippedId)
-        .firstOrNull;
+    final outfit = visiblePetOutfits(
+      context.read<AppState>(),
+    ).where((item) => item.id == equippedId).firstOrNull;
     return Container(
       height: height,
       clipBehavior: Clip.antiAlias,

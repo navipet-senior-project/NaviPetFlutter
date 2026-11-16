@@ -26,14 +26,13 @@ class _PetPackScreenState extends State<PetPackScreen> {
 
   Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
+    final outfits = visiblePetOutfits(state);
     final owned = [
-      for (final outfit in petOutfits)
+      for (final outfit in outfits)
         if (state.ownedOutfits.contains(outfit.id)) outfit,
     ];
     final previewId = _previewId ?? state.equippedOutfit;
-    final preview = petOutfits
-        .where((item) => item.id == previewId)
-        .firstOrNull;
+    final preview = outfits.where((item) => item.id == previewId).firstOrNull;
     final equipped = previewId != null && state.equippedOutfit == previewId;
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.5;
 
@@ -78,7 +77,7 @@ class _PetPackScreenState extends State<PetPackScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: Text(
-                              '${owned.length} owned · ${petOutfits.length} total',
+                              '${owned.length} owned · ${outfits.length} total',
                               style: const TextStyle(
                                 color: AppColors.muted,
                                 fontSize: 12,
@@ -101,7 +100,7 @@ class _PetPackScreenState extends State<PetPackScreen> {
                             ),
                           ),
                           Text(
-                            '${owned.length} owned · ${petOutfits.length} total',
+                            '${owned.length} owned · ${outfits.length} total',
                             style: const TextStyle(
                               color: AppColors.muted,
                               fontSize: 12,
@@ -110,6 +109,11 @@ class _PetPackScreenState extends State<PetPackScreen> {
                         ],
                       ),
                     const SizedBox(height: 10),
+                    if (state.petError != null)
+                      TextButton(
+                        onPressed: () => state.refreshPoints(),
+                        child: const Text('Could not load costumes. Retry'),
+                      ),
                     if (owned.isEmpty)
                       _emptyPack()
                     else

@@ -48,6 +48,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
     final loading = state.classesBusy && state.classes.isEmpty;
+    // Do not show a made-up 0 before the live balance has arrived.
+    final walletLoading =
+        state.hasPetBackend && !state.petLoaded && state.petError == null;
     final error =
         state.classesError ??
         (_refreshFailed
@@ -91,7 +94,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                   right: 16,
                   child: _hud(
                     PetLevel(completions),
-                    gems: loading ? null : state.points,
+                    gems: loading || walletLoading ? null : state.points,
                     compact: hudCompact,
                   ),
                 ),
@@ -275,36 +278,42 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   );
 
   Widget _mascot(String? outfitId, {required bool compact}) {
-    final outfit = petOutfits.where((item) => item.id == outfitId).firstOrNull;
+    final outfit = visiblePetOutfits(
+      context.read<AppState>(),
+    ).where((item) => item.id == outfitId).firstOrNull;
     final hasCustomArt = outfitId == 'grad_cap' || outfitId == 'csulb_tee';
     return Semantics(
-      image: true,
+      button: true,
       label: outfit == null
           ? 'Elbee the shark'
           : 'Elbee the shark, wearing ${outfit.label}',
-      child: SizedBox(
-        key: const ValueKey('pet-mascot'),
-        height: compact ? 150 : 184,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Image.asset(
-              petImageFor(outfitId),
-              height: compact ? 150 : 184,
-              fit: BoxFit.contain,
-              excludeFromSemantics: true,
-            ),
-            if (outfit != null && !hasCustomArt)
-              Positioned(
-                right: 6,
-                bottom: 6,
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: AppColors.yellow,
-                  child: Icon(outfit.icon, color: AppColors.petInk, size: 19),
-                ),
+      hint: 'Tap to refresh gems',
+      child: GestureDetector(
+        onTap: () => context.read<AppState>().refreshPoints(),
+        child: SizedBox(
+          key: const ValueKey('pet-mascot'),
+          height: compact ? 150 : 184,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.asset(
+                petImageFor(outfitId),
+                height: compact ? 150 : 184,
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
               ),
-          ],
+              if (outfit != null && !hasCustomArt)
+                Positioned(
+                  right: 6,
+                  bottom: 6,
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppColors.yellow,
+                    child: Icon(outfit.icon, color: AppColors.petInk, size: 19),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
