@@ -1,7 +1,7 @@
 /// Floors the shipped VEC scan actually contains.
 ///
-/// shortcut: floors 1 and 2 only, replace when a scan of another floor ships.
-const scannedIndoorFloors = {'1', '2'};
+/// shortcut: floors 1-3 only, replace when a scan of another floor ships.
+const scannedIndoorFloors = {'1', '2', '3'};
 
 bool indoorScanCovered(String? buildingCode, String? floor) {
   if (buildingCode?.trim().toUpperCase() != 'VEC') return false;

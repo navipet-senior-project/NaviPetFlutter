@@ -26,7 +26,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: IndoorHandoffSheet(
-            destination: _room('3'),
+            destination: _room('4'),
             padding: EdgeInsets.zero,
             onScan: () => scanned = true,
             onBack: () {},
@@ -34,7 +34,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Floor 3 is not scanned.'), findsOneWidget);
+    expect(find.text('Floor 4 is not scanned.'), findsOneWidget);
     expect(
       find.text('Direction to the room, not turn-by-turn.'),
       findsOneWidget,

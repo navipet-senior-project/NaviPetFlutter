@@ -104,7 +104,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
               ),
               const SizedBox(height: 12),
               _notice(
-                'The directory photo also shows floors 3–5. Those floors are not part of the current Unity scan, so they are listed below without a map.',
+                'The directory photo also shows floors 3–5. Floor 3 works with search and AR but has no map here. Floors 4–5 are not part of the current Unity scan.',
                 const Color(0xFFFFF4D6),
                 const Color(0xFF684B12),
               ),
@@ -390,7 +390,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
               const Wrap(
                 spacing: 7,
                 children: [
-                  Chip(label: Text('3rd floor · not scanned')),
+                  Chip(label: Text('3rd floor · AR only, no map')),
                   Chip(label: Text('4th floor · not scanned')),
                   Chip(label: Text('5th floor · not scanned')),
                 ],
