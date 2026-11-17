@@ -205,6 +205,7 @@ void main() {
       'floor': '2',
       'position': {'x': 1.0, 'y': 2.0, 'z': 3.0},
       'headingDeg': 90.0,
+      'capabilities': ['signArrival'],
       'arToken': {
         'token': 'test-token',
         'expiresOn': '2026-01-01T00:30:00.000Z',
@@ -214,6 +215,106 @@ void main() {
       find.text('MultiSet localized this area. Room 120 is 0.5 m away.'),
       findsOneWidget,
     );
+  });
+
+  Future<void> expectArrival(
+    WidgetTester tester, {
+    required IndoorArResult result,
+    String floor = '1',
+    required Matcher shown,
+  }) async {
+    final json = jsonDecode(_fixture) as Map<String, dynamic>;
+    ((json['place'] as Map<String, dynamic>)['indoor']
+            as Map<String, dynamic>)['floor'] =
+        floor;
+    (json['place'] as Map<String, dynamic>)['floorNumber'] = floor;
+    final harness = _Harness(
+      status: PermissionStatus.granted,
+      result: result,
+      fetch: (_) async => http.Response(jsonEncode(json), 200),
+    );
+    await harness.pump(tester);
+    await harness.tapAr(tester);
+    expect(harness.fake.requests, hasLength(1));
+    expect(find.textContaining('119'), shown);
+  }
+
+  testWidgets('floor 3 destination launches', (tester) async {
+    await expectArrival(
+      tester,
+      floor: '3',
+      result: const IndoorArResult(
+        status: IndoorArStatus.arrived,
+        checkDistanceM: 0.5,
+        localizationQueries: 1,
+        durationMs: 1,
+      ),
+      shown: findsOneWidget,
+    );
+  });
+
+  testWidgets('destination sign arrival shows no distance', (tester) async {
+    await expectArrival(
+      tester,
+      result: const IndoorArResult(
+        status: IndoorArStatus.arrived,
+        signRoom: 'VEC 119',
+        localizationQueries: 1,
+        durationMs: 1,
+      ),
+      shown: findsOneWidget,
+    );
+    expect(find.text('Found the 119 sign. You have arrived.'), findsOneWidget);
+    expect(find.textContaining('m away'), findsNothing);
+  });
+
+  testWidgets('destination sign beats a placeholder distance', (tester) async {
+    await expectArrival(
+      tester,
+      result: const IndoorArResult(
+        status: IndoorArStatus.arrived,
+        checkDistanceM: 0,
+        signRoom: 'VEC119',
+        localizationQueries: 1,
+        durationMs: 1,
+      ),
+      shown: findsOneWidget,
+    );
+    expect(find.textContaining('m away'), findsNothing);
+  });
+
+  testWidgets('another room sign keeps the measured distance', (tester) async {
+    await expectArrival(
+      tester,
+      result: const IndoorArResult(
+        status: IndoorArStatus.arrived,
+        checkDistanceM: 0.5,
+        signRoom: 'VEC120',
+        localizationQueries: 1,
+        durationMs: 1,
+      ),
+      shown: findsOneWidget,
+    );
+    expect(
+      find.text('MultiSet localized this area. Room 119 is 0.5 m away.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('distance-less arrival for another room is unreadable', (
+    tester,
+  ) async {
+    await expectArrival(
+      tester,
+      result: const IndoorArResult(
+        status: IndoorArStatus.arrived,
+        signRoom: 'VEC120',
+        localizationQueries: 1,
+        durationMs: 1,
+      ),
+      shown: findsNothing,
+    );
+    expect(find.text('AR returned an unreadable result.'), findsOneWidget);
   });
 
   testWidgets('fetch failure offers retry without launching', (tester) async {
