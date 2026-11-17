@@ -8,6 +8,7 @@ import '../data/app_state.dart';
 import '../data/pet_home.dart';
 import '../theme/app_theme.dart';
 import '../widgets/pet_section_navigation.dart';
+import '../widgets/bottom_nav_bar.dart';
 import 'pet_customization_screen.dart';
 
 class PetPackScreen extends StatefulWidget {
@@ -154,7 +155,7 @@ class _PetPackScreenState extends State<PetPackScreen> {
             equipped: equipped,
             onWear: () => _wear(preview),
           ),
-          const PetSectionBottomNavigation(active: PetSectionTab.pack),
+          const NaviBottomNav(active: NaviTab.pets),
         ],
       ),
     );

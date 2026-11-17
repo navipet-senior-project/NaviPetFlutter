@@ -21,6 +21,11 @@ void leavePetSection(BuildContext context) {
   context.go(returnTo == '/checklist' ? '/checklist' : '/map');
 }
 
+void returnToPetHome(BuildContext context) {
+  final from = GoRouterState.of(context).uri.queryParameters['from'];
+  context.go(petSectionLocation(PetSectionTab.home, from));
+}
+
 /// Pet layouts fit text up to 2x; beyond that the fixed HUD and tabs overflow.
 Widget petTextScaleCap(WidgetBuilder builder) =>
     MediaQuery.withClampedTextScaling(
@@ -41,13 +46,13 @@ class PetSectionHeader extends StatelessWidget {
       children: [
         Semantics(
           button: true,
-          label: 'Back to Navipet',
+          label: 'Back to Pet Home',
           excludeSemantics: true,
           child: SizedBox(
             width: 48,
             height: 48,
             child: OutlinedButton(
-              onPressed: () => leavePetSection(context),
+              onPressed: () => returnToPetHome(context),
               style: OutlinedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.petInk,
@@ -84,13 +89,12 @@ class PetSectionHeader extends StatelessWidget {
   );
 }
 
-class PetSectionBottomNavigation extends StatelessWidget {
-  const PetSectionBottomNavigation({super.key, required this.active});
+class PetSectionSideNavigation extends StatelessWidget {
+  const PetSectionSideNavigation({super.key, required this.active});
 
   final PetSectionTab active;
 
   static const _tabs = [
-    (PetSectionTab.home, 'Home', Icons.home_outlined),
     (PetSectionTab.pack, 'Pack', Icons.backpack_outlined),
     (PetSectionTab.shop, 'Shop', Icons.storefront_outlined),
     (PetSectionTab.quests, 'Quests', Icons.fact_check_outlined),
@@ -98,33 +102,19 @@ class PetSectionBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.5;
     return Semantics(
       container: true,
       explicitChildNodes: true,
       label: 'Pet section',
-      child: Container(
-        height: (largeText ? 84 : 68) + bottomInset,
-        padding: EdgeInsets.fromLTRB(8, 4, 8, bottomInset),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.petInk, width: 2)),
-        ),
-        child: Row(
-          children: [
-            for (final (tab, label, icon) in _tabs)
-              Expanded(
-                child: _tab(
-                  context,
-                  tab: tab,
-                  label: label,
-                  icon: icon,
-                  largeText: largeText,
-                ),
-              ),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (tab, label, icon) in _tabs)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: _tab(context, tab: tab, label: label, icon: icon),
+            ),
+        ],
       ),
     );
   }
@@ -134,60 +124,46 @@ class PetSectionBottomNavigation extends StatelessWidget {
     required PetSectionTab tab,
     required String label,
     required IconData icon,
-    required bool largeText,
   }) {
     final selected = active == tab;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: InkWell(
-        key: ValueKey('pet-tab-$label'),
-        borderRadius: BorderRadius.circular(18),
-        onTap: selected
-            ? null
-            : () {
-                final from = GoRouterState.of(
-                  context,
-                ).uri.queryParameters['from'];
-                context.pushReplacement(petSectionLocation(tab, from));
-              },
-        child: SizedBox(
-          height: largeText ? 76 : 56,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 52,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.yellow : Colors.transparent,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(icon, size: 22, color: AppColors.petInk),
-                  ),
-                  // Shrinks instead of wrapping a large-text label mid-word.
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: AppColors.petInk,
-                        fontSize: 12,
-                        fontWeight: selected
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                      ),
-                    ),
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            key: ValueKey('pet-tab-$label'),
+            customBorder: const CircleBorder(),
+            onTap: () {
+              final from = GoRouterState.of(
+                context,
+              ).uri.queryParameters['from'];
+              context.pushReplacement(petSectionLocation(tab, from));
+            },
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(
+                  color: selected ? AppColors.yellowInk : Colors.white,
+                  width: 2,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x2600244E),
+                    offset: Offset(0, 2),
+                    blurRadius: 8,
                   ),
                 ],
               ),
-            ],
+              child: Icon(icon, size: 22, color: AppColors.petInk),
+            ),
           ),
         ),
       ),
