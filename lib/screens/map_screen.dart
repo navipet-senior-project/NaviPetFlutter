@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/mapbox_config.dart';
 import '../data/indoor_ar_launcher.dart';
+import '../data/indoor_building_catalog.dart';
 import '../data/navi_map_controller.dart' show MapboxNaviMapController;
 import '../data/navigation_flow_controller.dart';
 import '../data/navigation_flow_state.dart';
@@ -63,11 +64,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   MapboxMap? _map;
   CameraViewportState? _initialMapViewport;
   MapboxNaviMapController? _naviMap;
-<<<<<<< HEAD
-=======
   Cancelable? _indoorBuildingMarkerTap;
   bool _openingVecIndoorMap = false;
->>>>>>> 7e4f197 (fart fix)
   bool _is3d = false;
   bool _raisedBuildings = true;
   bool _bicycling = false;
@@ -136,6 +134,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
+    _indoorBuildingMarkerTap?.cancel();
     // MapScreen remounts every time NaviBottomNav routes away and back
     // (e.g. to /checklist or /pet) while the flow itself — app-scoped —
     // keeps whatever state it was in. Detaching here means a route
@@ -150,8 +149,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
-<<<<<<< HEAD
-=======
     final indoorMarkers = await mapboxMap.annotations
         .createPointAnnotationManager();
     await indoorMarkers.setTextAllowOverlap(true);
@@ -175,7 +172,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         textSize: 14,
       ),
     );
->>>>>>> 7e4f197 (fart fix)
     await markers.setTextAllowOverlap(true);
     final arrowMarkers = await mapboxMap.annotations
         .createPointAnnotationManager();
