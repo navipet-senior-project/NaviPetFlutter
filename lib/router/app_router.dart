@@ -115,7 +115,9 @@ GoRouter createAppRouter(
     ),
     GoRoute(
       path: '/checklist',
-      builder: (context, state) => const ChecklistScreen(),
+      builder: (context, state) => ChecklistScreen(
+        focusDailyTasks: state.uri.queryParameters['focus'] == 'daily',
+      ),
     ),
     GoRoute(path: '/search', redirect: (context, state) => '/map'),
     GoRoute(

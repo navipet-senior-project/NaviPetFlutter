@@ -97,7 +97,6 @@ class PetSectionSideNavigation extends StatelessWidget {
   static const _tabs = [
     (PetSectionTab.pack, 'Pack', Icons.backpack_outlined),
     (PetSectionTab.shop, 'Shop', Icons.storefront_outlined),
-    (PetSectionTab.quests, 'Quests', Icons.fact_check_outlined),
   ];
 
   @override
