@@ -277,16 +277,25 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Guide'), findsOneWidget);
-    for (final tab in ['Home', 'Pack', 'Shop', 'Quests']) {
+    for (final tab in ['Pack', 'Shop', 'Quests']) {
       expect(find.byKey(ValueKey('pet-tab-$tab')), findsOneWidget);
     }
+    expect(find.byKey(const ValueKey('pet-tab-Home')), findsNothing);
+    expect(find.byKey(const ValueKey('nav-Calendar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-Pet')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-Locations')), findsOneWidget);
   });
 
   testWidgets('tapping the next-class icon opens class details', (
     tester,
   ) async {
     await _pump(tester, _FakeAppState(fakeClasses: const [_inPerson]));
-    await tester.tap(find.byIcon(Icons.location_on_outlined));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('pet-today-card')),
+        matching: find.byIcon(Icons.location_on_outlined),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Senior Project'), findsOneWidget);
   });
@@ -319,7 +328,7 @@ void main() {
       final rug = petRugRect(room.size).shift(room.topLeft);
       final mascot = tester.getRect(find.byKey(const ValueKey('pet-mascot')));
       final hudBottom = tester
-          .getRect(find.byKey(const ValueKey('pet-back')))
+          .getRect(find.byKey(const ValueKey('pet-level')))
           .bottom;
       final card = tester.getRect(find.byKey(const ValueKey('pet-today-card')));
       final reason = '$size x$scale';
@@ -348,7 +357,7 @@ void main() {
     await _pump(tester, _FakeAppState(fakeClasses: const []));
     expect(find.text('No upcoming classes this week.'), findsOneWidget);
     expect(find.text('Add class'), findsNothing);
-    expect(find.text('Calendar'), findsNothing);
+    expect(find.text('Calendar'), findsOneWidget);
 
     final failedRefresh = _FakeAppState(
       fakeClasses: const [],
@@ -600,20 +609,24 @@ void main() {
     );
   });
 
-  testWidgets('Pet back returns to the main tab and nav switches sections', (
-    tester,
-  ) async {
-    final state = _FakeAppState();
-    final router = _router(initialLocation: '/pet?from=/checklist');
-    await _pump(tester, state, router: router);
+  testWidgets(
+    'Pet sub-screen back returns home and bottom nav switches sections',
+    (tester) async {
+      final state = _FakeAppState();
+      final router = _router(initialLocation: '/pet?from=/checklist');
+      await _pump(tester, state, router: router);
 
-    await tester.tap(find.byKey(const ValueKey('pet-tab-Quests')));
-    await tester.pumpAndSettle();
-    expect(find.byType(PetQuestsScreen), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('Back to Navipet'));
-    await tester.pumpAndSettle();
-    expect(find.text('checklist page'), findsOneWidget);
-  });
+      await tester.tap(find.byKey(const ValueKey('pet-tab-Quests')));
+      await tester.pumpAndSettle();
+      expect(find.byType(PetQuestsScreen), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Back to Pet Home'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PetHomeScreen), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('nav-Calendar')));
+      await tester.pumpAndSettle();
+      expect(find.text('checklist page'), findsOneWidget);
+    },
+  );
 
   testWidgets('main Pet button preserves its Calendar return path', (
     tester,
@@ -676,11 +689,23 @@ void main() {
             fontFamily: 'Plus Jakarta Sans',
           );
           expect(tester.takeException(), isNull, reason: '$tab $size $scale');
-          // One line each: labels used to wrap mid-word ("Hom/e").
-          expect(
-            tester.getSize(find.text('Quests')).height,
-            tester.getSize(find.text('Home')).height,
-          );
+          if (tab.isEmpty) {
+            // Floating actions remain compact and equal-sized at large text.
+            for (final shortcut in ['Pack', 'Shop', 'Quests']) {
+              expect(
+                tester.getSize(find.byKey(ValueKey('pet-tab-$shortcut'))),
+                const Size(48, 48),
+              );
+            }
+          } else {
+            for (final shortcut in ['Pack', 'Shop', 'Quests']) {
+              expect(
+                find.byKey(ValueKey('pet-tab-$shortcut')),
+                findsNothing,
+                reason: 'Shortcuts only appear on Pet Home: $tab $size $scale',
+              );
+            }
+          }
         }
       }
     }

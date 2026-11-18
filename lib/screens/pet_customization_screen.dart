@@ -9,6 +9,7 @@ import '../data/pet_gems_gateway.dart';
 import '../data/pet_home.dart';
 import '../theme/app_theme.dart';
 import '../widgets/pet_section_navigation.dart';
+import '../widgets/bottom_nav_bar.dart';
 
 class PetOutfit {
   const PetOutfit(this.id, this.label, this.icon, this.price);
@@ -120,9 +121,7 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const PetSectionBottomNavigation(
-        active: PetSectionTab.shop,
-      ),
+      bottomNavigationBar: const NaviBottomNav(active: NaviTab.pets),
     );
   }
 
@@ -198,19 +197,26 @@ class _PetCustomizationScreenState extends State<PetCustomizationScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.cardBorder, width: 2),
+        color: owned ? const Color(0xFFF0F1F2) : Colors.white,
+        border: Border.all(
+          color: owned ? const Color(0xFFD0D5DD) : AppColors.cardBorder,
+          width: 2,
+        ),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(outfit.icon, size: largeText ? 28 : 34, color: AppColors.petInk),
+          Icon(
+            outfit.icon,
+            size: largeText ? 28 : 34,
+            color: owned ? AppColors.muted : AppColors.petInk,
+          ),
           Text(
             outfit.label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.petInk,
+            style: TextStyle(
+              color: owned ? AppColors.muted : AppColors.petInk,
               fontWeight: FontWeight.w700,
             ),
           ),
