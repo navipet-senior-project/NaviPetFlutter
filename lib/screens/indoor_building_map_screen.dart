@@ -125,27 +125,26 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                         content: Text(
                           'Choose a room on this floor to verify your location.',
                         ),
-                      );
-                      return;
-                    }
-                    context.push(
-                      '/ar',
-                      extra: IndoorArRequest(
-                        room: _selectedRoom,
-                        doorKey: door.id,
-                        floor: '$_floor',
-                        position: IndoorArVector3(door.x, door.y, door.z),
-                        headingDeg: door.rotationY,
-                        mapCode: IndoorBuildingCatalog.vecMapSetCode,
-                        frame: IndoorBuildingCatalog.vecMapFrame,
                       ),
                     );
-                  },
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: Text(
-                    'Verify location near room $_selectedRoom with AR',
-                  ),
-                ),
+                    return;
+                  }
+                  context.push(
+                    '/ar',
+                    extra: IndoorArRequest(
+                      room: _selectedRoom,
+                      doorKey: door.id,
+                      floor: '$_floor',
+                      position: IndoorArVector3(door.x, door.y, door.z),
+                      headingDeg: door.rotationY,
+                      mapCode: IndoorBuildingCatalog.vecMapSetCode,
+                      frame: IndoorBuildingCatalog.vecMapFrame,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: Text('Verify location near room $_selectedRoom with AR'),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
