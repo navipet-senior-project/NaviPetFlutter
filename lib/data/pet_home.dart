@@ -38,8 +38,8 @@ String petMessage({
   if (loading) return 'Checking your schedule...';
   if (missions.isEmpty) return "Add a class and I'll plan our day!";
   final left = missions.where((mission) => !mission.done).length;
-  if (left == 0) return 'All missions done today. Fin-tastic!';
-  return '$left ${left == 1 ? 'mission' : 'missions'} left today. '
+  if (left == 0) return 'All tasks done today. Fin-tastic!';
+  return '$left ${left == 1 ? 'task' : 'tasks'} left today. '
       "Let's go!";
 }
 

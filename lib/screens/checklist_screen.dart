@@ -29,6 +29,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   CalendarView _view = CalendarView.week;
   Timer? _onlineTimer;
   final _pageController = ScrollController();
+  final _dailyTasksKey = GlobalKey();
+  bool _focusDailyTasksRequested = false;
 
   @override
   void initState() {
@@ -58,6 +60,20 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final tasks = state.dailyTasks(_selectedDate);
+    if (!_focusDailyTasksRequested &&
+        GoRouterState.of(context).uri.queryParameters['focus'] == 'daily') {
+      _focusDailyTasksRequested = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = _dailyTasksKey.currentContext;
+        if (target != null) {
+          Scrollable.ensureVisible(
+            target,
+            duration: const Duration(milliseconds: 350),
+            alignment: .08,
+          );
+        }
+      });
+    }
     return Scaffold(
       backgroundColor: AppColors.screenBg,
       appBar: AppBar(
@@ -122,6 +138,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               ),
             const SizedBox(height: AppSpacing.xl),
             Container(
+              key: _dailyTasksKey,
               child: _sectionTitle(
                 'Daily tasks',
                 '${tasks.where((task) => task.done).length}/${tasks.length} done',

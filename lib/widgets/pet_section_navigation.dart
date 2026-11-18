@@ -93,7 +93,6 @@ class PetSectionBottomNavigation extends StatelessWidget {
     (PetSectionTab.home, 'Home', Icons.home_outlined),
     (PetSectionTab.pack, 'Pack', Icons.backpack_outlined),
     (PetSectionTab.shop, 'Shop', Icons.storefront_outlined),
-    (PetSectionTab.quests, 'Quests', Icons.fact_check_outlined),
   ];
 
   @override

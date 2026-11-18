@@ -63,7 +63,7 @@ void main() {
     expect(message(), contains('Add a class'));
     expect(
       message(missions: [_mission(course, done: false)]),
-      startsWith('1 mission left'),
+      startsWith('1 task left'),
     );
     expect(
       message(
@@ -73,11 +73,11 @@ void main() {
           _mission(course, done: true),
         ],
       ),
-      startsWith('2 missions left'),
+      startsWith('2 tasks left'),
     );
     expect(
       message(missions: [_mission(course, done: true)]),
-      contains('All missions done'),
+      contains('All tasks done'),
     );
   });
 

@@ -601,9 +601,9 @@ void main() {
     final router = _router(initialLocation: '/pet?from=/checklist');
     await _pump(tester, state, router: router);
 
-    await tester.tap(find.byKey(const ValueKey('pet-tab-Quests')));
+    await tester.tap(find.byKey(const ValueKey('pet-tab-Pack')));
     await tester.pumpAndSettle();
-    expect(find.byType(PetQuestsScreen), findsOneWidget);
+    expect(find.byType(PetPackScreen), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Back to Navipet'));
     await tester.pumpAndSettle();
     expect(find.text('checklist page'), findsOneWidget);
@@ -618,9 +618,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('nav-Pet')));
     await tester.pumpAndSettle();
     expect(find.byType(PetHomeScreen), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('pet-tab-Quests')));
+    await tester.tap(find.byKey(const ValueKey('pet-tab-Pack')));
     await tester.pumpAndSettle();
-    expect(find.byType(PetQuestsScreen), findsOneWidget);
+    expect(find.byType(PetPackScreen), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

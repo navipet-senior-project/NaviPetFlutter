@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +25,22 @@ class PetHomeScreen extends StatefulWidget {
 
 class _PetHomeScreenState extends State<PetHomeScreen> {
   bool _refreshFailed = false;
+  DateTime _now = DateTime.now();
+  Timer? _clockTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _refresh() async {
     setState(() => _refreshFailed = false);
@@ -83,7 +101,17 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
             return Stack(
               children: [
                 Positioned.fill(
-                  child: CustomPaint(painter: _RoomPainter(hudBottom)),
+                  child: CustomPaint(painter: _RoomPainter(hudBottom, _now)),
+                ),
+                Positioned(
+                  right: 16,
+                  top:
+                      constraints.maxHeight * .15 +
+                      math.max(
+                        0.0,
+                        hudBottom + 12 - constraints.maxHeight * .20,
+                      ),
+                  child: _roomWallControls(_now),
                 ),
                 Positioned(
                   top: hudTop,
@@ -184,7 +212,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     container: true,
     label:
         'Level ${level.level}, ${level.current} of ${PetLevel.perLevel} '
-        'verified missions to the next level',
+        'verified class completions to the next level',
     value: '${level.current} of ${PetLevel.perLevel}',
     child: Container(
       key: const ValueKey('pet-level'),
@@ -329,6 +357,128 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       style: const TextStyle(color: AppColors.petInk, fontSize: 13),
     ),
   );
+
+  Widget _roomWallControls(DateTime now) => SizedBox(
+    width: 112,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 100,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF25384B),
+            border: Border.all(color: const Color(0xFF17283A), width: 2),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: const [
+              BoxShadow(color: Color(0x3300244E), offset: Offset(0, 3)),
+            ],
+          ),
+          child: Column(
+            children: [
+              Text(
+                _digitalTime(now),
+                key: const ValueKey('pet-digital-clock'),
+                style: const TextStyle(
+                  color: Color(0xFFFFE6A8),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+              Text(
+                _timeOfDayLabel(now),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Semantics(
+          button: true,
+          label: "Open today's daily tasks in the calendar",
+          child: Material(
+            color: const Color(0xFFFFF8E9),
+            elevation: 3,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              key: const ValueKey('pet-calendar-shortcut'),
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => context.push('/checklist?focus=daily'),
+              child: Container(
+                width: 100,
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.petInk, width: 2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFD66D5E),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(7),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${_weekdayShort(now.weekday)}  ${now.day}',
+                      style: const TextStyle(
+                        color: AppColors.petInk,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Icon(
+                      Icons.check_circle_outline,
+                      color: AppColors.blue,
+                      size: 22,
+                    ),
+                    const Text(
+                      "TODAY'S TASKS",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.petInk,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  String _digitalTime(DateTime time) {
+    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    return '$hour:${time.minute.toString().padLeft(2, '0')} '
+        '${time.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  String _timeOfDayLabel(DateTime time) => switch (time.hour) {
+    >= 5 && < 12 => 'MORNING',
+    >= 12 && < 17 => 'AFTERNOON',
+    >= 17 && < 21 => 'EVENING',
+    _ => 'NIGHT',
+  };
+
+  String _weekdayShort(int weekday) =>
+      const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][weekday - 1];
 
   Widget _todayCard({
     required bool loading,
@@ -529,17 +679,35 @@ Rect petRugRect(Size room) => Rect.fromCenter(
 );
 
 class _RoomPainter extends CustomPainter {
-  const _RoomPainter(this.hudBottom);
+  const _RoomPainter(this.hudBottom, this.now);
 
   /// Bottom of a two-row HUD, or 0. The wall art moves down to clear it.
   final double hudBottom;
+  final DateTime now;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final wall = Paint()..color = const Color(0xFFDDF1EF);
-    final floor = Paint()..color = const Color(0xFFF3E2B0);
-    final trim = Paint()..color = const Color(0xFFE3CF98);
-    final glass = Paint()..color = const Color(0xFFBFE3F7);
+    final hour = now.hour;
+    final night = hour < 5 || hour >= 21;
+    final evening = hour >= 17 && hour < 21;
+    final wall = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: night
+            ? const [Color(0xFF29394F), Color(0xFF52606C)]
+            : evening
+            ? const [Color(0xFFE6C7B8), Color(0xFFF1DAB8)]
+            : const [Color(0xFFDDF1EF), Color(0xFFF2E9D6)],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height * .68));
+    final floor = Paint()
+      ..color = night
+          ? const Color(0xFF9B8059)
+          : evening
+          ? const Color(0xFFE4C18F)
+          : const Color(0xFFF3E2B0);
+    final trim = Paint()
+      ..color = night ? const Color(0xFF80694D) : const Color(0xFFE3CF98);
     final white = Paint()..color = Colors.white;
     final navy = Paint()
       ..color = AppColors.petInk
@@ -573,7 +741,76 @@ class _RoomPainter extends CustomPainter {
       )
       ..lineTo(window.right, window.bottom)
       ..close();
-    canvas.drawPath(windowPath, glass);
+    final sky = night
+        ? const [Color(0xFF101D3A), Color(0xFF263B62)]
+        : evening
+        ? const [Color(0xFFF2A06E), Color(0xFF806B9C)]
+        : hour < 12
+        ? const [Color(0xFFFFD7A0), Color(0xFF9BCBEA)]
+        : const [Color(0xFF80C7ED), Color(0xFFD3F0FF)];
+    canvas.drawPath(
+      windowPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: sky,
+        ).createShader(window),
+    );
+    if (night) {
+      final moonPaint = Paint()..color = const Color(0xFFFFE7A6);
+      canvas.drawCircle(
+        Offset(window.right - 27, window.top + 34),
+        10,
+        moonPaint,
+      );
+      canvas.drawCircle(
+        Offset(window.right - 22, window.top + 30),
+        10,
+        Paint()..color = sky.first,
+      );
+      for (final point in [
+        Offset(window.left + 25, window.top + 29),
+        Offset(window.left + 45, window.top + 16),
+        Offset(window.left + 82, window.top + 48),
+      ]) {
+        canvas.drawCircle(point, 1.5, Paint()..color = Colors.white);
+      }
+    } else {
+      canvas.drawCircle(
+        Offset(window.left + 28, window.top + 35),
+        12,
+        Paint()
+          ..color = evening ? const Color(0xFFFFC17B) : const Color(0xFFFFE796),
+      );
+    }
+    if (!night) {
+      final beam = Path()
+        ..moveTo(window.left + 30, window.bottom - 3)
+        ..lineTo(window.left - 14, floorTop)
+        ..lineTo(window.right + 42, floorTop)
+        ..lineTo(window.right - 17, window.bottom - 3)
+        ..close();
+      canvas.drawPath(
+        beam,
+        Paint()
+          ..shader =
+              LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: evening
+                    ? const [Color(0x24FFC17B), Color(0x08FFC17B)]
+                    : const [Color(0x20FFF2B2), Color(0x08FFF2B2)],
+              ).createShader(
+                Rect.fromLTRB(
+                  window.left - 14,
+                  window.bottom,
+                  window.right + 42,
+                  floorTop,
+                ),
+              ),
+      );
+    }
     canvas.drawPath(
       windowPath,
       Paint()
@@ -600,44 +837,11 @@ class _RoomPainter extends CustomPainter {
     final rug = petRugRect(size);
     canvas.drawOval(rug, white);
     canvas.drawOval(rug, navy);
-
-    final sign = Rect.fromLTWH(
-      size.width * .64,
-      size.height * .25 + drop,
-      82,
-      54,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(sign, const Radius.circular(6)),
-      white,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(sign, const Radius.circular(6)),
-      navy,
-    );
-    final text = TextPainter(
-      text: const TextSpan(
-        text: 'CAMPUS',
-        style: TextStyle(
-          color: AppColors.petInk,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          letterSpacing: .5,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    text.paint(canvas, Offset(sign.center.dx - text.width / 2, sign.top + 14));
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(sign.left + 14, sign.top + 37, 54, 4),
-        const Radius.circular(2),
-      ),
-      Paint()..color = AppColors.yellow,
-    );
   }
 
   @override
   bool shouldRepaint(covariant _RoomPainter oldDelegate) =>
-      oldDelegate.hudBottom != hudBottom;
+      oldDelegate.hudBottom != hudBottom ||
+      oldDelegate.now.hour != now.hour ||
+      oldDelegate.now.minute != now.minute;
 }

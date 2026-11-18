@@ -509,7 +509,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openVecIndoorMap() async {
-    if (!mounted || _openingVecIndoorMap || _indoorBuildingMarkers == null) {
+    if (!mounted || _openingVecIndoorMap) {
       return;
     }
     _openingVecIndoorMap = true;
@@ -683,7 +683,19 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       child: SearchBarField(
         placeholder: 'Where to?',
         onPressed: _flow.openSearch,
-        right: const AccountButton(),
+        right: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              key: const ValueKey('indoor-map-search-button'),
+              tooltip: 'Indoor maps',
+              onPressed: () => unawaited(_openVecIndoorMap()),
+              icon: const Icon(Icons.apartment_outlined),
+              color: AppColors.navy,
+            ),
+            const AccountButton(),
+          ],
+        ),
       ),
     );
   }
