@@ -14,7 +14,9 @@ import '../widgets/class_editor_sheet.dart';
 import '../widgets/schedule_calendar.dart';
 
 class ChecklistScreen extends StatefulWidget {
-  const ChecklistScreen({super.key});
+  const ChecklistScreen({super.key, this.focusDailyTasks = false});
+
+  final bool focusDailyTasks;
 
   @override
   State<ChecklistScreen> createState() => _ChecklistScreenState();
@@ -60,8 +62,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final tasks = state.dailyTasks(_selectedDate);
-    if (!_focusDailyTasksRequested &&
-        GoRouterState.of(context).uri.queryParameters['focus'] == 'daily') {
+    if (!_focusDailyTasksRequested && widget.focusDailyTasks) {
       _focusDailyTasksRequested = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final target = _dailyTasksKey.currentContext;
