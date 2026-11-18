@@ -63,6 +63,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   MapboxMap? _map;
   CameraViewportState? _initialMapViewport;
   MapboxNaviMapController? _naviMap;
+<<<<<<< HEAD
+=======
+  Cancelable? _indoorBuildingMarkerTap;
+  bool _openingVecIndoorMap = false;
+>>>>>>> 7e4f197 (fart fix)
   bool _is3d = false;
   bool _raisedBuildings = true;
   bool _bicycling = false;
@@ -145,6 +150,32 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final routes = await mapboxMap.annotations
         .createPolylineAnnotationManager();
     final markers = await mapboxMap.annotations.createPointAnnotationManager();
+<<<<<<< HEAD
+=======
+    final indoorMarkers = await mapboxMap.annotations
+        .createPointAnnotationManager();
+    await indoorMarkers.setTextAllowOverlap(true);
+    _indoorBuildingMarkerTap = indoorMarkers.tapEvents(
+      onTap: (_) {
+        unawaited(_openVecIndoorMap());
+      },
+    );
+    await indoorMarkers.create(
+      PointAnnotationOptions(
+        geometry: Point(
+          coordinates: Position(
+            IndoorBuildingCatalog.vecAnchor.longitude,
+            IndoorBuildingCatalog.vecAnchor.latitude,
+          ),
+        ),
+        textField: 'VEC · Indoor map',
+        textColor: AppColors.navy.toARGB32(),
+        textHaloColor: Colors.white.toARGB32(),
+        textHaloWidth: 2.5,
+        textSize: 14,
+      ),
+    );
+>>>>>>> 7e4f197 (fart fix)
     await markers.setTextAllowOverlap(true);
     final arrowMarkers = await mapboxMap.annotations
         .createPointAnnotationManager();
