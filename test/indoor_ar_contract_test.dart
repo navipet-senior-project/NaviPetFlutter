@@ -18,6 +18,7 @@ void main() {
         'headingDeg': 185.36,
         'mapCode': 'MSET_XTBY7AM7ZK77',
         'frame': 'multiset-mapset',
+        'capabilities': ['signArrival'],
         'arToken': {
           'token': 'test-token',
           'expiresOn': '2026-01-01T00:30:00.000Z',
@@ -37,6 +38,7 @@ void main() {
       expect(json.containsKey('doorKey'), isFalse);
       expect(json.containsKey('headingDeg'), isFalse);
       expect(json.containsKey('floor'), isFalse);
+      expect(json.containsKey('capabilities'), isFalse);
     });
 
     test('omits arToken when none was minted', () {
@@ -166,6 +168,33 @@ void main() {
       expect(exited.durationMs, 1500);
     });
 
+    test('sign-confirmed arrival needs no distance', () {
+      final result = IndoorArResult.decode(
+        '{"status":"arrived","signRoom":"VEC119","localizationQueries":1,'
+        '"durationMs":10}',
+      );
+      expect(result.status, IndoorArStatus.arrived);
+      expect(result.checkDistanceM, isNull);
+      expect(result.signRoom, 'VEC119');
+    });
+
+    test('sign-confirmed arrival keeps a tracked distance', () {
+      final result = IndoorArResult.decode(
+        '{"status":"arrived","checkDistanceM":2.5,"signRoom":"VEC119",'
+        '"localizationQueries":1,"durationMs":10}',
+      );
+      expect(result.checkDistanceM, 2.5);
+      expect(result.signRoom, 'VEC119');
+    });
+
+    test('drops a sign room on statuses other than arrived', () {
+      final result = IndoorArResult.decode(
+        '{"status":"cancelled","signRoom":"VEC119","localizationQueries":0,'
+        '"durationMs":5}',
+      );
+      expect(result.signRoom, isNull);
+    });
+
     test('drops a distance on statuses other than arrived', () {
       final result = IndoorArResult.decode(
         '{"status":"cancelled","checkDistanceM":3,"localizationQueries":0,'
@@ -206,6 +235,22 @@ void main() {
       );
       expectBadResult(
         '{"status":"arrived","localizationQueries":0,"durationMs":5}',
+      );
+      expectBadResult(
+        '{"status":"arrived","signRoom":"","localizationQueries":0,'
+        '"durationMs":5}',
+      );
+      expectBadResult(
+        '{"status":"arrived","signRoom":7,"localizationQueries":0,'
+        '"durationMs":5}',
+      );
+      expectBadResult(
+        '{"status":"arrived","checkDistanceM":-1,"signRoom":"VEC119",'
+        '"localizationQueries":0,"durationMs":5}',
+      );
+      expectBadResult(
+        '{"status":"arrived","checkDistanceM":null,"localizationQueries":0,'
+        '"durationMs":5}',
       );
       expectBadResult(
         '{"status":"arrived","checkDistanceM":-0.1,'

@@ -21,7 +21,7 @@ class SearchBarField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Container(
+    return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       decoration: BoxDecoration(
@@ -31,26 +31,52 @@ class SearchBarField extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.search, size: 20, color: AppColors.faint),
-          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Text(
-              placeholder,
-              style: const TextStyle(
-                color: AppColors.faint,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: onPressed == null
+                ? Row(
+                    children: [
+                      const Icon(
+                        Icons.search,
+                        size: 20,
+                        color: AppColors.faint,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        placeholder,
+                        style: const TextStyle(
+                          color: AppColors.faint,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  )
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onPressed,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.search,
+                          size: 20,
+                          color: AppColors.faint,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          placeholder,
+                          style: const TextStyle(
+                            color: AppColors.faint,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
           ),
           if (right != null) ...[const SizedBox(width: AppSpacing.sm), right!],
         ],
       ),
     );
-
-    if (onPressed != null) {
-      return GestureDetector(onTap: onPressed, child: content);
-    }
-    return content;
   }
 }

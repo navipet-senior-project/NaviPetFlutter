@@ -3,7 +3,7 @@ import 'dart:convert';
 /// Bridge contract v2 between the app and the Unity AR runtime.
 ///
 /// Every pose is in the MultiSet MapSet frame (left-handed, +Y up, metres,
-/// origin at the Floor 1 2 map root), the same frame as the backend's door
+/// origin at the Floor 1 2 map root, floors 1-3 share it), the same frame as the backend's door
 /// points. Nothing on either side of the bridge converts.
 class IndoorArVector3 {
   const IndoorArVector3(this.x, this.y, this.z);
@@ -83,6 +83,11 @@ class IndoorArRequest {
   static const buildFrame = 'multiset-mapset';
   static const localizeMode = 'localize';
 
+  /// Sent on destination requests: this app accepts a distance-less `arrived`
+  /// that carries the destination's `signRoom`. A runtime that does not read it
+  /// must keep sending `checkDistanceM`, which older app builds still require.
+  static const signArrivalCapability = 'signArrival';
+
   /// `localize` or null for a destination request. Null stays off the JSON.
   final String? mode;
   final String room;
@@ -141,6 +146,7 @@ class IndoorArRequest {
           'headingDeg': headingDeg,
           'mapCode': mapCode,
           'frame': frame,
+          'capabilities': [signArrivalCapability],
           if (arToken != null) 'arToken': arToken!.toJson(),
         };
 }
@@ -159,6 +165,7 @@ class IndoorArResult {
     required this.localizationQueries,
     required this.durationMs,
     this.checkDistanceM,
+    this.signRoom,
     this.confidence,
     this.localizedMapCode,
     this.errorCode,
@@ -185,8 +192,12 @@ class IndoorArResult {
 
   final IndoorArStatus status;
 
-  /// Horizontal distance from the phone to the door point, `arrived` only.
+  /// Horizontal distance from the phone to the door point, `arrived` only. Null
+  /// when the runtime confirmed the destination sign without a tracked pose.
   final double? checkDistanceM;
+
+  /// Room the runtime read from a sign, `arrived` only. Evidence, not a pose.
+  final String? signRoom;
   final double? confidence;
   final String? localizedMapCode;
   final int localizationQueries;
@@ -215,9 +226,15 @@ class IndoorArResult {
         (throw const FormatException('unknown status'));
     final distance = _optionalDouble(json['checkDistanceM']);
     final errorCode = _optionalString(json['errorCode']);
+    final signRoom = _optionalString(json['signRoom']);
+    // No distance is allowed only when a sign confirmed the arrival.
     if (status == IndoorArStatus.arrived &&
-        (distance == null || distance < 0)) {
-      throw const FormatException('arrived needs checkDistanceM >= 0');
+        (distance == null
+            ? signRoom == null || signRoom.isEmpty
+            : distance < 0)) {
+      throw const FormatException(
+        'arrived needs checkDistanceM >= 0 or a signRoom',
+      );
     }
     if (status == IndoorArStatus.error &&
         (errorCode == null || errorCode.isEmpty)) {
@@ -228,6 +245,7 @@ class IndoorArResult {
       localizationQueries: _count(json['localizationQueries']),
       durationMs: _count(json['durationMs']),
       checkDistanceM: status == IndoorArStatus.arrived ? distance : null,
+      signRoom: status == IndoorArStatus.arrived ? signRoom : null,
       confidence: _optionalDouble(json['confidence']),
       localizedMapCode: _optionalString(json['localizedMapCode']),
       errorCode: status == IndoorArStatus.error ? errorCode : null,

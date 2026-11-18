@@ -265,7 +265,7 @@ void main() {
   testWidgets('Pet Home shows Elbee, progress, gems, class and Guide', (
     tester,
   ) async {
-    await _pump(tester, _FakeAppState());
+    await _pump(tester, _FakeAppState(fakeClasses: const [_inPerson]));
 
     expect(find.byType(PetHomeScreen), findsOneWidget);
     expect(find.text('Elbee · Lv 2'), findsOneWidget);
@@ -277,16 +277,25 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Guide'), findsOneWidget);
-    for (final tab in ['Home', 'Pack', 'Shop', 'Quests']) {
+    for (final tab in ['Pack', 'Shop', 'Quests']) {
       expect(find.byKey(ValueKey('pet-tab-$tab')), findsOneWidget);
     }
+    expect(find.byKey(const ValueKey('pet-tab-Home')), findsNothing);
+    expect(find.byKey(const ValueKey('nav-Calendar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-Pet')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-Locations')), findsOneWidget);
   });
 
   testWidgets('tapping the next-class icon opens class details', (
     tester,
   ) async {
-    await _pump(tester, _FakeAppState());
-    await tester.tap(find.byIcon(Icons.location_on_outlined));
+    await _pump(tester, _FakeAppState(fakeClasses: const [_inPerson]));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('pet-today-card')),
+        matching: find.byIcon(Icons.location_on_outlined),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Senior Project'), findsOneWidget);
   });
@@ -294,7 +303,7 @@ void main() {
   testWidgets('tapping next-class card padding opens class details', (
     tester,
   ) async {
-    await _pump(tester, _FakeAppState());
+    await _pump(tester, _FakeAppState(fakeClasses: const [_inPerson]));
     final card = tester.getRect(find.byKey(const ValueKey('pet-today-card')));
     await tester.tapAt(Offset(card.left + 6, card.top + 6));
     await tester.pumpAndSettle();
@@ -319,7 +328,7 @@ void main() {
       final rug = petRugRect(room.size).shift(room.topLeft);
       final mascot = tester.getRect(find.byKey(const ValueKey('pet-mascot')));
       final hudBottom = tester
-          .getRect(find.byKey(const ValueKey('pet-back')))
+          .getRect(find.byKey(const ValueKey('pet-level')))
           .bottom;
       final card = tester.getRect(find.byKey(const ValueKey('pet-today-card')));
       final reason = '$size x$scale';
@@ -348,7 +357,7 @@ void main() {
     await _pump(tester, _FakeAppState(fakeClasses: const []));
     expect(find.text('No upcoming classes this week.'), findsOneWidget);
     expect(find.text('Add class'), findsNothing);
-    expect(find.text('Calendar'), findsNothing);
+    expect(find.text('Calendar'), findsOneWidget);
 
     final failedRefresh = _FakeAppState(
       fakeClasses: const [],
@@ -361,7 +370,13 @@ void main() {
     await tester.pump();
     expect(failedRefresh.refreshes, 1);
 
-    await _pump(tester, _FakeAppState(error: 'Temporary connection issue'));
+    await _pump(
+      tester,
+      _FakeAppState(
+        fakeClasses: const [_inPerson],
+        error: 'Temporary connection issue',
+      ),
+    );
     expect(find.text('CECS 491A'), findsOneWidget);
     expect(find.text('Guide'), findsOneWidget);
     expect(find.textContaining('Temporary connection issue'), findsOneWidget);
@@ -670,11 +685,23 @@ void main() {
             fontFamily: 'Plus Jakarta Sans',
           );
           expect(tester.takeException(), isNull, reason: '$tab $size $scale');
-          // One line each: labels used to wrap mid-word ("Hom/e").
-          expect(
-            tester.getSize(find.text('Quests')).height,
-            tester.getSize(find.text('Home')).height,
-          );
+          if (tab.isEmpty) {
+            // Floating actions remain compact and equal-sized at large text.
+            for (final shortcut in ['Pack', 'Shop', 'Quests']) {
+              expect(
+                tester.getSize(find.byKey(ValueKey('pet-tab-$shortcut'))),
+                const Size(48, 48),
+              );
+            }
+          } else {
+            for (final shortcut in ['Pack', 'Shop', 'Quests']) {
+              expect(
+                find.byKey(ValueKey('pet-tab-$shortcut')),
+                findsNothing,
+                reason: 'Shortcuts only appear on Pet Home: $tab $size $scale',
+              );
+            }
+          }
         }
       }
     }

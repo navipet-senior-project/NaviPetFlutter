@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
@@ -147,9 +148,17 @@ class _SearchOverlayState extends State<SearchOverlay> {
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.lg,
                       ),
-                      suffixIcon: _field.text.isEmpty
-                          ? null
-                          : Semantics(
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Open VEC indoor map',
+                            onPressed: () =>
+                                context.push<void>('/buildings/vec'),
+                            icon: const Icon(Icons.map_outlined),
+                          ),
+                          if (_field.text.isNotEmpty)
+                            Semantics(
                               label: 'Clear search',
                               button: true,
                               child: IconButton(
@@ -161,6 +170,8 @@ class _SearchOverlayState extends State<SearchOverlay> {
                                 icon: const Icon(Icons.close),
                               ),
                             ),
+                        ],
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(AppRadius.pill),
                         borderSide: const BorderSide(color: AppColors.line),

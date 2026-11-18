@@ -19,7 +19,21 @@ class NaviBottomNav extends StatelessWidget {
   final NaviTab active;
 
   void _goTo(BuildContext context, NaviTab tab) {
-    if (tab == active) return;
+    if (tab == active) {
+      final location = GoRouterState.of(context);
+      if (tab == NaviTab.pets && location.uri.path != '/pet') {
+        final from = location.uri.queryParameters['from'];
+        context.go(
+          Uri(
+            path: '/pet',
+            queryParameters: from == '/map' || from == '/checklist'
+                ? {'from': from}
+                : null,
+          ).toString(),
+        );
+      }
+      return;
+    }
     switch (tab) {
       case NaviTab.menu:
         context.go('/checklist');

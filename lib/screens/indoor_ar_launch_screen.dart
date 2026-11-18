@@ -214,6 +214,10 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   String? _resultText(IndoorArResult result) => switch (result.status) {
+    IndoorArStatus.arrived when _guideToRoom && _signConfirmed(result) =>
+      'Found the ${_request!.room} sign. You have arrived.',
+    IndoorArStatus.arrived when _guideToRoom && result.checkDistanceM == null =>
+      _errorText[IndoorArResult.badResultCode],
     IndoorArStatus.arrived =>
       !_guideToRoom
           ? 'MultiSet localized this area.'
@@ -225,6 +229,14 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     IndoorArStatus.error =>
       _errorText[result.errorCode] ?? 'AR failed (${result.errorCode}).',
   };
+
+  /// The sign the runtime read is the destination's own, so the arrival holds
+  /// with no distance. Any distance it carries is not shown.
+  bool _signConfirmed(IndoorArResult result) =>
+      _roomKey(result.signRoom ?? '') == _roomKey(_request!.doorKey);
+
+  static String _roomKey(String value) =>
+      value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
 
   void _leave(String? message) {
     if (!mounted) return;
