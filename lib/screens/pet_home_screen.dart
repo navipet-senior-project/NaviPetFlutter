@@ -12,6 +12,7 @@ import '../widgets/account_button.dart';
 import '../widgets/class_detail_sheet.dart';
 import '../widgets/elbee_sheet.dart';
 import '../widgets/pet_section_navigation.dart';
+import '../widgets/bottom_nav_bar.dart';
 import 'pet_customization_screen.dart';
 
 class PetHomeScreen extends StatefulWidget {
@@ -48,6 +49,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   Widget _build(BuildContext context) {
     final state = context.watch<AppState>();
     final loading = state.classesBusy && state.classes.isEmpty;
+    // Do not show a made-up 0 before the live balance has arrived.
+    final walletLoading =
+        state.hasPetBackend && !state.petLoaded && state.petError == null;
     final error =
         state.classesError ??
         (_refreshFailed
@@ -91,7 +95,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                   right: 16,
                   child: _hud(
                     PetLevel(completions),
-                    gems: loading ? null : state.points,
+                    gems: loading || walletLoading ? null : state.points,
                     compact: hudCompact,
                   ),
                 ),
@@ -121,41 +125,24 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                   bottom: 16,
                   child: _todayCard(loading: loading, error: error, next: next),
                 ),
+                Positioned(
+                  right: 12,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: PetSectionSideNavigation(active: PetSectionTab.home),
+                  ),
+                ),
               ],
             );
           },
         ),
       ),
-      bottomNavigationBar: const PetSectionBottomNavigation(
-        active: PetSectionTab.home,
-      ),
+      bottomNavigationBar: const NaviBottomNav(active: NaviTab.pets),
     );
   }
 
   Widget _hud(PetLevel level, {required int? gems, required bool compact}) {
-    final back = Semantics(
-      button: true,
-      label: 'Back to Navipet',
-      excludeSemantics: true,
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: OutlinedButton(
-          key: const ValueKey('pet-back'),
-          onPressed: () => leavePetSection(context),
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.petInk,
-            side: const BorderSide(color: AppColors.petInk, width: 2),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            padding: EdgeInsets.zero,
-          ),
-          child: const Icon(Icons.chevron_left, size: 26),
-        ),
-      ),
-    );
     final wallet = Row(
       mainAxisSize: MainAxisSize.min,
       children: [_gems(gems), const SizedBox(width: 8), const AccountButton()],
@@ -163,7 +150,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     if (compact) {
       return Column(
         children: [
-          Row(children: [back, const Spacer(), wallet]),
+          Row(children: [const Spacer(), wallet]),
           const SizedBox(height: 8),
           _levelChip(level),
         ],
@@ -171,8 +158,6 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     }
     return Row(
       children: [
-        back,
-        const SizedBox(width: 8),
         Expanded(child: _levelChip(level)),
         const SizedBox(width: 8),
         wallet,
@@ -275,36 +260,42 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   );
 
   Widget _mascot(String? outfitId, {required bool compact}) {
-    final outfit = petOutfits.where((item) => item.id == outfitId).firstOrNull;
+    final outfit = visiblePetOutfits(
+      context.read<AppState>(),
+    ).where((item) => item.id == outfitId).firstOrNull;
     final hasCustomArt = outfitId == 'grad_cap' || outfitId == 'csulb_tee';
     return Semantics(
-      image: true,
+      button: true,
       label: outfit == null
           ? 'Elbee the shark'
           : 'Elbee the shark, wearing ${outfit.label}',
-      child: SizedBox(
-        key: const ValueKey('pet-mascot'),
-        height: compact ? 150 : 184,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Image.asset(
-              petImageFor(outfitId),
-              height: compact ? 150 : 184,
-              fit: BoxFit.contain,
-              excludeFromSemantics: true,
-            ),
-            if (outfit != null && !hasCustomArt)
-              Positioned(
-                right: 6,
-                bottom: 6,
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: AppColors.yellow,
-                  child: Icon(outfit.icon, color: AppColors.petInk, size: 19),
-                ),
+      hint: 'Tap to refresh gems',
+      child: GestureDetector(
+        onTap: () => context.read<AppState>().refreshPoints(),
+        child: SizedBox(
+          key: const ValueKey('pet-mascot'),
+          height: compact ? 150 : 184,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.asset(
+                petImageFor(outfitId),
+                height: compact ? 150 : 184,
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
               ),
-          ],
+              if (outfit != null && !hasCustomArt)
+                Positioned(
+                  right: 6,
+                  bottom: 6,
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppColors.yellow,
+                    child: Icon(outfit.icon, color: AppColors.petInk, size: 19),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

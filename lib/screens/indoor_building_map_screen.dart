@@ -103,30 +103,27 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 const Color(0xFF28536A),
               ),
               const SizedBox(height: 12),
-              if (_floor > 2)
-                _notice(
-                  'Floors 3–5 use the directory diagrams. Select a room to mark it on the plan; Unity scan positioning and AR verification are available on floors 1–2.',
-                  const Color(0xFFFFF4D6),
-                  const Color(0xFF684B12),
-                ),
-              if (_floor <= 2) const SizedBox(height: 18),
-              if (_floor <= 2)
-                FilledButton.icon(
-                  onPressed: () {
-                    final matches = objects
-                        .where(
-                          (item) =>
-                              item.type == 'door' &&
-                              item.id == 'VEC$_selectedRoom',
-                        )
-                        .toList(growable: false);
-                    final door = matches.isEmpty ? null : matches.first;
-                    if (door == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Choose a room on this floor to verify your location.',
-                          ),
+              _notice(
+                'The directory photo also shows floors 3–5. Floor 3 works with search and AR but has no map here. Floors 4–5 are not part of the current Unity scan.',
+                const Color(0xFFFFF4D6),
+                const Color(0xFF684B12),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: () {
+                  final matches = objects
+                      .where(
+                        (item) =>
+                            item.type == 'door' &&
+                            item.id == 'VEC$_selectedRoom',
+                      )
+                      .toList(growable: false);
+                  final door = matches.isEmpty ? null : matches.first;
+                  if (door == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Choose a room on this floor to verify your location.',
                         ),
                       );
                       return;
@@ -384,6 +381,23 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                           : Colors.white,
                       onPressed: () => setState(() => _selectedRoom = room),
                     ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Directory-only floors',
+                style: TextStyle(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Wrap(
+                spacing: 7,
+                children: [
+                  Chip(label: Text('3rd floor · AR only, no map')),
+                  Chip(label: Text('4th floor · not scanned')),
+                  Chip(label: Text('5th floor · not scanned')),
                 ],
               ),
             ],

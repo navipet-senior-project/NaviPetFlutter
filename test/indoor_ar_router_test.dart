@@ -233,7 +233,7 @@ void main() {
 
   for (final unsupported in [
     (
-      floor: '3',
+      floor: '4',
       mapCode: IndoorArRequest.buildMapCode,
       frame: IndoorArRequest.buildFrame,
     ),

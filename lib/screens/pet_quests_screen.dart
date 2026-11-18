@@ -7,6 +7,7 @@ import '../data/app_state.dart';
 import '../data/course_class.dart';
 import '../theme/app_theme.dart';
 import '../widgets/pet_section_navigation.dart';
+import '../widgets/bottom_nav_bar.dart';
 
 class PetQuestsScreen extends StatefulWidget {
   const PetQuestsScreen({super.key});
@@ -105,9 +106,7 @@ class _PetQuestsScreenState extends State<PetQuestsScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: PetSectionBottomNavigation(
-        active: PetSectionTab.quests,
-      ),
+      bottomNavigationBar: const NaviBottomNav(active: NaviTab.pets),
     );
   }
 
