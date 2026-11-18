@@ -9,9 +9,7 @@ import '../data/indoor_ar_contract.dart';
 import '../data/indoor_building_catalog.dart';
 import '../theme/app_theme.dart';
 
-/// Shows the VEC objects authored in Unity's exported floor 1 and 2 map.
-/// Floors 3–5 appear on the directory photo, but aren't in the current Unity
-/// scan, so they are deliberately shown as directory-only.
+/// Shows the VEC Unity scan for floors 1–2 and directory plans for floors 3–5.
 class IndoorBuildingMapScreen extends StatefulWidget {
   const IndoorBuildingMapScreen({super.key});
 
@@ -98,7 +96,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
             children: [
               _notice(
-                'Tap a room marker or room number to select it. Pin positions come from the Unity scan; the scan does not include a walkable route or a complete building outline.',
+                _floor <= 2
+                    ? 'Tap a room marker or room number to select it. Pin positions come from the Unity scan; the scan does not include a walkable route or a complete building outline.'
+                    : 'Tap a room marker or room number to select it. Room outlines and numbering follow the directory diagrams.',
                 const Color(0xFFEAF4FA),
                 const Color(0xFF28536A),
               ),
@@ -146,32 +146,32 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 label: Text('Verify location near room $_selectedRoom with AR'),
               ),
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
                 children: [
-                  for (final floor in const [1, 2]) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text('Floor $floor'),
-                        selected: _floor == floor,
-                        selectedColor: AppColors.navy,
-                        labelStyle: TextStyle(
-                          color: _floor == floor
-                              ? Colors.white
-                              : AppColors.navy,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        onSelected: (_) => setState(() {
-                          _floor = floor;
-                          final rooms = map.roomNumbersForFloor(floor);
-                          if (!rooms.contains(_selectedRoom) &&
-                              rooms.isNotEmpty) {
-                            _selectedRoom = rooms.first;
-                          }
-                        }),
+                  for (final floor in const [1, 2, 3, 4, 5])
+                    ChoiceChip(
+                      label: Text('Floor $floor'),
+                      selected: _floor == floor,
+                      selectedColor: AppColors.navy,
+                      labelStyle: TextStyle(
+                        color: _floor == floor ? Colors.white : AppColors.navy,
+                        fontWeight: FontWeight.w700,
                       ),
+                      onSelected: (_) => setState(() {
+                        if (_floor != floor) {
+                          _mapTransform.value = Matrix4.identity();
+                          _mapTransformInitialized = false;
+                        }
+                        _floor = floor;
+                        final rooms = map.roomNumbersForFloor(floor);
+                        if (!rooms.contains(_selectedRoom) &&
+                            rooms.isNotEmpty) {
+                          _selectedRoom = rooms.first;
+                        }
+                      }),
                     ),
-                  ],
                 ],
               ),
               const SizedBox(height: 10),
@@ -194,7 +194,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                     Row(
                       children: [
                         Text(
-                          'UNITY LEVEL $_floor',
+                          _floor <= 2 ? 'UNITY LEVEL $_floor' : 'FLOOR $_floor',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
@@ -203,9 +203,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                         ),
                         const Spacer(),
                         Text(
-                          _floor == 1
+                          _floor <= 2
                               ? '${objects.length} Unity scan points'
-                              : '${objects.length} scanned map points',
+                              : 'Directory plan · not scanned',
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 11,
@@ -232,7 +232,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                               _mapViewportSize = viewport;
                               final mapSize = Size(
                                 viewport.width * 1.5,
-                                viewport.height * 1.35,
+                                _floor <= 2
+                                    ? viewport.height * 1.35
+                                    : viewport.width * 1.5 / 2.15,
                               );
                               if (!_mapTransformInitialized) {
                                 _mapTransformInitialized = true;
@@ -276,6 +278,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                                         objects,
                                         details.localPosition,
                                         mapSize,
+                                        floor: _floor,
                                       );
                                       if (room != null) {
                                         setState(() => _selectedRoom = room);
@@ -286,6 +289,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                                       painter: _FloorMapPainter(
                                         objects,
                                         selectedRoom: _selectedRoom,
+                                        floor: _floor,
                                       ),
                                     ),
                                   ),
@@ -335,7 +339,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                         _Legend(color: Color(0xFF8D83AA), label: 'Restroom'),
                       ],
                     ),
-                    if (_floor == 1) ...[
+                    if (_floor <= 2) ...[
                       const SizedBox(height: 9),
                       const Text(
                         'Filled rooms have Unity scan points. Outlined rooms come from the directory reference.',
@@ -355,8 +359,8 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Room doors in this scan',
+              Text(
+                _floor <= 2 ? 'Room doors in this scan' : 'Rooms on this floor',
                 style: TextStyle(
                   color: AppColors.navy,
                   fontWeight: FontWeight.w800,
@@ -443,10 +447,13 @@ class _VecIndoorMap {
   List<_IndoorObject> objectsForFloor(int floor) =>
       objects.where((object) => object.floor == floor).toList(growable: false);
 
-  List<String> roomNumbersForFloor(int floor) => objectsForFloor(floor)
-      .where((object) => object.type == 'door')
-      .map((object) => object.id.substring(3))
-      .toList(growable: false);
+  List<String> roomNumbersForFloor(int floor) {
+    if (floor > 2) return _FloorMapPainter.directoryRooms[floor] ?? const [];
+    return objectsForFloor(floor)
+        .where((object) => object.type == 'door')
+        .map((object) => object.id.substring(3))
+        .toList(growable: false);
+  }
 }
 
 class _IndoorObject {
@@ -483,10 +490,21 @@ class _IndoorObject {
 }
 
 class _FloorMapPainter extends CustomPainter {
-  const _FloorMapPainter(this.objects, {required this.selectedRoom});
+  const _FloorMapPainter(
+    this.objects, {
+    required this.selectedRoom,
+    required this.floor,
+  });
 
   final List<_IndoorObject> objects;
   final String selectedRoom;
+  final int floor;
+
+  static const Map<int, List<String>> directoryRooms = {
+    3: ['301', '302', '304', '321', '322', '325', '326', '330', '331'],
+    4: ['402', '417', '418', '419', '420', '424', '425'],
+    5: ['510', '514', '515', '516', '518', '519', '523'],
+  };
 
   static const _minX = -34.0;
   static const _maxX = 34.0;
@@ -531,6 +549,55 @@ class _FloorMapPainter extends CustomPainter {
     Rect.fromLTWH(.58, .20, .10, .14),
     Rect.fromLTWH(.05, .57, .29, .37),
   ];
+  // These layouts follow the newly labeled directory sketches. Rectangles
+  // without room numbers preserve the unlabelled spaces for later mapping.
+  static const Map<String, Rect> _floorThreeRooms = {
+    '301': Rect.fromLTWH(.02, .03, .16, .40),
+    '302': Rect.fromLTWH(.18, .03, .15, .40),
+    '304': Rect.fromLTWH(.33, .30, .18, .13),
+    '321': Rect.fromLTWH(.76, .03, .13, .40),
+    '322': Rect.fromLTWH(.89, .03, .10, .40),
+    '325': Rect.fromLTWH(.09, .63, .19, .34),
+    '326': Rect.fromLTWH(.28, .63, .13, .34),
+    '330': Rect.fromLTWH(.62, .63, .20, .34),
+    '331': Rect.fromLTWH(.82, .63, .17, .34),
+  };
+  static const List<Rect> _floorThreeUnlabeledRooms = [
+    Rect.fromLTWH(.33, .03, .18, .27),
+    Rect.fromLTWH(.51, .03, .25, .14),
+  ];
+  static const Map<String, Rect> _floorFourRooms = {
+    '402': Rect.fromLTWH(.18, .03, .15, .40),
+    '417': Rect.fromLTWH(.76, .03, .13, .40),
+    '418': Rect.fromLTWH(.89, .03, .10, .40),
+    '419': Rect.fromLTWH(.09, .63, .19, .34),
+    '420': Rect.fromLTWH(.28, .63, .13, .34),
+    '424': Rect.fromLTWH(.62, .63, .12, .34),
+    '425': Rect.fromLTWH(.78, .63, .21, .34),
+  };
+  static const List<Rect> _floorFourUnlabeledRooms = [
+    Rect.fromLTWH(.02, .03, .16, .40),
+    Rect.fromLTWH(.33, .03, .32, .14),
+    Rect.fromLTWH(.65, .03, .05, .40),
+    Rect.fromLTWH(.70, .03, .06, .40),
+    Rect.fromLTWH(.74, .63, .04, .34),
+  ];
+  static const Map<String, Rect> _floorFiveRooms = {
+    '510': Rect.fromLTWH(.02, .10, .31, .33),
+    '514': Rect.fromLTWH(.66, .03, .06, .40),
+    '515': Rect.fromLTWH(.72, .03, .06, .40),
+    '516': Rect.fromLTWH(.78, .03, .21, .40),
+    '518': Rect.fromLTWH(.09, .63, .16, .34),
+    '519': Rect.fromLTWH(.25, .63, .16, .34),
+    '523': Rect.fromLTWH(.59, .63, .19, .34),
+  };
+  static const List<Rect> _floorFiveUnlabeledRooms = [
+    Rect.fromLTWH(.33, .10, .31, .14),
+    Rect.fromLTWH(.33, .24, .31, .15),
+    Rect.fromLTWH(.39, .25, .21, .14),
+    Rect.fromLTWH(.78, .63, .12, .34),
+    Rect.fromLTWH(.90, .63, .09, .20),
+  ];
   static const Map<String, Offset> _floorOneFeatures = {
     'VECentr1B': Offset(.06, .45),
     'VECentr1A': Offset(.94, .45),
@@ -554,12 +621,16 @@ class _FloorMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawColor(const Color(0xFFF7F7F4), BlendMode.src);
-    if (objects.any((object) => object.floor == 1)) {
+    if (floor == 1) {
       _paintFloorOne(canvas, size);
       return;
     }
-    if (objects.any((object) => object.floor == 2)) {
+    if (floor == 2) {
       _paintFloorTwo(canvas, size);
+      return;
+    }
+    if (floor >= 3 && floor <= 5) {
+      _paintDirectoryFloor(canvas, size);
       return;
     }
 
@@ -660,6 +731,86 @@ class _FloorMapPainter extends CustomPainter {
     );
   }
 
+  void _paintDirectoryFloor(Canvas canvas, Size size) {
+    final rooms = switch (floor) {
+      3 => _floorThreeRooms,
+      4 => _floorFourRooms,
+      _ => _floorFiveRooms,
+    };
+    final blankRooms = switch (floor) {
+      3 => _floorThreeUnlabeledRooms,
+      4 => _floorFourUnlabeledRooms,
+      _ => _floorFiveUnlabeledRooms,
+    };
+    _paintFloorPlan(
+      canvas,
+      size,
+      rooms,
+      const {},
+      blankRooms,
+      corridorTop: .42,
+      corridorHeight: .20,
+    );
+
+    final features = switch (floor) {
+      3 => <(Offset, String, Color)>[
+        (Offset(.04, .52), 'E', const Color(0xFF5B9CB0)),
+        (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
+        (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
+        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
+        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
+        (Offset(.58, .355), 'R', const Color(0xFF8D83AA)),
+        (Offset(.685, .355), 'R', const Color(0xFF8D83AA)),
+      ],
+      4 => <(Offset, String, Color)>[
+        (Offset(.04, .52), 'E', const Color(0xFF5B9CB0)),
+        (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
+        (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
+        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
+        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
+        (Offset(.465, .355), 'R', const Color(0xFF8D83AA)),
+        (Offset(.57, .355), 'R', const Color(0xFF8D83AA)),
+      ],
+      _ => <(Offset, String, Color)>[
+        (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
+        (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
+        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
+        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
+        (Offset(.43, .32), 'R', const Color(0xFF8D83AA)),
+        (Offset(.535, .32), 'R', const Color(0xFF8D83AA)),
+      ],
+    };
+    for (final (position, label, color) in features) {
+      final center = Offset(
+        position.dx * size.width,
+        position.dy * size.height,
+      );
+      final marker = Rect.fromCenter(
+        center: center,
+        width: size.width * (label == 'R' ? .09 : .075),
+        height:
+            size.height *
+            (label == 'L'
+                ? .16
+                : label == 'R'
+                ? .11
+                : .065),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(marker, Radius.circular(size.width * .008)),
+        Paint()..color = color,
+      );
+      _drawText(
+        canvas,
+        label,
+        center,
+        size.width * .027,
+        Colors.white,
+        bold: true,
+      );
+    }
+  }
+
   void _paintFloorPlan(
     Canvas canvas,
     Size size,
@@ -668,6 +819,8 @@ class _FloorMapPainter extends CustomPainter {
     List<Rect> unlabeledRooms, {
     double horizontalShift = 0,
     bool lowerEntranceCorridor = false,
+    double corridorTop = .34,
+    double corridorHeight = .21,
   }) {
     final scannedRooms = objects
         .where((object) => object.type == 'door')
@@ -698,9 +851,9 @@ class _FloorMapPainter extends CustomPainter {
 
     final corridor = Rect.fromLTWH(
       building.left + size.width * .012,
-      size.height * .34,
+      size.height * corridorTop,
       building.width - size.width * .024,
-      size.height * .21,
+      size.height * corridorHeight,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(corridor, Radius.circular(size.width * .018)),
@@ -716,7 +869,10 @@ class _FloorMapPainter extends CustomPainter {
     _drawText(
       canvas,
       'MAIN CORRIDOR',
-      Offset(size.width * .50, size.height * .445),
+      Offset(
+        size.width * .50,
+        size.height * (corridorTop + corridorHeight / 2),
+      ),
       size.width * .022,
       const Color(0xFF566171),
       bold: true,
@@ -777,7 +933,7 @@ class _FloorMapPainter extends CustomPainter {
         normalizedRect.height * size.height,
       );
       final isScanned = scannedRooms.contains(entry.key);
-      final isSelected = entry.key == selectedRoom && isScanned;
+      final isSelected = entry.key == selectedRoom;
       final radius = Radius.circular(size.width * .008);
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, radius),
@@ -803,7 +959,7 @@ class _FloorMapPainter extends CustomPainter {
         canvas,
         entry.key,
         rect.center,
-        math.min(rect.width, rect.height) * .23,
+        math.max(size.width * .024, math.min(rect.width, rect.height) * .23),
         const Color(0xFF26344F),
         bold: true,
       );
@@ -872,12 +1028,29 @@ class _FloorMapPainter extends CustomPainter {
   static String? hitTestRoom(
     List<_IndoorObject> objects,
     Offset position,
-    Size size,
-  ) {
-    if (objects.any((object) => object.floor == 1 || object.floor == 2)) {
-      final roomLayout = objects.any((object) => object.floor == 1)
-          ? _floorOneRooms
-          : _floorTwoRooms;
+    Size size, {
+    required int floor,
+  }) {
+    if (floor <= 5) {
+      final roomLayout = switch (floor) {
+        1 => _floorOneRooms,
+        2 => _floorTwoRooms,
+        3 => _floorThreeRooms,
+        4 => _floorFourRooms,
+        _ => _floorFiveRooms,
+      };
+      if (floor > 2) {
+        for (final entry in roomLayout.entries) {
+          final rect = Rect.fromLTWH(
+            entry.value.left * size.width,
+            entry.value.top * size.height,
+            entry.value.width * size.width,
+            entry.value.height * size.height,
+          );
+          if (rect.inflate(12).contains(position)) return entry.key;
+        }
+        return null;
+      }
       for (final object in objects.where((item) => item.type == 'door')) {
         final room = object.id.substring(3);
         final normalizedRect = roomLayout[room];
