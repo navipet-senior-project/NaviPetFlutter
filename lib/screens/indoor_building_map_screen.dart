@@ -1,12 +1,18 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_building_catalog.dart';
+import '../data/indoor_floor_fusion.dart';
+import '../data/indoor_floor_tracker.dart';
+import '../data/indoor_pressure_stream.dart';
+import '../data/indoor_wifi_survey.dart';
 import '../theme/app_theme.dart';
 
 /// Shows the VEC Unity scan for floors 1–2 and directory plans for floors 3–5.
@@ -25,9 +31,140 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   Size _mapViewportSize = Size.zero;
   int _floor = 1;
   String _selectedRoom = '119';
+  late final IndoorFloorFusion _floorFusion;
+  late final IndoorFloorTracker _floorTracker;
+  StreamSubscription<FloorEstimate>? _floorSubscription;
+  FloorEstimate _floorEstimate = const FloorEstimate(
+    floor: null,
+    confidence: 0,
+  );
+  final IndoorWifiSurveySource _wifiSurveySource = IndoorWifiSurveySource();
+  final IndoorWifiSurveyStore _wifiSurveyStore = IndoorWifiSurveyStore();
+  String? _selectedSurveyPointId;
+  bool _wifiSurveyBusy = false;
+  String? _wifiSurveyMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _floorFusion = IndoorFloorFusion(floors: IndoorBuildingCatalog.vecFloors);
+    _floorTracker = IndoorFloorTracker(
+      buildingCode: IndoorBuildingCatalog.vecBuildingCode,
+      fusion: _floorFusion,
+      pressureStream: IndoorPressureStream(),
+    );
+    _floorSubscription = _floorTracker.estimates.listen(_onFloorEstimate);
+    unawaited(_startFloorTracking());
+    unawaited(
+      _wifiSurveyStore.load().then((_) {
+        if (mounted) setState(() {});
+      }),
+    );
+  }
+
+  Future<void> _startFloorTracking() async {
+    try {
+      await _floorTracker.start();
+      if (mounted) setState(() => _floorEstimate = _floorTracker.current);
+    } catch (_) {
+      // Missing barometer support is handled by the fallback UI.
+    }
+  }
+
+  void _onFloorEstimate(FloorEstimate estimate) {
+    if (!mounted) return;
+    setState(() {
+      _floorEstimate = estimate;
+      final detectedFloor = int.tryParse(estimate.floor ?? '');
+      if (detectedFloor != null &&
+          estimate.confidence >= .5 &&
+          _floor != detectedFloor) {
+        _floor = detectedFloor;
+        _mapTransform.value = Matrix4.identity();
+        _mapTransformInitialized = false;
+      }
+    });
+  }
+
+  Future<void> _confirmCurrentFloor() async {
+    try {
+      await _floorTracker.confirmFloor('$_floor');
+      if (!mounted) return;
+      setState(() => _floorEstimate = _floorTracker.current);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved the Floor $_floor pressure reference.')),
+      );
+    } on StateError {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hold still and wait for more barometer readings.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _captureWifiSample(_IndoorObject point) async {
+    if (!_wifiSurveySource.isSupported || _wifiSurveyBusy) return;
+    setState(() {
+      _wifiSurveyBusy = true;
+      _wifiSurveyMessage = 'Requesting a fresh Wi-Fi scan…';
+    });
+    try {
+      final permission = await Permission.locationWhenInUse.request();
+      if (!permission.isGranted) {
+        throw StateError(
+          'Allow location access to collect Android Wi-Fi scan results.',
+        );
+      }
+      final scan = await _wifiSurveySource.scan();
+      if (scan.accessPoints.isEmpty) {
+        throw StateError('No access points were visible at this landpoint.');
+      }
+      await _wifiSurveyStore.add(
+        pointId: point.id,
+        floor: point.floor,
+        x: point.x,
+        y: point.y,
+        z: point.z,
+        scan: scan,
+      );
+      if (!mounted) return;
+      setState(
+        () => _wifiSurveyMessage =
+            'Saved ${scan.accessPoints.length} access points at ${point.id}.',
+      );
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _wifiSurveyMessage = error.message ?? 'Wi-Fi scan failed.',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _wifiSurveyMessage = error.toString().replaceFirst(
+          'Bad state: ',
+          '',
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _wifiSurveyBusy = false);
+    }
+  }
+
+  Future<void> _copyWifiSurvey() async {
+    await Clipboard.setData(ClipboardData(text: _wifiSurveyStore.exportJson()));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Survey JSON copied to clipboard.')),
+      );
+    }
+  }
 
   @override
   void dispose() {
+    unawaited(_floorSubscription?.cancel());
+    unawaited(_floorTracker.dispose());
     _mapTransform.dispose();
     super.dispose();
   }
@@ -108,6 +245,10 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 const Color(0xFFFFF4D6),
                 const Color(0xFF684B12),
               ),
+              const SizedBox(height: 12),
+              _floorStatusCard(_floorFusion.pressureReferences.length),
+              const SizedBox(height: 10),
+              _wifiSurveyCard(objects),
               const SizedBox(height: 18),
               FilledButton.icon(
                 onPressed: () {
@@ -426,6 +567,173 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
       ],
     ),
   );
+
+  Widget _floorStatusCard(int references) {
+    final estimatedFloor = _floorEstimate.floor;
+    final isSurveyed = references == IndoorBuildingCatalog.vecFloors.length;
+    final readingCount = _floorTracker.pressureSampleCount;
+    return Card(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.layers_outlined, color: AppColors.navy),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    estimatedFloor == null
+                        ? 'Floor not detected yet'
+                        : 'Estimated floor: $estimatedFloor',
+                    style: const TextStyle(
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (estimatedFloor != null)
+                  Text('${(_floorEstimate.confidence * 100).round()}%'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isSurveyed
+                  ? 'Pressure references saved for all five floors. The selected map floor follows the live estimate.'
+                  : 'Stand still on the selected floor and confirm it. Survey progress: $references/5 floors. $readingCount pressure readings collected.',
+              style: const TextStyle(color: AppColors.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: readingCount >= 5 ? _confirmCurrentFloor : null,
+                icon: const Icon(Icons.save_outlined),
+                label: Text('Confirm I am on Floor $_floor and save reference'),
+              ),
+            ),
+            if (!isSurveyed)
+              const Text(
+                'Repeat on every floor. Automatic pressure matching starts after all five floor references are saved.',
+                style: TextStyle(color: AppColors.muted, fontSize: 11),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _wifiSurveyCard(List<_IndoorObject> floorObjects) {
+    final points = floorObjects
+        .where(
+          (object) => const {
+            'door',
+            'stairs',
+            'elevator',
+            'entrance',
+          }.contains(object.type),
+        )
+        .toList(growable: false);
+    final selectedId = points.any((point) => point.id == _selectedSurveyPointId)
+        ? _selectedSurveyPointId
+        : (points.isEmpty ? null : points.first.id);
+    final selectedPoint = selectedId == null
+        ? null
+        : points.firstWhere((point) => point.id == selectedId);
+    return Card(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Android Wi-Fi fingerprint survey',
+              style: TextStyle(
+                color: AppColors.navy,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _wifiSurveySource.isSupported
+                  ? 'Stand at a known Unity landpoint, select it, then capture a fresh scan. Surveys stay on this phone until copied.'
+                  : 'Wi-Fi survey capture is Android-only. On iPhone, use the barometer and AR floor evidence.',
+              style: const TextStyle(color: AppColors.muted, fontSize: 12),
+            ),
+            if (_wifiSurveySource.isSupported && points.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: selectedId,
+                decoration: const InputDecoration(
+                  labelText: 'Unity landpoint on this floor',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: [
+                  for (final point in points)
+                    DropdownMenuItem(
+                      value: point.id,
+                      child: Text('${point.id} · ${point.type}'),
+                    ),
+                ],
+                onChanged: (value) =>
+                    setState(() => _selectedSurveyPointId = value),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: _wifiSurveyBusy || selectedPoint == null
+                      ? null
+                      : () => _captureWifiSample(selectedPoint),
+                  icon: _wifiSurveyBusy
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.wifi_find),
+                  label: Text(
+                    _wifiSurveyBusy ? 'Scanning…' : 'Capture Wi-Fi sample',
+                  ),
+                ),
+              ),
+            ] else if (_wifiSurveySource.isSupported) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'No Unity survey landpoints are available on this floor. Floors 3–5 need landpoints exported into the VEC map first.',
+                style: TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+            ],
+            Text(
+              '${_wifiSurveyStore.records.length} samples stored locally',
+              style: const TextStyle(color: AppColors.muted, fontSize: 11),
+            ),
+            if (_wifiSurveyMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _wifiSurveyMessage!,
+                  style: const TextStyle(color: AppColors.navy, fontSize: 12),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _wifiSurveyStore.records.isEmpty
+                    ? null
+                    : _copyWifiSurvey,
+                icon: const Icon(Icons.copy),
+                label: const Text('Copy survey JSON'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _VecIndoorMap {

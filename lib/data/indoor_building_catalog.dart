@@ -6,6 +6,7 @@ import 'navigation_models.dart';
 abstract final class IndoorBuildingCatalog {
   static const vecBuildingCode = 'VEC';
   static const vecDisplayName = 'Vivian Engineering Center';
+  static const vecFloors = ['1', '2', '3', '4', '5'];
   static const vecMapSetCode = 'MSET_XTBY7AM7ZK77';
   static const vecMapFrame = 'multiset-mapset';
   static const vecAnchor = NavigationCoordinate(
