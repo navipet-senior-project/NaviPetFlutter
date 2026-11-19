@@ -31,18 +31,21 @@ class IndoorFloorTracker {
       if (!restored) fusion.setBuilding(buildingCode);
     }
     await _subscription?.cancel();
-    _subscription = pressureStream.pascals.listen((pressure) {
-      _recentPressure.add(pressure);
-      if (_recentPressure.length > 40) _recentPressure.removeAt(0);
-      _estimates.add(fusion.addPressure(pressure));
-      final now = DateTime.now();
-      if (now.difference(_lastSave) >= const Duration(seconds: 15)) {
-        _lastSave = now;
-        unawaited(fusion.save());
-      }
-    }, onError: (_) {
-      // A missing pressure sensor is an expected capability fallback.
-    });
+    _subscription = pressureStream.pascals.listen(
+      (pressure) {
+        _recentPressure.add(pressure);
+        if (_recentPressure.length > 40) _recentPressure.removeAt(0);
+        _estimates.add(fusion.addPressure(pressure));
+        final now = DateTime.now();
+        if (now.difference(_lastSave) >= const Duration(seconds: 15)) {
+          _lastSave = now;
+          unawaited(fusion.save());
+        }
+      },
+      onError: (_) {
+        // A missing pressure sensor is an expected capability fallback.
+      },
+    );
   }
 
   /// User confirms the floor after reaching a known room or other landmark.

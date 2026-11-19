@@ -43,21 +43,31 @@ class IndoorWifiSurveySource {
     if (!isSupported) throw UnsupportedError('Wi-Fi survey is Android-only.');
     final response = await _channel.invokeMapMethod<String, Object?>('scan');
     if (response == null || response['fresh'] != true) {
-      throw StateError('Android did not return a fresh Wi-Fi scan. Try again later.');
+      throw StateError(
+        'Android did not return a fresh Wi-Fi scan. Try again later.',
+      );
     }
     final rawPoints = response['accessPoints'];
     final capturedAtValue = response['capturedAtEpochMs'];
     final capturedAt = capturedAtValue is num
-        ? DateTime.fromMillisecondsSinceEpoch(capturedAtValue.toInt(), isUtc: true)
+        ? DateTime.fromMillisecondsSinceEpoch(
+            capturedAtValue.toInt(),
+            isUtc: true,
+          )
         : null;
     if (rawPoints is! List || capturedAt == null) {
       throw const FormatException('Malformed Wi-Fi scan response.');
     }
-    final points = rawPoints.whereType<Map>().map((point) => WifiAccessPointReading(
-      bssid: point['bssid'] as String,
-      rssiDbm: (point['rssiDbm'] as num).toInt(),
-      frequencyMhz: (point['frequencyMhz'] as num).toInt(),
-    )).toList(growable: false);
+    final points = rawPoints
+        .whereType<Map>()
+        .map(
+          (point) => WifiAccessPointReading(
+            bssid: point['bssid'] as String,
+            rssiDbm: (point['rssiDbm'] as num).toInt(),
+            frequencyMhz: (point['frequencyMhz'] as num).toInt(),
+          ),
+        )
+        .toList(growable: false);
     return WifiScanSnapshot(capturedAt: capturedAt, accessPoints: points);
   }
 }
@@ -104,27 +114,31 @@ class IndoorWifiSurveyStore {
     try {
       final document = jsonDecode(raw) as Map<String, dynamic>;
       final items = document['records'] as List<dynamic>;
-      records = items.map((item) {
-        final json = item as Map<String, dynamic>;
-        final position = json['position'] as Map<String, dynamic>;
-        final points = (json['accessPoints'] as List<dynamic>).map((entry) {
-          final point = entry as Map<String, dynamic>;
-          return WifiAccessPointReading(
-            bssid: point['bssid'] as String,
-            rssiDbm: (point['rssiDbm'] as num).toInt(),
-            frequencyMhz: (point['frequencyMhz'] as num).toInt(),
-          );
-        }).toList(growable: false);
-        return WifiFingerprintSurveyRecord(
-          pointId: json['pointId'] as String,
-          floor: json['floor'] as String,
-          x: (position['x'] as num).toDouble(),
-          y: (position['y'] as num).toDouble(),
-          z: (position['z'] as num).toDouble(),
-          capturedAt: DateTime.parse(json['capturedAt'] as String),
-          accessPoints: points,
-        );
-      }).toList(growable: true);
+      records = items
+          .map((item) {
+            final json = item as Map<String, dynamic>;
+            final position = json['position'] as Map<String, dynamic>;
+            final points = (json['accessPoints'] as List<dynamic>)
+                .map((entry) {
+                  final point = entry as Map<String, dynamic>;
+                  return WifiAccessPointReading(
+                    bssid: point['bssid'] as String,
+                    rssiDbm: (point['rssiDbm'] as num).toInt(),
+                    frequencyMhz: (point['frequencyMhz'] as num).toInt(),
+                  );
+                })
+                .toList(growable: false);
+            return WifiFingerprintSurveyRecord(
+              pointId: json['pointId'] as String,
+              floor: json['floor'] as String,
+              x: (position['x'] as num).toDouble(),
+              y: (position['y'] as num).toDouble(),
+              z: (position['z'] as num).toDouble(),
+              capturedAt: DateTime.parse(json['capturedAt'] as String),
+              accessPoints: points,
+            );
+          })
+          .toList(growable: true);
     } on FormatException {
       records = [];
     } on TypeError {
@@ -132,18 +146,25 @@ class IndoorWifiSurveyStore {
     }
   }
 
-  Future<void> add({required String pointId, required int floor,
-    required double x, required double y, required double z,
-    required WifiScanSnapshot scan}) async {
-    records.add(WifiFingerprintSurveyRecord(
-      pointId: pointId,
-      floor: '$floor',
-      x: x,
-      y: y,
-      z: z,
-      capturedAt: scan.capturedAt,
-      accessPoints: scan.accessPoints,
-    ));
+  Future<void> add({
+    required String pointId,
+    required int floor,
+    required double x,
+    required double y,
+    required double z,
+    required WifiScanSnapshot scan,
+  }) async {
+    records.add(
+      WifiFingerprintSurveyRecord(
+        pointId: pointId,
+        floor: '$floor',
+        x: x,
+        y: y,
+        z: z,
+        capturedAt: scan.capturedAt,
+        accessPoints: scan.accessPoints,
+      ),
+    );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, jsonEncode(exportDocument()));
   }
@@ -155,5 +176,6 @@ class IndoorWifiSurveyStore {
     'records': records.map((record) => record.toJson()).toList(),
   };
 
-  String exportJson() => const JsonEncoder.withIndent('  ').convert(exportDocument());
+  String exportJson() =>
+      const JsonEncoder.withIndent('  ').convert(exportDocument());
 }

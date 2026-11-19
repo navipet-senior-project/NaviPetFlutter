@@ -35,7 +35,10 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   late final IndoorFloorFusion _floorFusion;
   late final IndoorFloorTracker _floorTracker;
   StreamSubscription<FloorEstimate>? _floorSubscription;
-  FloorEstimate _floorEstimate = const FloorEstimate(floor: null, confidence: 0);
+  FloorEstimate _floorEstimate = const FloorEstimate(
+    floor: null,
+    confidence: 0,
+  );
   final IndoorWifiSurveySource _wifiSurveySource = IndoorWifiSurveySource();
   final IndoorWifiSurveyStore _wifiSurveyStore = IndoorWifiSurveyStore();
   String? _selectedSurveyPointId;
@@ -53,9 +56,11 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     );
     _floorSubscription = _floorTracker.estimates.listen(_onFloorEstimate);
     unawaited(_startFloorTracking());
-    unawaited(_wifiSurveyStore.load().then((_) {
-      if (mounted) setState(() {});
-    }));
+    unawaited(
+      _wifiSurveyStore.load().then((_) {
+        if (mounted) setState(() {});
+      }),
+    );
   }
 
   Future<void> _startFloorTracking() async {
@@ -72,7 +77,8 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     setState(() {
       _floorEstimate = estimate;
       final detectedFloor = int.tryParse(estimate.floor ?? '');
-      if (detectedFloor != null && estimate.confidence >= .5 &&
+      if (detectedFloor != null &&
+          estimate.confidence >= .5 &&
           _floor != detectedFloor) {
         _floor = detectedFloor;
         _mapTransform.value = Matrix4.identity();
@@ -92,7 +98,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     } on StateError {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hold still and wait for more barometer readings.')),
+        const SnackBar(
+          content: Text('Hold still and wait for more barometer readings.'),
+        ),
       );
     }
   }
@@ -106,7 +114,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     try {
       final permission = await Permission.locationWhenInUse.request();
       if (!permission.isGranted) {
-        throw StateError('Allow location access to collect Android Wi-Fi scan results.');
+        throw StateError(
+          'Allow location access to collect Android Wi-Fi scan results.',
+        );
       }
       final scan = await _wifiSurveySource.scan();
       if (scan.accessPoints.isEmpty) {
@@ -121,14 +131,23 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
         scan: scan,
       );
       if (!mounted) return;
-      setState(() => _wifiSurveyMessage =
-          'Saved ${scan.accessPoints.length} access points at ${point.id}.');
+      setState(
+        () => _wifiSurveyMessage =
+            'Saved ${scan.accessPoints.length} access points at ${point.id}.',
+      );
     } on PlatformException catch (error) {
       if (!mounted) return;
-      setState(() => _wifiSurveyMessage = error.message ?? 'Wi-Fi scan failed.');
+      setState(
+        () => _wifiSurveyMessage = error.message ?? 'Wi-Fi scan failed.',
+      );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _wifiSurveyMessage = error.toString().replaceFirst('Bad state: ', ''));
+      setState(
+        () => _wifiSurveyMessage = error.toString().replaceFirst(
+          'Bad state: ',
+          '',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _wifiSurveyBusy = false);
     }
@@ -609,8 +628,14 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
 
   Widget _wifiSurveyCard(List<_IndoorObject> floorObjects) {
     final points = floorObjects
-        .where((object) => const {'door', 'stairs', 'elevator', 'entrance'}
-            .contains(object.type))
+        .where(
+          (object) => const {
+            'door',
+            'stairs',
+            'elevator',
+            'entrance',
+          }.contains(object.type),
+        )
         .toList(growable: false);
     final selectedId = points.any((point) => point.id == _selectedSurveyPointId)
         ? _selectedSurveyPointId
@@ -627,7 +652,10 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
           children: [
             const Text(
               'Android Wi-Fi fingerprint survey',
-              style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                color: AppColors.navy,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
@@ -652,7 +680,8 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                       child: Text('${point.id} · ${point.type}'),
                     ),
                 ],
-                onChanged: (value) => setState(() => _selectedSurveyPointId = value),
+                onChanged: (value) =>
+                    setState(() => _selectedSurveyPointId = value),
               ),
               const SizedBox(height: 8),
               SizedBox(
@@ -667,7 +696,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.wifi_find),
-                  label: Text(_wifiSurveyBusy ? 'Scanning…' : 'Capture Wi-Fi sample'),
+                  label: Text(
+                    _wifiSurveyBusy ? 'Scanning…' : 'Capture Wi-Fi sample',
+                  ),
                 ),
               ),
             ] else if (_wifiSurveySource.isSupported) ...[
@@ -692,7 +723,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: _wifiSurveyStore.records.isEmpty ? null : _copyWifiSurvey,
+                onPressed: _wifiSurveyStore.records.isEmpty
+                    ? null
+                    : _copyWifiSurvey,
                 icon: const Icon(Icons.copy),
                 label: const Text('Copy survey JSON'),
               ),
