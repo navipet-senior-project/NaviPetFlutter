@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -667,7 +666,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             if (_wifiSurveySource.isSupported && points.isNotEmpty) ...[
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: selectedId,
+                initialValue: selectedId,
                 decoration: const InputDecoration(
                   labelText: 'Unity landpoint on this floor',
                   border: OutlineInputBorder(),

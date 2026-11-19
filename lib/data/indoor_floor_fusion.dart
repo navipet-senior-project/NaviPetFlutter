@@ -58,8 +58,9 @@ class IndoorFloorFusion {
       Map.unmodifiable(_pressureByFloor);
 
   void setBuilding(String buildingCode) {
-    if (buildingCode.trim().isEmpty)
+    if (buildingCode.trim().isEmpty) {
       throw ArgumentError('buildingCode is empty');
+    }
     if (_building == buildingCode) return;
     _building = buildingCode;
     _pressureByFloor.clear();
@@ -91,8 +92,9 @@ class IndoorFloorFusion {
   /// in this building; ambient weather changes make global pressure-to-floor
   /// conversion unreliable.
   FloorEstimate addPressure(double pascals) {
-    if (!pascals.isFinite || pascals < 30000 || pascals > 120000)
+    if (!pascals.isFinite || pascals < 30000 || pascals > 120000) {
       return estimate;
+    }
     _lastPressure = pascals;
     // Do not guess from an incomplete survey: every VEC floor needs a
     // pressure reference before pressure can distinguish them.
@@ -212,8 +214,9 @@ class IndoorFloorFusion {
     if (json['version'] != 1 ||
         json['building'] is! String ||
         json['floors'] is! List ||
-        (json['floors'] as List).join('|') != floors.join('|'))
+        (json['floors'] as List).join('|') != floors.join('|')) {
       return;
+    }
     _building = json['building'] as String;
     _pressureByFloor
       ..clear()
@@ -233,8 +236,9 @@ class IndoorFloorFusion {
   }
 
   void _checkFloor(String floor) {
-    if (!floors.contains(floor))
+    if (!floors.contains(floor)) {
       throw ArgumentError.value(floor, 'floor', 'not in this building');
+    }
   }
 
   void _resetUniform() => _particles = List.generate(
