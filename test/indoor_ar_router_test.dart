@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -89,6 +90,17 @@ class _FailingSearch extends flow.FakeSearchGateway {
     failure: CampusSearchFailure.offline,
     message: 'offline',
   );
+}
+
+class _DelayedSearch extends flow.FakeSearchGateway {
+  final pending = Completer<List<CampusPlace>>();
+
+  @override
+  Future<List<CampusPlace>> autocomplete(
+    String query, {
+    NavigationCoordinate? proximity,
+    int limit = 10,
+  }) => pending.future;
 }
 
 class _Harness {
@@ -277,6 +289,63 @@ void main() {
     expect(harness.tokens.calls, 0);
     expect(harness.requests, isEmpty);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  for (final selection in ['floor', 'room chip', 'map marker']) {
+    testWidgets('changing $selection discards pending room lookup', (
+      tester,
+    ) async {
+      final search = _DelayedSearch()..results = _vecRooms();
+      final harness = _Harness(search: search);
+      await harness.pump(tester);
+      await tester.tap(find.textContaining('Verify location near room '));
+      await tester.pump();
+
+      if (selection == 'floor') {
+        await tester.tap(find.text('Floor 2'));
+      } else if (selection == 'room chip') {
+        final chip = find.widgetWithText(ActionChip, '120');
+        await tester.scrollUntilVisible(
+          chip,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(chip);
+      } else {
+        final map = find
+            .descendant(
+              of: find.byType(InteractiveViewer),
+              matching: find.byType(CustomPaint),
+            )
+            .first;
+        await tester.ensureVisible(find.byType(InteractiveViewer));
+        final render = tester.renderObject<RenderBox>(map);
+        await tester.tapAt(
+          render.localToGlobal(
+            Offset(render.size.width * .19, render.size.height * .18),
+          ),
+        );
+      }
+      await tester.pump();
+      await tester.scrollUntilVisible(
+        find.textContaining('Verify location near room '),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.textContaining('Verify location near room 119'),
+        findsNothing,
+      );
+      search.pending.complete(_vecRooms());
+      await tester.pumpAndSettle();
+      expect(harness.tokens.calls, 0);
+      expect(harness.requests, isEmpty);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(
+        harness.router.routeInformationProvider.value.uri.path,
+        '/buildings/vec',
+      );
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+  }
 
   testWidgets('floor-plan entry keeps camera consent before token minting', (
     tester,

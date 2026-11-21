@@ -28,6 +28,15 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   int _floor = 1;
   String _selectedRoom = '119';
   bool _resolvingRoom = false;
+  int _selectionVersion = 0;
+
+  void _selectRoom(String room) {
+    if (_selectedRoom == room) return;
+    setState(() {
+      _selectedRoom = room;
+      _selectionVersion++;
+    });
+  }
 
   @override
   void dispose() {
@@ -68,6 +77,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   Future<void> _verifyWithAr() async {
     final room = _selectedRoom;
     final floor = '$_floor';
+    final selectionVersion = _selectionVersion;
     final gateway = context.read<NavigationFlowController>().searchGateway;
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
@@ -103,6 +113,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     }
     if (!mounted) return;
     setState(() => _resolvingRoom = false);
+    if (selectionVersion != _selectionVersion) return;
     if (placeId == null) {
       messenger.showSnackBar(SnackBar(content: Text(message!)));
       return;
@@ -184,6 +195,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                       ),
                       onSelected: (_) => setState(() {
                         if (_floor != floor) {
+                          _selectionVersion++;
                           _mapTransform.value = Matrix4.identity();
                           _mapTransformInitialized = false;
                         }
@@ -304,7 +316,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                                         floor: _floor,
                                       );
                                       if (room != null) {
-                                        setState(() => _selectedRoom = room);
+                                        _selectRoom(room);
                                       }
                                     },
                                     child: CustomPaint(
@@ -401,7 +413,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                       backgroundColor: _selectedRoom == room
                           ? const Color(0xFFFFF0C2)
                           : Colors.white,
-                      onPressed: () => setState(() => _selectedRoom = room),
+                      onPressed: () => _selectRoom(room),
                     ),
                 ],
               ),
