@@ -33,6 +33,10 @@ includes:
   inventing a destination. Indoor AR points toward a room; it does not provide
   turn-by-turn indoor routing. The MultiSet secret never ships in the app.
   Unity AR still requires verification on a physical phone.
+- On the VEC building map, select a floor and room, then choose Verify location
+  to open indoor AR using the same backend room record as search. If the room
+  cannot be matched uniquely or the lookup fails, AR does not open; try search
+  or retry the lookup.
 - Ask Elbee about CSULB buildings and rooms from the map. Elbee returns
   verified places that open existing navigation; schedule access requires
   consent for each request. It can also explain official parking rules. Elbee
