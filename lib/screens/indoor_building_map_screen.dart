@@ -4,9 +4,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-import '../data/indoor_ar_contract.dart';
+import '../data/campus_place.dart';
 import '../data/indoor_building_catalog.dart';
+import '../data/navigation_flow_controller.dart';
 import '../theme/app_theme.dart';
 
 /// Shows the VEC Unity scan for floors 1–2 and directory plans for floors 3–5.
@@ -25,6 +27,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   Size _mapViewportSize = Size.zero;
   int _floor = 1;
   String _selectedRoom = '119';
+  bool _resolvingRoom = false;
 
   @override
   void dispose() {
@@ -56,6 +59,57 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     _mapTransform.value = Matrix4.identity()
       ..translateByDouble(translateX, translateY, 0, 1)
       ..scaleByDouble(nextScale, nextScale, nextScale, 1);
+  }
+
+  /// The map only picks a room number. The destination is the same backend
+  /// record autocomplete selects, so the AR launch screen loads its door pose
+  /// from `place(id)` exactly as it does for a search result; the bundled scan
+  /// asset is for drawing only and never supplies AR coordinates.
+  Future<void> _verifyWithAr() async {
+    final room = _selectedRoom;
+    final floor = '$_floor';
+    final gateway = context.read<NavigationFlowController>().searchGateway;
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    setState(() => _resolvingRoom = true);
+    String? message;
+    String? placeId;
+    try {
+      final found = await gateway.autocomplete(
+        '${IndoorBuildingCatalog.vecBuildingCode} $room',
+      );
+      final matches = found
+          .where(
+            (place) =>
+                place.isLocal &&
+                place.type == CampusDestinationType.room &&
+                place.buildingCode == IndoorBuildingCatalog.vecBuildingCode &&
+                place.roomNumber == room &&
+                place.floorNumber == floor,
+          )
+          .map((place) => place.id)
+          .toSet();
+      if (matches.length == 1) {
+        placeId = matches.single;
+      } else {
+        message =
+            "Couldn't match room $room on floor $floor to a campus record. Search for it instead.";
+      }
+    } on CampusSearchException {
+      message =
+          "Couldn't look up room $room. Check your connection and try again.";
+    } catch (_) {
+      message = "Couldn't look up room $room. Try again.";
+    }
+    if (!mounted) return;
+    setState(() => _resolvingRoom = false);
+    if (placeId == null) {
+      messenger.showSnackBar(SnackBar(content: Text(message!)));
+      return;
+    }
+    router.push(
+      Uri(path: '/ar', queryParameters: {'destination': placeId}).toString(),
+    );
   }
 
   @override
@@ -110,38 +164,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
               ),
               const SizedBox(height: 18),
               FilledButton.icon(
-                onPressed: () {
-                  final matches = objects
-                      .where(
-                        (item) =>
-                            item.type == 'door' &&
-                            item.id == 'VEC$_selectedRoom',
-                      )
-                      .toList(growable: false);
-                  final door = matches.isEmpty ? null : matches.first;
-                  if (door == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Choose a room on this floor to verify your location.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  context.push(
-                    '/ar',
-                    extra: IndoorArRequest(
-                      room: _selectedRoom,
-                      doorKey: door.id,
-                      floor: '$_floor',
-                      position: IndoorArVector3(door.x, door.y, door.z),
-                      headingDeg: door.rotationY,
-                      mapCode: IndoorBuildingCatalog.vecMapSetCode,
-                      frame: IndoorBuildingCatalog.vecMapFrame,
-                    ),
-                  );
-                },
+                onPressed: _resolvingRoom ? null : _verifyWithAr,
                 icon: const Icon(Icons.camera_alt_outlined),
                 label: Text('Verify location near room $_selectedRoom with AR'),
               ),

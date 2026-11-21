@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +10,7 @@ import 'package:navipet/data/indoor_ar_contract.dart';
 import 'package:navipet/data/indoor_ar_launcher.dart';
 import 'package:navipet/data/indoor_ar_token_gateway.dart';
 import 'package:navipet/data/navigation_flow_controller.dart';
+import 'package:navipet/data/navigation_models.dart';
 import 'package:navipet/router/app_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -43,10 +43,61 @@ class _Tokens implements IndoorArTokenGateway {
   }
 }
 
+CampusPlace _vecRoom(
+  String room,
+  String floor,
+  IndoorArVector3 position,
+  double headingDeg, {
+  String? id,
+}) => CampusPlace(
+  id: id ?? 'vec-$room',
+  type: CampusDestinationType.room,
+  title: 'VEC $room',
+  subtitle: 'Vivian Engineering Center · Floor $floor',
+  source: 'csulb',
+  buildingCode: 'VEC',
+  roomNumber: room,
+  floorNumber: floor,
+  indoor: IndoorDoorPose(
+    mapCode: IndoorArRequest.buildMapCode,
+    frame: IndoorArRequest.buildFrame,
+    doorKey: 'VEC$room',
+    floor: floor,
+    position: position,
+    headingDeg: headingDeg,
+  ),
+);
+
+// Backend poses; deliberately different from the bundled scan asset.
+List<CampusPlace> _vecRooms() => [
+  _vecRoom(
+    '119',
+    '1',
+    const IndoorArVector3(-5.7651, -1.8186, 22.6689),
+    185.36,
+  ),
+  _vecRoom('218', '2', const IndoorArVector3(1.25, -1.5, 9.5), 90),
+];
+
+class _FailingSearch extends flow.FakeSearchGateway {
+  @override
+  Future<List<CampusPlace>> autocomplete(
+    String query, {
+    NavigationCoordinate? proximity,
+    int limit = 10,
+  }) async => throw const CampusSearchException(
+    failure: CampusSearchFailure.offline,
+    message: 'offline',
+  );
+}
+
 class _Harness {
+  _Harness({flow.FakeSearchGateway? search})
+    : search = search ?? (flow.FakeSearchGateway()..results = _vecRooms());
+
   final tokens = _Tokens();
   final requests = <Map<String, dynamic>>[];
-  final search = flow.FakeSearchGateway();
+  final flow.FakeSearchGateway search;
   PermissionStatus camera = PermissionStatus.granted;
   int permissionRequests = 0;
   late final GoRouter router;
@@ -146,19 +197,15 @@ void main() {
         await harness.tapFloorPlanAr(tester);
         expect(harness.requests, hasLength(1));
         final request = harness.requests.single;
-        final map =
-            jsonDecode(
-                  File('assets/indoor/vec_floors1and2.json').readAsStringSync(),
-                )
-                as Map<String, dynamic>;
-        final door = (map['objects'] as List)
-            .cast<Map<String, dynamic>>()
-            .singleWhere((object) => object['id'] == request['doorKey']);
+        final place = harness.search.results.singleWhere(
+          (item) => item.floorNumber == '$floor',
+        );
+        final pose = place.indoor!;
         expect(request['schemaVersion'], IndoorArRequest.schemaVersion);
         expect(request['floor'], '$floor');
-        expect(door['floorId'], endsWith('$floor'));
-        expect(request['position'], door['position']);
-        expect(request['headingDeg'], door['rotationY']);
+        expect(request['doorKey'], pose.doorKey);
+        expect(request['position'], pose.position.toJson());
+        expect(request['headingDeg'], pose.headingDeg);
         expect(request['mapCode'], IndoorArRequest.buildMapCode);
         expect(request['frame'], IndoorArRequest.buildFrame);
         expect(request['arToken']['token'], 'router-test-token');
@@ -171,6 +218,65 @@ void main() {
       variant: TargetPlatformVariant.only(TargetPlatform.iOS),
     );
   }
+
+  testWidgets('map room button sends the same request as autocomplete', (
+    tester,
+  ) async {
+    final harness = _Harness();
+    await harness.pump(tester);
+    await harness.tapFloorPlanAr(tester);
+    final fromMap = {...harness.requests.single}..remove('arToken');
+    harness.requests.clear();
+    harness.router.push('/ar?destination=vec-119');
+    await tester.pumpAndSettle();
+    expect({...harness.requests.single}..remove('arToken'), fromMap);
+    // Coordinates are the backend's, not the bundled scan's.
+    expect(fromMap['position'], {'x': -5.7651, 'y': -1.8186, 'z': 22.6689});
+    expect(fromMap['headingDeg'], 185.36);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  final unsafeLookups = <String, List<CampusPlace>>{
+    'no matching record': const [],
+    'only another floor': [
+      _vecRoom('119', '2', const IndoorArVector3(1, 1, 1), 10),
+    ],
+    'only another room': [
+      _vecRoom('120', '1', const IndoorArVector3(1, 1, 1), 10),
+    ],
+    'ambiguous records': [
+      _vecRoom('119', '1', const IndoorArVector3(1, 1, 1), 10, id: 'a'),
+      _vecRoom('119', '1', const IndoorArVector3(2, 2, 2), 20, id: 'b'),
+    ],
+  };
+  for (final entry in unsafeLookups.entries) {
+    testWidgets('map room button does not launch AR for ${entry.key}', (
+      tester,
+    ) async {
+      final harness = _Harness(
+        search: flow.FakeSearchGateway()..results = entry.value,
+      );
+      await harness.pump(tester);
+      await harness.tapFloorPlanAr(tester);
+      expect(find.textContaining("Couldn't match room 119"), findsOneWidget);
+      expect(harness.tokens.calls, 0);
+      expect(harness.requests, isEmpty);
+      expect(
+        harness.router.routeInformationProvider.value.uri.path,
+        '/buildings/vec',
+      );
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+  }
+
+  testWidgets('map room button does not launch AR when lookup fails', (
+    tester,
+  ) async {
+    final harness = _Harness(search: _FailingSearch());
+    await harness.pump(tester);
+    await harness.tapFloorPlanAr(tester);
+    expect(find.textContaining("Couldn't look up room 119"), findsOneWidget);
+    expect(harness.tokens.calls, 0);
+    expect(harness.requests, isEmpty);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
   testWidgets('floor-plan entry keeps camera consent before token minting', (
     tester,
