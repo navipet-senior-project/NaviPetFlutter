@@ -11,11 +11,13 @@ import '../screens/account_settings_screen.dart';
 import '../screens/change_email_screen.dart';
 import '../screens/checklist_screen.dart';
 import '../screens/email_sent_screen.dart';
+import '../screens/floor_pressure_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/indoor_ar_launch_screen.dart';
 import '../screens/indoor_ar_spike_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/indoor_building_map_screen.dart';
+import '../screens/indoor_positioning_screen.dart';
 import '../screens/pet_customization_screen.dart';
 import '../screens/pet_home_screen.dart';
 import '../screens/pet_pack_screen.dart';
@@ -53,6 +55,7 @@ GoRouter createAppRouter(
     if (location == '/reset-password' && !appState.hasPendingPasswordRecovery) {
       return '/forgot-password';
     }
+    if (kDebugMode && location == '/dev/floor-pressure') return null;
     if (!appState.isAuthenticated && !onPublicRoute) return '/signin';
     if (appState.isAuthenticated && onPublicRoute) return '/map';
     // Guests have no email to change. This also covers typed or deep-linked
@@ -172,6 +175,17 @@ GoRouter createAppRouter(
         path: '/dev/indoor-ar-spike',
         builder: (context, state) =>
             IndoorArSpikeScreen(launcher: NativeIndoorArLauncher()),
+      ),
+    // Wave D barometer measurement; debug builds only, no production entry.
+    if (kDebugMode)
+      GoRoute(
+        path: '/dev/floor-pressure',
+        builder: (context, state) => const FloorPressureScreen(),
+      ),
+    if (kDebugMode)
+      GoRoute(
+        path: '/dev/vec-positioning',
+        builder: (context, state) => const IndoorPositioningScreen(),
       ),
   ],
 );

@@ -7,9 +7,12 @@ import 'package:navipet/router/app_router.dart';
 import 'package:navipet/screens/account_settings_screen.dart';
 import 'package:navipet/screens/change_email_screen.dart';
 import 'package:navipet/screens/indoor_ar_spike_screen.dart';
+import 'package:navipet/screens/floor_pressure_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:navipet/screens/verify_email_screen.dart';
 
 import 'email_change_test_support.dart';
+
 import 'package:navipet/screens/reset_password_screen.dart';
 import 'package:navipet/screens/sign_in_screen.dart';
 import 'package:navipet/screens/pet_customization_screen.dart';
@@ -42,6 +45,27 @@ class _RouterAppState extends AppState {
 }
 
 void main() {
+  testWidgets('opens floor pressure while signed out', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final appState = _RouterAppState(
+      authenticated: false,
+      passwordRecovery: false,
+    );
+    final router = createAppRouter(
+      appState,
+      initialLocation: '/dev/floor-pressure',
+    );
+    addTearDown(router.dispose);
+    addTearDown(appState.dispose);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>.value(
+        value: appState,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(FloorPressureScreen), findsOneWidget);
+  });
   testWidgets(
     'keeps a signed-out recovery state on sign-in without a redirect loop',
     (tester) async {

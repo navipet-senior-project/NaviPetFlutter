@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -25,6 +26,8 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   final TransformationController _mapTransform = TransformationController();
   bool _mapTransformInitialized = false;
   Size _mapViewportSize = Size.zero;
+  Size _lastViewportSize = Size.zero;
+  Size? _lastMapSize;
   int _floor = 1;
   String _selectedRoom = '119';
   bool _resolvingRoom = false;
@@ -59,7 +62,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     final current = _mapTransform.value;
     final currentScale = current.getMaxScaleOnAxis();
     if (currentScale <= 0 || _mapViewportSize.isEmpty) return;
-    final nextScale = (currentScale * factor).clamp(.35, 4.0).toDouble();
+    final nextScale = (currentScale * factor).clamp(.2, 4.0).toDouble();
     final ratio = nextScale / currentScale;
     final centerX = _mapViewportSize.width / 2;
     final centerY = _mapViewportSize.height / 2;
@@ -68,6 +71,23 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     _mapTransform.value = Matrix4.identity()
       ..translateByDouble(translateX, translateY, 0, 1)
       ..scaleByDouble(nextScale, nextScale, nextScale, 1);
+  }
+
+  void _fitMap(Size viewport, Size mapSize) {
+    if (viewport.isEmpty || mapSize.isEmpty) return;
+    final containScale = math.min(
+      viewport.width / mapSize.width,
+      viewport.height / mapSize.height,
+    );
+    final scale = (containScale * .94).clamp(.2, 4.0).toDouble();
+    _mapTransform.value = Matrix4.identity()
+      ..translateByDouble(
+        (viewport.width - mapSize.width * scale) / 2,
+        (viewport.height - mapSize.height * scale) / 2,
+        0,
+        1,
+      )
+      ..scaleByDouble(scale, scale, scale, 1);
   }
 
   /// The map only picks a room number. The destination is the same backend
@@ -142,6 +162,14 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
           ),
         ],
       ),
+      actions: [
+        if (kDebugMode)
+          IconButton(
+            tooltip: 'VEC positioning survey',
+            onPressed: () => context.push('/dev/vec-positioning'),
+            icon: const Icon(Icons.wifi_tethering),
+          ),
+      ],
     ),
     body: SafeArea(
       child: FutureBuilder<_VecIndoorMap>(
@@ -271,36 +299,27 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                                     ? viewport.height * 1.35
                                     : viewport.width * 1.5 / 2.15,
                               );
-                              if (!_mapTransformInitialized) {
+                              if (!_mapTransformInitialized ||
+                                  _lastMapSize != mapSize ||
+                                  _lastViewportSize != viewport) {
                                 _mapTransformInitialized = true;
+                                _lastMapSize = mapSize;
+                                _lastViewportSize = viewport;
                                 WidgetsBinding.instance.addPostFrameCallback((
                                   _,
                                 ) {
                                   if (!mounted) return;
-                                  const initialScale = .75;
-                                  _mapTransform.value = Matrix4.identity()
-                                    ..translateByDouble(
-                                      (viewport.width -
-                                              mapSize.width * initialScale) /
-                                          2,
-                                      (viewport.height -
-                                              mapSize.height * initialScale) /
-                                          2,
-                                      0,
-                                      1,
-                                    )
-                                    ..scaleByDouble(
-                                      initialScale,
-                                      initialScale,
-                                      initialScale,
-                                      1,
-                                    );
+                                  if (_lastMapSize != mapSize ||
+                                      _lastViewportSize != viewport) {
+                                    return;
+                                  }
+                                  _fitMap(viewport, mapSize);
                                 });
                               }
                               return InteractiveViewer(
                                 constrained: false,
                                 transformationController: _mapTransform,
-                                minScale: .35,
+                                minScale: .2,
                                 maxScale: 4,
                                 boundaryMargin: const EdgeInsets.all(500),
                                 child: SizedBox(
@@ -346,6 +365,15 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                               color: Colors.white70,
                               fontSize: 11,
                             ),
+                          ),
+                          IconButton(
+                            tooltip: 'Fit entire floor plan',
+                            onPressed: () => _fitMap(
+                              _mapViewportSize,
+                              _lastMapSize ?? Size.zero,
+                            ),
+                            color: Colors.white,
+                            icon: const Icon(Icons.fit_screen),
                           ),
                           IconButton(
                             tooltip: 'Zoom out',

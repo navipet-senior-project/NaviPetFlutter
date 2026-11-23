@@ -51,6 +51,7 @@ dependencies:
   url_launcher: ^6.3.2
   navipet_api:
     path: packages/navipet_api
+  sensors_plus: ^7.1.1
 
 dev_dependencies:
   flutter_test:
