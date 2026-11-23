@@ -14,6 +14,8 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, IndoorArChannel.CHANNEL)
             .setMethodCallHandler(channel)
         indoorAr = channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "navipet/indoor_wifi_scan")
+            .setMethodCallHandler(IndoorWifiScanChannel(this))
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

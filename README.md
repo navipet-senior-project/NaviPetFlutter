@@ -428,6 +428,48 @@ The three most recent selected destinations are kept only on the phone and can
 be cleared from Search. They are not uploaded to Supabase. Class locations are
 stored in Supabase so Search can adapt to a user's schedule across devices.
 
+## Wave D floor-pressure measurements
+
+On a barometer-equipped phone, launch a debug build with
+`flutter run --dart-define=NAVIPET_DEV_ROUTE=/dev/floor-pressure`. The recorder
+is available while signed out and has no production entry. Device behavior has
+not yet been verified on campus.
+
+Start recording, enter the floor you are standing on, and select **Confirm
+floor**. Select **Start moving between floors** before leaving a floor, then
+confirm the new floor after arriving. Each new run also requires a floor
+confirmation. Readings without a confirmed floor are omitted. Stop to save a
+run, then use **Copy JSON** to export saved runs or **Clear runs** to remove
+them. If saving fails, use **Retry save**.
+
+Runs are stored on the device and contain the platform and per-sample floor,
+elapsed time, and pressure change in hPa relative to the first reading in that
+run. They do not contain absolute pressure, wall-clock time, location, or an
+identifier. Compare changes only within a run: handling, HVAC, and weather can
+affect pressure. iOS may require Motion & Fitness access; devices without a
+barometer cannot record.
+
+## VEC Wi-Fi survey and floor belief
+
+In a debug build, open the VEC indoor map and tap the Wi-Fi icon in the app bar
+to open the positioning screen. On Android, survey at each available Unity
+landpoint while standing still; repeat captures at each point. Nearby scan
+results require Wi-Fi, location permission, and Android Location services.
+Scans and the particle filter's last belief stay in local app storage. Android
+limits scan frequency, so a scan may need to be retried. iOS does not provide
+nearby access-point scans to this app. Its barometer readings are supported;
+the existing AR confirmation remains a separate step.
+
+For barometer floor references, start a recording on floor 1, enter floor
+numbers consistently, and confirm each floor as you arrive. In the positioning
+screen confirm the current starting floor to anchor
+relative pressure for that outing. The floor belief can persist without Wi-Fi;
+Wi-Fi scans refresh the likely landmark when available. The current bundled
+Unity scan provides landmark coordinates for floors 1 and 2 only. Floors 3–5
+can have a floor belief from pressure calibration, but do not yet have surveyed
+Wi-Fi landpoints or coordinates in this build. These estimates are a prototype
+and need on-device VEC survey/validation before being used as navigation truth.
+
 ## Verification
 
 ```powershell
