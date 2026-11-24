@@ -511,6 +511,65 @@ void main() {
       });
     }
 
+    for (final localize in [false, true]) {
+      final mode = localize ? 'localize' : 'door';
+      testWidgets('$mode refreshes a boot clock reply received after resume', (
+        tester,
+      ) async {
+        final firstReply = Completer<double?>();
+        var clockReads = 0;
+        final harness = build(
+          request: localize
+              ? IndoorArRequest.localize(
+                  floor: '1',
+                  mapCode: IndoorArRequest.buildMapCode,
+                  frame: IndoorArRequest.buildFrame,
+                )
+              : null,
+          status: PermissionStatus.denied,
+          bootClock: () {
+            clockReads++;
+            return clockReads == 1
+                ? firstReply.future
+                : Future.value(4280.5 + now.inMilliseconds / 1000);
+          },
+        );
+        await harness.pump(tester);
+        await harness.tapAr(tester);
+        await tester.tap(find.text('Floor 2'));
+        await tester.pump();
+        await holdStill(tester, 20);
+        await holdStill(tester, 21, hPa: 999.5);
+        await tester.tap(find.text('Continue'));
+        await tester.pump();
+        expect(clockReads, 1);
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        await holdStill(tester, 12, hPa: 999.5);
+        const sampleAge = Duration(milliseconds: 250);
+        now += sampleAge;
+        await tester.pump(sampleAge);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await tester.pump();
+        expect(clockReads, 1);
+        expect(harness.fake.requests, isEmpty);
+
+        firstReply.complete(4321.5);
+        await tester.pumpAndSettle();
+        final request = harness.fake.requests.single;
+        expect(request.isLocalize, localize);
+        expect(clockReads, 2);
+        final wire = request.toJson();
+        expect(wire['requestSentAtBootS'], 4333.75);
+        expect(wire['pressureSinceStart'], {
+          'settled': true,
+          'moved': true,
+          'sampleAgeS': 0.25,
+          'deltaHpa': -0.5,
+        });
+      });
+    }
+
     testWidgets('a floor window that settles before resume gets a stamp', (
       tester,
     ) async {

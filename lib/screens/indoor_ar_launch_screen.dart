@@ -88,6 +88,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   Timer? _holdPoll;
   Completer<void>? _resumeWait;
   int _launchGeneration = 0;
+  int _focusLossGeneration = 0;
   late final Stopwatch _launchClock = Stopwatch()..start();
 
   Duration _elapsedNow() => widget.monotonicNow?.call() ?? _launchClock.elapsed;
@@ -121,6 +122,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       _checkHold();
       return;
     }
+    _focusLossGeneration++;
     if (_isBackgrounded(state)) {
       _launchGeneration++;
       _holdPoll?.cancel();
@@ -312,6 +314,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       final bootClock = widget.bootClock;
       final token = await gateway.fetch();
       double? sentAt;
+      int focusLossGeneration;
       // Stamped just before the ages are computed, so Unity's added send-to-SDK
       // time can only overstate them.
       do {
@@ -319,10 +322,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
           await (_resumeWait ??= Completer<void>()).future;
         }
         if (!_active) return;
+        focusLossGeneration = _focusLossGeneration;
         sentAt = bootClock != null && _anchor?.evidence()?.hasUsableDelta == true
             ? await bootClock()
             : null;
-      } while (_active && !_resumed);
+      } while (_active && focusLossGeneration != _focusLossGeneration);
       if (!_active) return;
       // Monotonic elapsed time advances the phone's clock from mint start, so
       // this expiry check inherits any clock skew already present at minting.
