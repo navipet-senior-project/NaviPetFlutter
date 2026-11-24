@@ -7,7 +7,7 @@ includes:
   account creation, password reset, anonymous guest sessions, persisted
   sessions, and profile data.
 - A native Mapbox map with live device location.
-- Mapbox destination autocomplete and walking directions.
+- Campus destination autocomplete through the backend and Mapbox walking directions.
 - A 2D Pet section with Elbee Home, Pack, Shop, and Quests. Home shows the
   signed-in user's saved classes and verified point balance (shown as gems);
   Quests uses the existing server-verified claim flow, Shop uses the existing
@@ -53,7 +53,8 @@ lib/
     search_history_store.dart       On-device recent destination history
     user_account.dart               Authenticated profile model
     mapbox_config.dart              Mapbox token and campus defaults
-    mapbox_navigation_service.dart  Search Box + Directions API client
+    campus_search_gateway.dart      Backend campus search and place lookup
+    mapbox_navigation_service.dart  Walking directions and class-location geocoding
     navigation_models.dart          Destination, route, and maneuver models
 
 EXTERNAL BACKEND
@@ -127,9 +128,12 @@ phone unless a note says so.
    nonnegative integers for `localizationQueries` and `durationMs`. An
    `error` also requires a nonempty string `errorCode`. If Unity closes without
    a result, either native host returns `error` / `UNITY_EXITED`. Dart decodes
-   malformed results as `error` / `BAD_RESULT`. For a destination result
-   marked `arrived`, Flutter confirms arrival when the room sign matches or
-   reports the distance if provided. A result with neither is invalid.
+   malformed results as `error` / `BAD_RESULT`. An `arrived` result's
+   `checkDistanceM`, when supplied, must be finite and nonnegative. Without a
+   distance, `arrived` requires a nonempty `signRoom`. For a destination
+   request, Flutter confirms arrival when `signRoom` matches the destination
+   `doorKey` after ignoring case and non-alphanumeric characters. Otherwise
+   it reports the distance if supplied or shows the `BAD_RESULT` message.
    Cancellation exits silently. See [sensor evidence](#sensor-evidence) for
    localization retries. Other results show a message and return to the
    previous screen, or to the map if there is no prior screen.
@@ -141,7 +145,9 @@ parses it in `IndoorArContract`. Poses pass through in the MultiSet MapSet
 frame (metres, +Y up). Both modes send `schemaVersion: 2` and accept optional
 floor evidence. A destination request carries `room`, `doorKey`, `floor`,
 `position`, `headingDeg`, `mapCode`, `frame`,
-`capabilities: ["signArrival"]`, and `arToken`. A localization request carries
+`capabilities: ["signArrival"]`, and `arToken`. The `signArrival` capability
+allows Unity to report a confirmed destination sign without a distance.
+A localization request carries
 `mode: localize`, `mapCode`, `frame`, `arToken`, and optional `room` and
 `floor`. Never log a request.
 
@@ -542,9 +548,11 @@ status.
 
 ## Navigation behavior
 
-Outdoor walking navigation uses Mapbox. The native Maps Flutter SDK handles
-rendering and location, the Search Box API finds destinations, and the Directions
-API's walking profile supplies route geometry and maneuver instructions.
+Campus destination search uses the backend's `GET /autocomplete`. It searches
+campus records first and can fall back to Mapbox for ordinary queries without
+a campus match that has outdoor coordinates. After destination selection, the
+Mapbox Directions API supplies walking route geometry and maneuver
+instructions. The Mapbox Maps Flutter SDK handles rendering and location.
 
 This is a functional foreground walking-navigation experience. Before treating
 it as safety-critical or shipping it broadly, add integration/device tests for
@@ -640,7 +648,8 @@ asset. No real keys are used in CI.
 | Password reset returns to OTP | The recovery token expired; request a new reset code and repeat the recovery flow. |
 | "Backend not configured" error on sign-up | Add `BACKEND_BASE_URL` to `.env` and restart the app. |
 | Confirmation email has a link but no six-digit code | Update the Supabase **Confirm signup** email template to include `{{ .Token }}`. |
-| Map is blank or destination search fails | Verify `MAPBOX_PUBLIC_TOKEN` is a valid `pk.*` token. |
+| Map is blank | Verify `MAPBOX_PUBLIC_TOKEN` is a valid `pk.*` token. |
+| Campus destination search fails | Verify `BACKEND_BASE_URL`, check that the backend is reachable, and sign in again if the session expired. |
 | Android Mapbox dependency returns 401 | Verify the global `MAPBOX_DOWNLOADS_TOKEN` starts with `sk.` and has `DOWNLOADS:READ`. |
 | Current location is unavailable | Enable precise location for NaviPet and turn on the phone's Location Services. |
 | Route is not found | Walking directions require a Mapbox-routable origin and destination; try a nearby street entrance. |
