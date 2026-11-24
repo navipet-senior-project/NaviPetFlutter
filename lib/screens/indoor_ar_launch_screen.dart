@@ -323,7 +323,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
         }
         if (!_active) return;
         focusLossGeneration = _focusLossGeneration;
-        sentAt = bootClock != null && _anchor?.evidence()?.hasUsableDelta == true
+        sentAt =
+            bootClock != null && _anchor?.evidence()?.hasUsableDelta == true
             ? await bootClock()
             : null;
       } while (_active && focusLossGeneration != _focusLossGeneration);

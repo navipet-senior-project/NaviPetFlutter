@@ -164,11 +164,7 @@ void main() {
             expect(wire['startFloor'], '1');
             final measured = wire['pressureSinceStart']! as Map;
             expect(measured['moved'], moved);
-            expect(
-              measured.containsKey('deltaHpa'),
-              sent,
-              reason: '$delta',
-            );
+            expect(measured.containsKey('deltaHpa'), sent, reason: '$delta');
             expect(measured['deltaHpa'], sent ? delta : null);
           }
         }

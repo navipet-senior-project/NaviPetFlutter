@@ -364,49 +364,50 @@ void main() {
         ('usable', 999.5, false, true),
       ]) {
         final mode = localize ? 'localize' : 'door';
-        testWidgets('$mode sends hint fields only for a usable delta ($label)', (
-          tester,
-        ) async {
-          var clockReads = 0;
-          final harness = build(
-            request: localize
-                ? IndoorArRequest.localize(
-                    floor: '1',
-                    mapCode: IndoorArRequest.buildMapCode,
-                    frame: IndoorArRequest.buildFrame,
-                  )
-                : null,
-            status: PermissionStatus.denied,
-            bootClock: () async {
-              clockReads++;
-              return 4321.5;
-            },
-          );
-          await harness.pump(tester);
-          await harness.tapAr(tester);
-          await tester.tap(find.text('Floor 2'));
-          await tester.pump();
-          await holdStill(tester, 20);
-          if (level != null) await holdStill(tester, 21, hPa: level);
-          if (returns) await holdStill(tester, 21);
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Continue'));
-          await tester.pumpAndSettle();
+        testWidgets(
+          '$mode sends hint fields only for a usable delta ($label)',
+          (tester) async {
+            var clockReads = 0;
+            final harness = build(
+              request: localize
+                  ? IndoorArRequest.localize(
+                      floor: '1',
+                      mapCode: IndoorArRequest.buildMapCode,
+                      frame: IndoorArRequest.buildFrame,
+                    )
+                  : null,
+              status: PermissionStatus.denied,
+              bootClock: () async {
+                clockReads++;
+                return 4321.5;
+              },
+            );
+            await harness.pump(tester);
+            await harness.tapAr(tester);
+            await tester.tap(find.text('Floor 2'));
+            await tester.pump();
+            await holdStill(tester, 20);
+            if (level != null) await holdStill(tester, 21, hPa: level);
+            if (returns) await holdStill(tester, 21);
+            await tester.pumpAndSettle();
+            await tester.tap(find.text('Continue'));
+            await tester.pumpAndSettle();
 
-          final request = harness.fake.requests.single;
-          expect(request.isLocalize, localize);
-          final wire = request.toJson();
-          expect(clockReads, sendHint ? 1 : 0);
-          expect(wire.containsKey('requestSentAtBootS'), sendHint);
-          expect(wire['requestSentAtBootS'], sendHint ? 4321.5 : null);
-          expect(wire['startFloor'], '2');
-          expect(wire['pressureSinceStart'], {
-            'settled': true,
-            'moved': level != null,
-            'sampleAgeS': 0,
-            if (sendHint) 'deltaHpa': -0.5,
-          });
-        });
+            final request = harness.fake.requests.single;
+            expect(request.isLocalize, localize);
+            final wire = request.toJson();
+            expect(clockReads, sendHint ? 1 : 0);
+            expect(wire.containsKey('requestSentAtBootS'), sendHint);
+            expect(wire['requestSentAtBootS'], sendHint ? 4321.5 : null);
+            expect(wire['startFloor'], '2');
+            expect(wire['pressureSinceStart'], {
+              'settled': true,
+              'moved': level != null,
+              'sampleAgeS': 0,
+              if (sendHint) 'deltaHpa': -0.5,
+            });
+          },
+        );
       }
     }
 
@@ -544,12 +545,16 @@ void main() {
         await tester.pump();
         expect(clockReads, 1);
 
-        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
         await holdStill(tester, 12, hPa: 999.5);
         const sampleAge = Duration(milliseconds: 250);
         now += sampleAge;
         await tester.pump(sampleAge);
-        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
         await tester.pump();
         expect(clockReads, 1);
         expect(harness.fake.requests, isEmpty);
