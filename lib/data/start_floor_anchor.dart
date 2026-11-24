@@ -10,9 +10,9 @@ import 'indoor_ar_contract.dart';
 ///
 /// Nothing but two flags and an age leaves this class: no absolute or raw
 /// pressure, no wall-clock time, no location. Time is the injected monotonic
-/// [clock]. A settled window may include samples from just before the
-/// confirmation; walking would make it unsettled, so a still phone is the only
-/// way to anchor.
+/// [clock]. The anchor needs a settled window at the moment of
+/// confirmation (it may include samples from just before); otherwise the
+/// evidence stays `settled: false` until the user confirms again.
 ///
 /// shortcut: one iPhone, one building, one afternoon of data backs the
 /// thresholds; re-measure on a second device and over longer drift.
@@ -65,9 +65,11 @@ class StartFloorAnchor {
     if (value.isEmpty) return false;
     _floor = value;
     _confirmedAt = _clock();
-    _anchor = null;
+    // Anchored only if the level is settled right now. An unsettled phone gets
+    // no anchor, later or ever: settling afterwards could validate a floor the
+    // user was no longer on when they answered. They must confirm again.
+    _anchor = _settledMedian(_confirmedAt);
     _moved = false;
-    _evaluate();
     return true;
   }
 
@@ -80,7 +82,7 @@ class StartFloorAnchor {
     return IndoorArStartFloor(
       floor: floor,
       ageS: (now - _confirmedAt).inMilliseconds / 1000,
-      settled: _settledMedian(now) != null,
+      settled: _anchor != null && _settledMedian(now) != null,
       moved: _moved,
       sampleAgeS: (now - _buffer.last.at).inMilliseconds / 1000,
     );
@@ -94,13 +96,10 @@ class StartFloorAnchor {
   }
 
   void _evaluate() {
-    if (_floor == null) return;
-    final median = _settledMedian(_clock());
-    if (median == null) return;
     final anchor = _anchor;
-    if (anchor == null) {
-      _anchor = median;
-    } else if ((median - anchor).abs() >= moveHpa) {
+    if (anchor == null) return;
+    final median = _settledMedian(_clock());
+    if (median != null && (median - anchor).abs() >= moveHpa) {
       _moved = true; // latched: going up and back is still a move
     }
   }

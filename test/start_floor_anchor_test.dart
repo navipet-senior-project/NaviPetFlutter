@@ -121,6 +121,21 @@ void main() {
     expect(e.moved, isFalse);
   });
 
+  test('confirming while unsettled never anchors later', () async {
+    final rig = _Rig();
+    for (var i = 0; i < 10; i++) {
+      await rig.hold(1000 + i * 0.2, 1); // still climbing
+    }
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1003, 60); // settles afterwards
+    final e = rig.anchor.evidence()!;
+    expect(e.settled, isFalse);
+    expect(e.moved, isFalse);
+    // A fresh confirmation once settled anchors.
+    rig.anchor.confirmFloor('2');
+    expect(rig.anchor.evidence()!.settled, isTrue);
+  });
+
   test('moved stays latched after returning to the anchor level', () async {
     final rig = _Rig();
     await rig.hold(1000, 25);
