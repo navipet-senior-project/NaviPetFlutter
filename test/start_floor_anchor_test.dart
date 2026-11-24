@@ -254,6 +254,31 @@ void main() {
     },
   );
 
+  for (final (label, rawGapMs, skewBeforeMs, skewAfterMs, resets) in [
+    ('9.9 s on both clocks', 9900, 0, 0, false),
+    ('10 s on both clocks', 10000, 0, 0, true),
+    ('10 s on the sensor clock only', 10000, 0, 4, true),
+    ('10 s on the elapsed clock only', 9996, 4, 0, true),
+  ]) {
+    test('capture gap of $label', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 24);
+      rig.wallOffset = Duration(milliseconds: skewBeforeMs);
+      await rig.hold(1000, 1);
+      expect(rig.anchor.evidence(), isNotNull);
+      rig.wallOffset = Duration(milliseconds: skewAfterMs);
+      rig.now += Duration(milliseconds: rawGapMs);
+      rig.source.controller.add(
+        PressureReading(hPa: 1000, timestamp: _wall.add(rig.now)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await rig.hold(1000, 5);
+      expect(rig.anchor.evidence(), resets ? isNull : isNotNull);
+      expect(rig.source.controller.hasListener, isTrue);
+    });
+  }
+
   test('a settled 0.47 hPa step latches movement', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
@@ -273,13 +298,19 @@ void main() {
     expect(e.moved, isFalse);
   });
 
-  test('a 0.06 hPa range is settled at confirmation and handoff', () async {
-    final rig = _Rig();
-    rig.anchor.confirmFloor('1');
-    await rig.hold(1000.01, 19, noiseHpa: 0);
-    await rig.hold(1000.07, 1, noiseHpa: 0);
-    expect(rig.anchor.evidence(), isNotNull);
-  });
+  for (final (low, high, settled) in [
+    (1000.01, 1000.069, true),
+    (1000.01, 1000.07, false),
+    (1000.00, 1000.06, false),
+  ]) {
+    test('a range from $low to $high hPa at confirmation', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(low, 19, noiseHpa: 0);
+      await rig.hold(high, 1, noiseHpa: 0);
+      expect(rig.anchor.evidence(), settled ? isNotNull : isNull);
+    });
+  }
 
   test('a settled 0.30 hPa step latches movement', () async {
     final rig = _Rig();

@@ -35,12 +35,17 @@ pressure values. That shows the two paths agree; it does not show the sensor is
 accurate on any device.
 
 The anchor drops captures less than 0.5 s apart. A settled 20 s window has
-at least 8 samples spanning at least 18 s and a range of at most 0.06 hPa.
+at least 8 samples spanning at least 18 s and a range below 0.06 hPa.
 A settled median difference of at least 0.30 hPa sets `moved`.
 
 After the initial hold, captures that pass the spacing check clear the pressure
-window if the gap exceeds 10 s or the timestamp goes backward. Collection can
-continue until the confirmation expires at 1200 s. A new settled
+window if the gap is at least 10 s on either capture clock or a timestamp goes
+backward. Flutter is intentionally stricter than Unity at the gap and range
+boundaries. Unity resets for gaps over 10 s and accepts a settled range of
+0.06 hPa. Flutter treats ranges within 1e-9 hPa of that limit as unsettled.
+The outgoing sample-age limit is inclusive at 10 s.
+
+Collection can continue until the confirmation expires at 1200 s. A new settled
 window is compared with the original anchor. Flutter deliberately keeps
 `moved` latched after detecting a settled pressure change, so a return to the
 anchor pressure does not restore Unity's floor veto.

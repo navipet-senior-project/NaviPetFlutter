@@ -43,6 +43,7 @@ class StartFloorAnchor {
   static const _minSampleSpan = Duration(seconds: 18);
   static const _minSampleSpacing = Duration(milliseconds: 500);
   static const _maxAnchorGap = Duration(seconds: 2);
+  static const _captureGapLimit = Duration(seconds: 10);
   static const _timestampTolerance = Duration(milliseconds: 5);
   static const maxRangeHpa = 0.06;
   static const moveHpa = 0.30;
@@ -220,10 +221,11 @@ class StartFloorAnchor {
         }
         return;
       }
-      final maxGap = anchor == null
-          ? _maxAnchorGap
-          : IndoorArStartFloor.maxSampleAge;
-      if (elapsedGap > maxGap || timestampGap > maxGap) {
+      final gap = elapsedGap > timestampGap ? elapsedGap : timestampGap;
+      final exceededGap = anchor == null
+          ? gap > _maxAnchorGap
+          : gap >= _captureGapLimit;
+      if (exceededGap) {
         if (anchor == null) {
           invalidate();
           return;
@@ -275,7 +277,7 @@ class StartFloorAnchor {
       return null;
     }
     final values = [for (final s in samples) s.hPa]..sort();
-    if (values.last - values.first > maxRangeHpa + _pressureRoundoffHpa) {
+    if (values.last - values.first >= maxRangeHpa - _pressureRoundoffHpa) {
       return null;
     }
     final mid = values.length ~/ 2;
