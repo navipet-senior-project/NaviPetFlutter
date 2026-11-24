@@ -80,10 +80,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   var _exiting = false;
   String? _retryText;
   StartFloorAnchor? _anchor;
+  Timer? _holdPoll;
 
   bool get _active => mounted && !_exiting;
 
-  static bool _isBackgrounded(AppLifecycleState? state) => switch (state) {
+  static bool _isBackgrounded(AppLifecycleState state) => switch (state) {
     AppLifecycleState.hidden ||
     AppLifecycleState.paused ||
     AppLifecycleState.detached => true,
@@ -103,7 +104,12 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_isBackgrounded(state)) _anchor?.invalidate();
+    if (_isBackgrounded(state)) {
+      _holdPoll?.cancel();
+      _anchor?.invalidate();
+    } else if (state == AppLifecycleState.resumed) {
+      _checkHold();
+    }
   }
 
   Future<void> _start() async {
@@ -212,17 +218,22 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
     }
     // The barometer needs a still phone for about 20 s after the answer.
     setState(() => _holding = true);
-    while (_active &&
-        _holding &&
-        (_isBackgrounded(WidgetsBinding.instance.lifecycleState) ||
-            !_anchor!.resolved)) {
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+    _holdPoll = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) => _checkHold(),
+    );
+    _checkHold();
+  }
+
+  void _checkHold() {
+    if (_active && _holding && _anchor!.resolved) {
+      unawaited(_stopHolding());
     }
-    if (_active && _holding) await _stopHolding();
   }
 
   Future<void> _stopHolding({bool discard = false}) async {
     if (!_active || !_holding) return;
+    _holdPoll?.cancel();
     setState(() => _holding = false);
     if (discard) unawaited(_anchor?.reset());
     await _checkCamera();
@@ -337,6 +348,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   void _cancelAttempt() {
     if (_exiting) return;
     _exiting = true;
+    _holdPoll?.cancel();
     unawaited(_anchor?.reset());
   }
 
@@ -361,6 +373,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _holdPoll?.cancel();
     _anchor?.dispose();
     super.dispose();
   }
@@ -384,103 +397,102 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
             _placeLookupFailure != null
         ? AppBar(title: const Text('AR mode'))
         : null,
-    body: Center(
-      child: _placeLookupFailure != null
-          ? _message(
-              _placeLookupFailure!,
-              action: 'Retry',
-              onAction: _retry,
-              back: 'Back to map',
-              onBack: () => _leave(null),
-            )
-          : _retryText != null
-          ? _message(
-              _retryText!,
-              action: 'Try again',
-              onAction: _retry,
-              back: 'Back to map',
-              onBack: () => _leave(null),
-            )
-          : _unavailable
-          ? _message(
-              _tokenFailed
-                  ? "Couldn't start AR. Check your connection and try again."
-                  : "Indoor AR isn't available for this room",
-              action: 'Retry',
-              onAction: _retry,
-              back: 'Back to map',
-              onBack: () => _leave(null),
-            )
-          : _holding
-          ? Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Hold still for a few seconds while NaviPet checks your '
-                    'floor with the barometer.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  const CircularProgressIndicator(),
-                  TextButton(
-                    onPressed: () => _stopHolding(discard: true),
-                    child: const Text('Continue without waiting'),
-                  ),
-                ],
-              ),
-            )
-          : _choosingFloor
-          ? Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Which floor are you standing on? Choosing one turns on the '
-                    "barometer to check you don't change floors. Skip to "
-                    'continue without it.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  for (final floor in scannedIndoorFloors.toList()..sort())
-                    FilledButton(
-                      onPressed: () => _floorChosen(floor),
-                      child: Text('Floor $floor'),
-                    ),
-                  TextButton(
-                    onPressed: () => _floorChosen(null),
-                    child: const Text('Skip'),
-                  ),
-                ],
-              ),
-            )
-          : _blocked
-          ? _message(
-              _cameraOff,
-              action: 'Open settings',
-              onAction: _openSettings,
-              back: 'Back to map',
-              onBack: () => _leave(null),
-            )
-          : _rationale
-          ? _message(
-              _guideToRoom
-                  ? 'Allow camera access so NaviPet can point toward this room. '
-                        'This is a direction to the room, not turn-by-turn guidance.'
-                  : 'Allow camera access to scan and find your position. '
-                        'No door position is saved, so this does not start a route.',
-              action: 'Continue',
-              onAction: _askForCamera,
-              back: 'Not now',
-              onBack: () => _leave(
-                'AR needs camera access. Tap the AR button to try again.',
-              ),
-            )
-          : const CircularProgressIndicator(),
-    ),
+    body: Center(child: SingleChildScrollView(child: _content())),
   );
+
+  Widget _content() => _placeLookupFailure != null
+      ? _message(
+          _placeLookupFailure!,
+          action: 'Retry',
+          onAction: _retry,
+          back: 'Back to map',
+          onBack: () => _leave(null),
+        )
+      : _retryText != null
+      ? _message(
+          _retryText!,
+          action: 'Try again',
+          onAction: _retry,
+          back: 'Back to map',
+          onBack: () => _leave(null),
+        )
+      : _unavailable
+      ? _message(
+          _tokenFailed
+              ? "Couldn't start AR. Check your connection and try again."
+              : "Indoor AR isn't available for this room",
+          action: 'Retry',
+          onAction: _retry,
+          back: 'Back to map',
+          onBack: () => _leave(null),
+        )
+      : _holding
+      ? Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Hold still for a few seconds while NaviPet checks your '
+                'floor with the barometer.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              const CircularProgressIndicator(),
+              TextButton(
+                onPressed: () => _stopHolding(discard: true),
+                child: const Text('Continue without waiting'),
+              ),
+            ],
+          ),
+        )
+      : _choosingFloor
+      ? Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Which floor are you standing on? Choosing one turns on the '
+                "barometer to check you don't change floors. Skip to "
+                'continue without it.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              for (final floor in scannedIndoorFloors.toList()..sort())
+                FilledButton(
+                  onPressed: () => _floorChosen(floor),
+                  child: Text('Floor $floor'),
+                ),
+              TextButton(
+                onPressed: () => _floorChosen(null),
+                child: const Text('Skip'),
+              ),
+            ],
+          ),
+        )
+      : _blocked
+      ? _message(
+          _cameraOff,
+          action: 'Open settings',
+          onAction: _openSettings,
+          back: 'Back to map',
+          onBack: () => _leave(null),
+        )
+      : _rationale
+      ? _message(
+          _guideToRoom
+              ? 'Allow camera access so NaviPet can point toward this room. '
+                    'This is a direction to the room, not turn-by-turn guidance.'
+              : 'Allow camera access to scan and find your position. '
+                    'No door position is saved, so this does not start a route.',
+          action: 'Continue',
+          onAction: _askForCamera,
+          back: 'Not now',
+          onBack: () =>
+              _leave('AR needs camera access. Tap the AR button to try again.'),
+        )
+      : const CircularProgressIndicator();
 
   Widget _message(
     String text, {

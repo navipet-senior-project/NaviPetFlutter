@@ -250,12 +250,14 @@ void main() {
     _Harness build({
       Future<http.Response> Function(http.Request)? mint,
       IndoorArLauncher? launcher,
+      IndoorArResult result = _cancelled,
       PermissionStatus status = PermissionStatus.granted,
       PermissionStatus camera = PermissionStatus.granted,
     }) {
       now = Duration.zero;
       source = StreamController<PressureReading>.broadcast();
       return _Harness(
+        result: result,
         status: status,
         camera: camera,
         mint: mint,
@@ -278,6 +280,15 @@ void main() {
         source.add(PressureReading(hPa: hPa, timestamp: wallClock()));
         await tester.pump(const Duration(seconds: 1));
       }
+    }
+
+    void useShortLandscape(WidgetTester tester) {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(480, 208);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.5;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     }
 
     testWidgets('asks first, reads no sensor, launches nothing', (
@@ -318,6 +329,62 @@ void main() {
       expect(source.hasListener, isFalse);
       launcher.resultReady.complete(_cancelled);
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('floor and hold bypass actions scroll into reach', (
+      tester,
+    ) async {
+      useShortLandscape(tester);
+      final harness = build();
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      final skip = find.text('Skip');
+      expect(skip.hitTestable(), findsNothing);
+      await tester.ensureVisible(skip);
+      await tester.tap(skip);
+      await tester.pumpAndSettle();
+      expect(harness.fake.requests.single.startFloor, isNull);
+      expect(source.hasListener, isFalse);
+
+      await harness.tapAr(tester);
+      final floor = find.text('Floor 2');
+      await tester.ensureVisible(floor);
+      await tester.tap(floor);
+      await tester.pump();
+      final continueEarly = find.text('Continue without waiting');
+      await tester.ensureVisible(continueEarly);
+      await tester.tap(continueEarly);
+      await tester.pumpAndSettle();
+      expect(harness.fake.requests, hasLength(2));
+      expect(harness.fake.requests.last.startFloor, isNull);
+      expect(source.hasListener, isFalse);
+    });
+
+    testWidgets('localization retry and exit remain reachable', (tester) async {
+      useShortLandscape(tester);
+      final harness = build(
+        result: const IndoorArResult(
+          status: IndoorArStatus.localizationFailed,
+          localizationQueries: 1,
+          durationMs: 1,
+        ),
+      );
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      for (var attempt = 0; attempt < 2; attempt++) {
+        final floor = find.text('Floor 2');
+        await tester.ensureVisible(floor);
+        await tester.tap(floor);
+        await tester.pump();
+        await holdStill(tester, 20);
+        await tester.pumpAndSettle();
+        final action = find.text(attempt == 0 ? 'Try again' : 'Back to map');
+        await tester.ensureVisible(action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+      }
+      expect(harness.fake.requests, hasLength(2));
+      expect(find.text('map'), findsOneWidget);
     });
 
     testWidgets('continuing without waiting sends no start floor', (
@@ -467,7 +534,7 @@ void main() {
             AppLifecycleState.paused,
           );
           try {
-            await tester.pump(const Duration(milliseconds: 500));
+            await tester.pump(const Duration(seconds: 10, milliseconds: 250));
             expect(source.hasListener, isFalse);
             expect(harness.statusChecks, duringHold ? 0 : 1);
           } finally {
@@ -475,6 +542,9 @@ void main() {
               AppLifecycleState.resumed,
             );
           }
+          await tester.pump();
+          expect(harness.statusChecks, 1);
+          expect(find.text(_rationale), findsOneWidget);
           await holdStill(tester, 22);
           await tester.pumpAndSettle();
           await tester.tap(find.text('Continue'));
@@ -482,6 +552,7 @@ void main() {
 
           final request = harness.fake.requests.single.toJson();
           expect(request['pressureSinceStart'], containsPair('settled', false));
+          expect(harness.statusChecks, 1);
         },
       );
     }
