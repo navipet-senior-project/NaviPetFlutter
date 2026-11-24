@@ -309,17 +309,20 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       final generation = _launchGeneration;
       final mintWallTime = widget.now();
       final mintStarted = _elapsedNow();
+      final bootClock = widget.bootClock;
       final token = await gateway.fetch();
-      if (!_active) return;
+      double? sentAt;
       // Stamped just before the ages are computed, so Unity's added send-to-SDK
       // time can only overstate them.
-      final bootClock = widget.bootClock;
-      final sentAt = bootClock != null && _anchor?.evidence() != null
-          ? await bootClock()
-          : null;
-      while (_active && !_resumed) {
-        await (_resumeWait ??= Completer<void>()).future;
-      }
+      do {
+        while (_active && !_resumed) {
+          await (_resumeWait ??= Completer<void>()).future;
+        }
+        if (!_active) return;
+        sentAt = bootClock != null && _anchor?.evidence() != null
+            ? await bootClock()
+            : null;
+      } while (_active && !_resumed);
       if (!_active) return;
       // Monotonic elapsed time advances the phone's clock from mint start, so
       // this expiry check inherits any clock skew already present at minting.

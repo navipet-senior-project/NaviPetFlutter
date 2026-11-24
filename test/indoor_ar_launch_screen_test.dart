@@ -221,6 +221,7 @@ void main() {
       status: PermissionStatus.granted,
       destinationId: 'another-room',
       fetch: (_) async => http.Response(jsonEncode(json), 200),
+      bootClock: () async => fail('Launch without an anchor read the clock'),
       result: const IndoorArResult(
         status: IndoorArStatus.arrived,
         checkDistanceM: 0.5,
@@ -413,7 +414,9 @@ void main() {
           tokenElapsed: () => elapsed,
           bootClock: () {
             clockReads++;
-            return clock.future;
+            return clockReads == 1
+                ? clock.future
+                : Future.value(4301.5 + now.inMilliseconds / 1000);
           },
         );
         await harness.pump(tester);
@@ -432,23 +435,71 @@ void main() {
         expect(harness.fake.requests, isEmpty);
         if (lifecycle != AppLifecycleState.resumed) {
           expect(find.text('Retry'), findsNothing);
+          if (lifecycle == AppLifecycleState.inactive) {
+            await holdStill(tester, 12);
+            const sampleAge = Duration(milliseconds: 250);
+            now += sampleAge;
+            await tester.pump(sampleAge);
+            expect(clockReads, 1);
+          }
           tester.binding.handleAppLifecycleStateChanged(
             AppLifecycleState.resumed,
           );
         }
         await tester.pumpAndSettle();
         if (lifecycle == AppLifecycleState.inactive) {
-          expect(
-            harness.fake.requests.single.startFloor?.requestSentAtBootS,
-            4321.5,
-          );
+          final evidence = harness.fake.requests.single.startFloor!;
+          expect(clockReads, 2);
+          expect(evidence.requestSentAtBootS, 4333.75);
+          expect(evidence.sampleAgeS, 0.25);
         } else {
+          expect(clockReads, 1);
           expect(harness.fake.requests, isEmpty);
           expect(find.text('Retry'), findsOneWidget);
         }
         expect(source.hasListener, isFalse);
       });
     }
+
+    testWidgets('a floor window that settles before resume gets a stamp', (
+      tester,
+    ) async {
+      final mint = Completer<http.Response>();
+      var clockReads = 0;
+      final harness = build(
+        mint: (_) => mint.future,
+        bootClock: () async {
+          clockReads++;
+          return 4300 + now.inSeconds.toDouble();
+        },
+      );
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      expect(harness.mintRequests, hasLength(1));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await holdStill(tester, 1, hPa: 1000.5);
+      mint.complete(http.Response(_mintedBody, 200));
+      await tester.pump();
+      await holdStill(tester, 20, hPa: 1000.5);
+      expect(clockReads, 0);
+      expect(harness.fake.requests, isEmpty);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      final json = harness.fake.requests.single.toJson();
+      expect(clockReads, 1);
+      expect(json['requestSentAtBootS'], 4341);
+      expect(json['pressureSinceStart'], {
+        'settled': true,
+        'moved': true,
+        'sampleAgeS': 0,
+        'deltaHpa': 0.5,
+      });
+    });
 
     testWidgets('floor and hold bypass actions scroll into reach', (
       tester,
