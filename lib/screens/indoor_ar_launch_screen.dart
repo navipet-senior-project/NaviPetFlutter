@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -195,8 +197,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     if (mounted && _holding) await _stopHolding();
   }
 
-  Future<void> _stopHolding() async {
+  Future<void> _stopHolding({bool discard = false}) async {
     setState(() => _holding = false);
+    if (discard) unawaited(_anchor?.reset());
     await _checkCamera();
   }
 
@@ -206,6 +209,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       if (!mounted) return;
       if (camera.isGranted) {
         await _launch();
+      } else if (camera.isPermanentlyDenied) {
+        _blockCamera();
       } else {
         setState(() => _rationale = true);
       }
@@ -220,7 +225,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       final camera = await widget.requestCamera();
       if (!mounted) return;
       if (camera.isPermanentlyDenied) {
-        setState(() => _blocked = true);
+        _blockCamera();
       } else if (camera.isGranted) {
         await _launch();
       } else {
@@ -229,6 +234,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     } catch (error) {
       _launchFailed(error);
     }
+  }
+
+  void _blockCamera() {
+    unawaited(_anchor?.reset());
+    setState(() => _blocked = true);
   }
 
   Future<void> _launch() async {
@@ -243,7 +253,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         throw const IndoorArTokenException(0);
       }
     } on IndoorArTokenException {
-      _anchor?.reset(); // the failure screen collects nothing
+      unawaited(_anchor?.reset()); // the failure screen collects nothing
       if (mounted) {
         setState(() {
           _unavailable = true;
@@ -254,12 +264,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     }
     if (!mounted) return;
     final evidence = _anchor?.evidence();
+    unawaited(_anchor?.reset());
     final result = await widget.launcher.launch(
       _request!.withArToken(token).withStartFloor(evidence),
     );
     if (!mounted) return;
-    // The evidence is spent: Unity has stopped sampling and never reuses it.
-    _anchor?.reset();
     if (evidence != null &&
         result.status == IndoorArStatus.localizationFailed) {
       // Unity's "Try again" returns here (Addendum 9): ask the floor afresh.
@@ -301,6 +310,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   void _leave(String? message) {
     if (!mounted) return;
+    unawaited(_anchor?.reset());
     if (message != null) {
       ScaffoldMessenger.of(
         context,
@@ -374,7 +384,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
                   const SizedBox(height: 16),
                   const CircularProgressIndicator(),
                   TextButton(
-                    onPressed: _stopHolding,
+                    onPressed: () => _stopHolding(discard: true),
                     child: const Text('Continue without waiting'),
                   ),
                 ],

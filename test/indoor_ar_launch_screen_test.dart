@@ -49,6 +49,16 @@ class _ThrowingLauncher implements IndoorArLauncher {
       Future.error(StateError('launch failed'));
 }
 
+class _PendingLauncher extends FakeIndoorArLauncher {
+  final resultReady = Completer<IndoorArResult>();
+
+  @override
+  Future<IndoorArResult> launch(IndoorArRequest request) {
+    requests.add(request);
+    return resultReady.future;
+  }
+}
+
 class _StreamSource implements PressureSource {
   const _StreamSource(this.stream);
 
@@ -235,17 +245,25 @@ void main() {
   group('start floor question', () {
     var source = StreamController<PressureReading>.broadcast();
     var now = Duration.zero;
+    DateTime wallClock() => DateTime.utc(2026).add(now);
 
-    _Harness build({Future<http.Response> Function(http.Request)? mint}) {
+    _Harness build({
+      Future<http.Response> Function(http.Request)? mint,
+      IndoorArLauncher? launcher,
+      PermissionStatus status = PermissionStatus.granted,
+      PermissionStatus camera = PermissionStatus.granted,
+    }) {
       now = Duration.zero;
       source = StreamController<PressureReading>.broadcast();
       return _Harness(
-        status: PermissionStatus.granted,
+        status: status,
+        camera: camera,
         mint: mint,
+        launcher: launcher,
         anchor: StartFloorAnchor(
           source: _StreamSource(source.stream),
           clock: () => now,
-          wallClock: () => DateTime.utc(2026),
+          wallClock: wallClock,
         ),
       );
     }
@@ -253,7 +271,7 @@ void main() {
     Future<void> holdStill(WidgetTester tester, int seconds) async {
       for (var i = 0; i < seconds; i++) {
         now += const Duration(seconds: 1);
-        source.add(PressureReading(hPa: 1000, timestamp: DateTime.utc(2026)));
+        source.add(PressureReading(hPa: 1000, timestamp: wallClock()));
         await tester.pump(const Duration(seconds: 1));
       }
     }
@@ -273,17 +291,18 @@ void main() {
     testWidgets('confirmed floor held still sends the evidence', (
       tester,
     ) async {
-      final harness = build();
+      final launcher = _PendingLauncher();
+      final harness = build(launcher: launcher);
       await harness.pump(tester);
       await harness.tapAr(tester);
       await tester.tap(find.text('Floor 2'));
       await tester.pump();
       expect(find.textContaining('Hold still'), findsOneWidget);
       expect(source.hasListener, isTrue);
-      expect(harness.fake.requests, isEmpty);
+      expect(launcher.requests, isEmpty);
       await holdStill(tester, 20);
-      await tester.pumpAndSettle();
-      final json = harness.fake.requests.single.toJson();
+      await tester.pump();
+      final json = launcher.requests.single.toJson();
       expect(json['floor'], '1', reason: 'destination floor is untouched');
       expect(json['startFloor'], '2');
       expect(json['startFloorAgeS'], 20);
@@ -292,22 +311,60 @@ void main() {
         'moved': false,
         'sampleAgeS': 0,
       });
+      expect(source.hasListener, isFalse);
+      launcher.resultReady.complete(_cancelled);
+      await tester.pumpAndSettle();
     });
 
     testWidgets('continuing without waiting sends no start floor', (
       tester,
     ) async {
-      final harness = build();
+      final mint = Completer<http.Response>();
+      final harness = build(mint: (_) => mint.future);
       await harness.pump(tester);
       await harness.tapAr(tester);
       await tester.tap(find.text('Floor 2'));
       await tester.pump();
+      await holdStill(tester, 19);
       await tester.tap(find.text('Continue without waiting'));
+      await tester.pump();
+      expect(harness.mintRequests, hasLength(1));
+      expect(source.hasListener, isFalse);
+      await holdStill(tester, 3);
+      mint.complete(http.Response(_mintedBody, 200));
       await tester.pumpAndSettle();
       final json = harness.fake.requests.single.toJson();
       expect(json.keys, isNot(contains('startFloor')));
       expect(json.keys, isNot(contains('pressureSinceStart')));
     });
+
+    for (final initiallyBlocked in [false, true]) {
+      testWidgets(
+        'permanent camera denial stops the sensor (initial: $initiallyBlocked)',
+        (tester) async {
+          final harness = build(
+            status: initiallyBlocked
+                ? PermissionStatus.permanentlyDenied
+                : PermissionStatus.denied,
+            camera: PermissionStatus.permanentlyDenied,
+          );
+          await harness.pump(tester);
+          await harness.tapAr(tester);
+          await tester.tap(find.text('Floor 2'));
+          await tester.pump();
+          await holdStill(tester, 20);
+          await tester.pumpAndSettle();
+          if (!initiallyBlocked) {
+            await tester.tap(find.text('Continue'));
+            await tester.pumpAndSettle();
+          }
+          expect(find.text('Open settings'), findsOneWidget);
+          expect(source.hasListener, isFalse);
+          expect(harness.mintRequests, isEmpty);
+          expect(harness.fake.requests, isEmpty);
+        },
+      );
+    }
 
     testWidgets('failure screen stops reading; retry asks again', (
       tester,
@@ -357,7 +414,7 @@ void main() {
           return StartFloorAnchor(
             source: _StreamSource(source.stream),
             clock: () => now,
-            wallClock: () => DateTime.utc(2026),
+            wallClock: wallClock,
           );
         }(),
       );

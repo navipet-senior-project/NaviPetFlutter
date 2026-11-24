@@ -19,7 +19,7 @@ class _Rig {
     anchor = StartFloorAnchor(
       source: source,
       clock: () => now,
-      wallClock: () => _wall,
+      wallClock: () => _wall.add(now),
     );
   }
 
@@ -40,7 +40,7 @@ class _Rig {
       source.controller.add(
         PressureReading(
           hPa: hPa + (_noise.isEven ? 0.01 : -0.01),
-          timestamp: _wall.subtract(age),
+          timestamp: _wall.add(now - age),
         ),
       );
       await Future<void>.delayed(Duration.zero);
@@ -158,6 +158,27 @@ void main() {
     expect(rig.anchor.evidence()!.settled, isTrue);
   });
 
+  test('a transition in the first two seconds rules out the answer', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 1);
+    await rig.hold(1000.25, 1);
+    await rig.hold(1000.5, 20);
+    expect(rig.anchor.evidence()!.settled, isFalse);
+  });
+
+  for (final delta in [-0.5, 0.5]) {
+    test('brief excursion of $delta hPa stays latched', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 20);
+      await rig.hold(1000 + delta, 2);
+      await rig.hold(1000, 22);
+      expect(rig.anchor.evidence()!.settled, isTrue);
+      expect(rig.anchor.evidence()!.moved, isTrue);
+    });
+  }
+
   test('first samples arriving late leave the answer uncovered', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
@@ -173,6 +194,41 @@ void main() {
     await rig.hold(1000, 30, age: const Duration(seconds: 10));
     expect(rig.anchor.evidence(), isNull);
     expect(rig.anchor.resolved, isTrue);
+  });
+
+  test('future and pre-confirmation captures are rejected', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 1, age: const Duration(seconds: -1));
+    expect(rig.anchor.evidence(), isNull);
+    await rig.hold(1000, 1, age: const Duration(milliseconds: 2900));
+    expect(rig.anchor.evidence(), isNull);
+  });
+
+  test('capture time controls when the window and newest sample end', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 20, age: const Duration(seconds: 2));
+    expect(rig.anchor.evidence()!.settled, isFalse);
+    await rig.hold(1000, 2, age: const Duration(seconds: 2));
+    expect(rig.anchor.evidence()!.settled, isTrue);
+    rig.gap(2);
+    await rig.hold(1000, 1, age: const Duration(milliseconds: 2900));
+    expect(rig.anchor.evidence()!.sampleAgeS, 2.9);
+  });
+
+  test('redelivery does not increase the number of captured samples', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 1);
+    for (var i = 0; i < 6; i++) {
+      rig.gap(2);
+      await rig.hold(1000, 1);
+    }
+    await rig.hold(1000, 1, age: const Duration(seconds: 1));
+    await rig.hold(1000, 1, age: const Duration(seconds: 2));
+    expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.anchor.evidence()!.sampleAgeS, 2);
   });
 
   test('moved stays latched after returning to the anchor level', () async {

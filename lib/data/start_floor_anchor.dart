@@ -17,11 +17,7 @@ import 'indoor_ar_contract.dart';
 ///
 /// Nothing but two flags and two ages leaves this class: no absolute or raw
 /// pressure, no wall-clock time, no location. Time is the injected monotonic
-/// [clock]; the wall clock only rejects readings the sensor stamped as old.
-///
-/// shortcut: assumes the platform stamps readings on the wall clock; verify on
-/// a device. If it does not, every reading is dropped and the evidence stays
-/// `settled: false`, which is the safe side.
+/// [clock].
 ///
 /// shortcut: one iPhone, one building, one afternoon of data backs the
 /// thresholds; re-measure on a second device and over longer drift.
@@ -39,8 +35,6 @@ class StartFloorAnchor {
   static const maxRangeHpa = 0.06;
   static const moveHpa = 0.30;
 
-  /// Latest moment, after the answer, that the anchor window may complete: the
-  /// window then still covers the answer to within [anchorLead] + 2 s.
   static const anchorDeadline = Duration(seconds: 22);
 
   /// A reading whose own timestamp is older than this is a delayed or replayed
@@ -53,7 +47,6 @@ class StartFloorAnchor {
   final PressureSource source;
   final Duration Function() _clock;
 
-  /// Only compares the sensor's own timestamp with now; never stored or sent.
   final DateTime Function() _wallClock;
 
   final _buffer = <({Duration at, double hPa})>[];
@@ -115,50 +108,52 @@ class StartFloorAnchor {
     final floor = _floor;
     if (floor == null || _failed || _buffer.isEmpty) return null;
     final now = _clock();
-    _evaluate();
     return IndoorArStartFloor(
       floor: floor,
       ageS: (now - _confirmedAt).inMilliseconds / 1000,
-      settled: _anchor != null && _settledMedian(now) != null,
+      settled: _anchor != null && _settledMedian(now - window, now) != null,
       moved: _moved,
       sampleAgeS: (now - _buffer.last.at).inMilliseconds / 1000,
     );
   }
 
   void _onReading(PressureReading reading) {
-    if (_wallClock().difference(reading.timestamp) > maxReadingAge) return;
+    final age = _wallClock().difference(reading.timestamp);
     final now = _clock();
-    _buffer.add((at: now, hPa: reading.hPa));
-    _buffer.removeWhere((s) => s.at <= now - window);
-    _evaluate();
-  }
-
-  void _evaluate() {
-    if (_floor == null) return;
-    final now = _clock();
-    final anchor = _anchor;
-    if (anchor == null) {
-      final since = now - _confirmedAt;
-      if (since >= window && since <= anchorDeadline) {
-        _anchor = _settledMedian(now, lead: anchorLead);
-      }
+    final at = now - age;
+    if (age.isNegative ||
+        age > maxReadingAge ||
+        at < _confirmedAt ||
+        !reading.hPa.isFinite ||
+        (_buffer.isNotEmpty && at <= _buffer.last.at)) {
       return;
     }
-    final median = _settledMedian(now);
-    if (median != null && (median - anchor).abs() >= moveHpa) {
+    _buffer.add((at: at, hPa: reading.hPa));
+    final anchor = _anchor;
+    if (anchor != null && (reading.hPa - anchor).abs() >= moveHpa) {
       _moved = true; // latched: going up and back is still a move
+    }
+    if (anchor == null &&
+        at - _confirmedAt >= window &&
+        now - _confirmedAt <= anchorDeadline) {
+      _anchor = _settledMedian(_confirmedAt, at, lead: anchorLead);
+    }
+    if (_anchor != null || now - _confirmedAt > anchorDeadline) {
+      _buffer.removeWhere((s) => s.at < now - window);
     }
   }
 
-  /// Median of the last [window] if it is dense, gap-free and flat, else null.
-  double? _settledMedian(Duration now, {Duration lead = maxGap}) {
-    final start = now - window;
+  double? _settledMedian(
+    Duration start,
+    Duration end, {
+    Duration lead = maxGap,
+  }) {
     final samples = [
       for (final s in _buffer)
-        if (s.at > start && s.at <= now) s,
+        if (s.at >= start && s.at <= end) s,
     ];
     if (samples.length < minSamples) return null;
-    if (samples.first.at - start > lead || now - samples.last.at > maxGap) {
+    if (samples.first.at - start > lead || end - samples.last.at > maxGap) {
       return null;
     }
     for (var i = 1; i < samples.length; i++) {
