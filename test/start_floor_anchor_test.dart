@@ -136,31 +136,52 @@ void main() {
     },
   );
 
-  for (final ageMs in [250, 500]) {
-    test(
-      'non-increasing capture at age ${ageMs}ms clears the window',
-      () async {
-        final rig = _Rig();
-        rig.anchor.confirmFloor('1');
-        await rig.hold(1000, 20);
-        expect(rig.anchor.evidence(), isNotNull);
-        rig.now += const Duration(milliseconds: 250);
-        rig.source.controller.add(
-          PressureReading(
-            hPa: 1000,
-            timestamp: _wall.add(rig.now - Duration(milliseconds: ageMs)),
-          ),
-        );
-        await Future<void>.delayed(Duration.zero);
-        expect(rig.anchor.evidence(), isNull);
-        expect(rig.source.controller.hasListener, isTrue);
-        await rig.hold(1000, 18);
-        expect(rig.anchor.evidence(), isNull);
-        await rig.hold(1000, 1);
-        expect(rig.anchor.evidence()?.moved, isFalse);
-      },
-    );
+  for (final (label, delay, pressure) in [
+    ('redelivery', Duration.zero, 1000.01),
+    ('capture 250 ms later', Duration(milliseconds: 250), 1000.08),
+  ]) {
+    test('$label preserves the settled window and newest sample age', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 20);
+      expect(rig.anchor.evidence(), isNotNull);
+      rig.now += const Duration(milliseconds: 250);
+      rig.source.controller.add(
+        PressureReading(
+          hPa: pressure,
+          timestamp: _wall.add(const Duration(seconds: 20) + delay),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      final evidence = rig.anchor.evidence();
+      expect(evidence?.sampleAgeS, 0.25);
+      expect(evidence?.moved, isFalse);
+    });
   }
+
+  test(
+    'a backward capture clears the window but preserves the anchor',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 20);
+      expect(rig.anchor.evidence(), isNotNull);
+      rig.now += const Duration(milliseconds: 250);
+      rig.source.controller.add(
+        PressureReading(
+          hPa: 1000,
+          timestamp: _wall.add(rig.now - const Duration(milliseconds: 500)),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(rig.anchor.evidence(), isNull);
+      expect(rig.source.controller.hasListener, isTrue);
+      await rig.hold(1000, 18);
+      expect(rig.anchor.evidence(), isNull);
+      await rig.hold(1000, 1);
+      expect(rig.anchor.evidence()?.moved, isFalse);
+    },
+  );
 
   for (final (gap, pressure, moved) in [
     (3, 1000.0, false),

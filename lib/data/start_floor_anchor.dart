@@ -69,6 +69,8 @@ class StartFloorAnchor {
   Duration _confirmedAt = Duration.zero;
   late DateTime _confirmedWallTime;
   double? _anchor;
+  // Keep Unity's floor veto disabled after a settled trip away, even if the
+  // current median returns to the anchor.
   var _moved = false;
 
   static Duration Function() _monotonic() {
@@ -200,10 +202,10 @@ class StartFloorAnchor {
     } else {
       final elapsedGap = at - last.at;
       final timestampGap = timestamp.difference(last.timestamp);
-      if (elapsedGap <= Duration.zero || timestampGap <= Duration.zero) {
+      if (elapsedGap.isNegative || timestampGap.isNegative) {
         if (anchor != null) {
           _buffer.clear();
-        } else if (elapsedGap.isNegative || timestampGap.isNegative) {
+        } else {
           invalidate();
         }
         return;

@@ -38,10 +38,12 @@ The anchor drops captures less than 0.5 s apart. A settled 20 s window has
 at least 8 samples spanning at least 18 s and a range of at most 0.06 hPa.
 A settled median difference of at least 0.30 hPa sets `moved`.
 
-After the initial hold, a capture gap over 10 s or a non-increasing timestamp
+After the initial hold, a capture gap over 10 s or a strictly backward timestamp
 clears the pressure window. Collection can continue until the confirmation
-expires at 1200 s. A new settled window is compared with the original anchor,
-and any movement already detected stays latched.
+expires at 1200 s. Duplicate captures leave the window intact. A new settled
+window is compared with the original anchor. Flutter deliberately keeps
+`moved` latched after detecting a settled pressure change, so a return to the
+anchor pressure does not restore Unity's floor veto.
 
 ## Known limits
 
