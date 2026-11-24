@@ -413,11 +413,6 @@ ignores the whole `android/unity-ar/` directory.
 See [iPhone testing](docs/ios-testing.md#indoor-ar) for setup and validation
 status.
 
-### Indoor AR floor confirmation
-
-The floor prompt is skippable. Useful floor evidence requires a paired Unity build with the NaviPetUnity PR 37 floor policy or later.
-The [floor-evidence guide](docs/indoor-ar-floor-evidence.md) covers `sensors_plus` timestamp and clock limits, calibration on one iPhone in one building, iOS Motion & Fitness permission, and device verification still pending on iOS and Android.
-
 ## Navigation behavior
 
 The app stays on Mapbox for this phase. It uses the native Maps Flutter SDK for
@@ -432,6 +427,17 @@ and battery use. Do not rely on it for emergency navigation.
 The three most recent selected destinations are kept only on the phone and can
 be cleared from Search. They are not uploaded to Supabase. Class locations are
 stored in Supabase so Search can adapt to a user's schedule across devices.
+
+### Indoor AR floor confirmation
+
+When indoor AR asks, choose the floor you are standing on and hold the phone
+still for about 20 seconds. Select **Skip** to proceed without starting the
+barometer or **Continue without waiting** to proceed without floor evidence
+after the hold starts. If you retry a failed floor-assisted scan in Unity,
+Flutter offers **Try again** to confirm your current floor again and
+**Back to map** to exit.
+See the [floor-evidence guide](docs/indoor-ar-floor-evidence.md) for Unity
+compatibility and device limits.
 
 ## Wave D floor-pressure measurements
 

@@ -13,8 +13,7 @@ import '../data/indoor_ar_token_gateway.dart';
 import '../data/indoor_floor_coverage.dart';
 import '../data/start_floor_anchor.dart';
 
-/// Asks for the camera, opens the Unity AR camera and returns to the map.
-/// Opened fresh by every AR tap, so every tap asks again.
+/// Prepares a Unity AR session and handles its result.
 class IndoorArLaunchScreen extends StatefulWidget {
   const IndoorArLaunchScreen({
     super.key,
@@ -36,8 +35,7 @@ class IndoorArLaunchScreen extends StatefulWidget {
   final IndoorArRequest? request;
   final CampusSearchGateway gateway;
 
-  /// Null skips the "which floor are you on" question. Owned by this screen,
-  /// which starts and disposes it.
+  /// Null skips the floor question. The screen owns and resets the anchor.
   final StartFloorAnchor? anchor;
 
   /// Null when the app has no backend session to ask; AR is then unavailable.

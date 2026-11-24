@@ -1,54 +1,56 @@
 # Indoor AR floor evidence (Flutter side)
 
-Before launching Unity, the app asks which floor the user stands on and sends
-Unity a small summary of whether the phone stayed on that level. Unity uses it
-to veto a map match on the wrong floor. The wire contract is Unity's
-`docs/floor-evidence-contract.md`; this page covers the Flutter host.
+Flutter uses the barometer to check whether the phone stayed on the floor the
+user confirmed. Unity can use that evidence to reject a map match on another
+floor. Unity's `docs/floor-evidence-contract.md` owns the wire contract.
 
 ## What is sent
 
-The app sends the fields below only when the user confirmed a positive integer
-floor, both pressure windows are settled, the confirmation is at most 1200 s
-old, the newest sample is at most 10 s old, and the sensor stream is alive.
+Door verification and localization use the same optional fields. Flutter
+requires a confirmed floor, a settled anchor and current window, a live sensor
+stream, and a newest sample at most 10 s old. Collection stops at 1200 s after
+confirmation. The serializers reject confirmation ages over 1200 s.
 
 - `floorEvidenceVersion` 1, `startFloor` (the user's own answer, never the
   destination), `startFloorAgeS`
 - `pressureSinceStart`: `settled` (always `true` when sent), `moved`, `sampleAgeS`
 
-Otherwise nothing is sent and Unity behaves as it did before. The AR floor
-summary carries no absolute or raw pressure, wall-clock time, or location.
-Skipping the prompt reads no sensor.
+If evidence is ineligible, Flutter omits all four floor fields and Unity uses
+its existing localization behavior. The summary carries no absolute or raw
+pressure, wall-clock time, or location. Flutter uses the same evidence snapshot
+to decide whether a `localizationFailed` result should offer a fresh floor
+confirmation.
 
 ## Same pressure as the recorder
 
 The floor anchor and the optional debug recorder both use
 `SensorsPlusPressureSource`. The `sensors_plus` barometer reports
-`BarometerEvent.pressure` directly in hPa. Starting a debug recording saves
-per-floor `deltaHpa` and `elapsedMs` measurements on the device. The user can
-choose to copy the recording as JSON.
-Flutter requests a 1 s sampling period. iOS ignores that request for the
-barometer, and Android treats it as a hint.
-`test/floor_pressure_parity_test.dart` drives that source
-through the plugin's channels and checks that a 0.47 hPa step is 0.47 in the
-recorder and latches `moved` in the anchor, and that the wire summary holds no
-pressure values. That shows the two paths agree; it does not show the sensor is
-accurate on any device.
+`BarometerEvent.pressure` directly in hPa. Flutter requests a 1 s sampling
+period. iOS ignores that request for the barometer, and Android treats it as a
+hint. The [parity test](../test/floor_pressure_parity_test.dart) drives the
+plugin channels to check units, movement, and the fields sent to Unity. See the
+[debug recorder instructions](../README.md#wave-d-floor-pressure-measurements)
+for local measurements and export.
 
-The anchor drops captures less than 0.5 s apart. A settled 20 s window has
-at least 8 samples spanning at least 18 s and a range below 0.06 hPa.
-A settled median difference of at least 0.30 hPa sets `moved`.
+## Settling and movement
+
+Flutter drops captures less than 0.5 s apart. The initial hold needs its first
+accepted capture within 1.5 s of confirmation and allows gaps up to 2 s. From
+20 s through the 22 s deadline, Flutter checks the full hold for stability and
+takes the anchor median from the trailing 20 s. A settled window has at least
+8 samples spanning at least 18 s on both capture clocks and a range below
+0.06 hPa.
 
 After the initial hold, captures that pass the spacing check clear the pressure
 window if the gap is at least 10 s on either capture clock or a timestamp goes
 backward. Flutter is intentionally stricter than Unity at the gap and range
 boundaries. Unity resets for gaps over 10 s and accepts a settled range of
 0.06 hPa. Flutter treats ranges within 1e-9 hPa of that limit as unsettled.
-The outgoing sample-age limit is inclusive at 10 s.
+The separate sample-age limit above remains inclusive.
 
-Collection can continue until the confirmation expires at 1200 s. A new settled
-window is compared with the original anchor. Flutter deliberately keeps
-`moved` latched after detecting a settled pressure change, so a return to the
-anchor pressure does not restore Unity's floor veto.
+Flutter compares each new settled median with the original anchor. A
+difference of at least 0.30 hPa sets `moved`. The flag remains set for that
+confirmation even if the pressure returns to the anchor.
 
 ## Known limits
 
@@ -57,17 +59,19 @@ anchor pressure does not restore Unity's floor veto.
   step or sleep can drop or mis-age readings. The usual result is dropped
   readings and omitted evidence. A clock step before confirmation combined with
   fast stairs could hide the start of the climb and make the previous floor
-  look valid. No native pressure source is added to avoid this.
-- Thresholds come from one iPhone in one building. Android is unverified.
+  look valid.
+- Thresholds come from one afternoon of readings on one iPhone in one building.
+  Android is unverified.
 - The iOS Motion & Fitness permission dialog may interrupt the hold.
-- The floor prompt is skippable. Useful evidence needs a paired Unity build that
-  contains the floor policy (NaviPetUnity PR 37 or later); older Unity builds
-  ignore the fields. Flutter has no version handshake and cannot tell which
-  build it launches.
+- Useful evidence needs a paired Unity build that contains the floor policy
+  (NaviPetUnity PR 37 or later). Older Unity builds ignore the fields. Flutter
+  has no version handshake and cannot tell which build it launches.
 - The foreground check before launch is Dart-only. Home pressed while the
   platform call is queued can still reach the native handler.
-- Token expiry uses the phone's clock at mint start plus monotonic elapsed
-  time, so skew already present at minting can make the check early or late.
-  The launch also checks the current phone clock and rejects the token if
-  either check indicates expiry within the one-minute launch margin.
+- A brief loss of focus waits for the app to resume. A hidden, paused, or
+  detached transition during token minting or the subsequent wait invalidates
+  the token. On resume, Flutter checks expiry against the current phone clock
+  and against the mint-start clock advanced by monotonic elapsed time. Either
+  check rejects a token with one minute or less remaining. Clock skew already
+  present at minting can make the monotonic check early or late.
 - Nothing here has been verified on a device.

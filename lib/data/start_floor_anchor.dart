@@ -3,34 +3,16 @@ import 'dart:async';
 import 'floor_pressure.dart';
 import 'indoor_ar_contract.dart';
 
-/// Barometer evidence that the phone stayed on one level since the user said
-/// which floor they stand on. It never names a floor: the floor is always the
-/// user's own confirmation, never the destination and never derived from
-/// pressure. The rule mirrors Unity's `IndoorFloorBarometer` (report addendum 7).
-///
-/// The sensor is not read until [confirmFloor]; skipping the question means no
-/// collection at all. Every sample is then taken after the confirmation, and
-/// the anchor is the settled 20 s window that ends 20 to [anchorDeadline]
-/// seconds after the answer, so it covers the answer itself. A phone that
-/// moved first, or settled later, gets no anchor and the user must confirm
-/// again.
-///
-/// Nothing but two flags and two ages leaves this class: no absolute or raw
-/// pressure, no wall-clock time, no location. Time is the injected monotonic
-/// [clock].
+/// Tracks pressure relative to the floor selected by the user. A settled window
+/// later in the session cannot replace the initial hold, since the floor answer
+/// applies to the moment of confirmation.
 ///
 /// Sensors Plus converts boot-clock timestamps with a cached wall-clock offset.
 /// Clock changes or sleep can cause dropped or mis-aged readings and omitted
 /// evidence. A clock change before confirmation can hide the start of a fast
 /// stair transition and make the previous floor appear valid.
 ///
-/// The floor question is skippable. It only helps when Unity is a paired build
-/// that contains the floor policy (NaviPetUnity PR 37 or later). An older Unity
-/// build ignores the extra fields and behaves as before; Flutter cannot detect
-/// which build it launches and claims no version capability.
-///
-/// shortcut: one iPhone, one building, one afternoon of data backs the
-/// thresholds; re-measure on a second device and over longer drift.
+/// See `docs/indoor-ar-floor-evidence.md` for eligibility and calibration limits.
 class StartFloorAnchor {
   StartFloorAnchor({
     required this.source,

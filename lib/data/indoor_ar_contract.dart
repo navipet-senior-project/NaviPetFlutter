@@ -171,8 +171,7 @@ class IndoorArRequest {
   /// localisation, such as the transport spike.
   final IndoorArToken? arToken;
 
-  /// Null when the user skipped the floor question or the barometer gave
-  /// nothing; the fields then stay off the JSON and Unity behaves as before.
+  /// Optional floor evidence. See `docs/indoor-ar-floor-evidence.md`.
   final IndoorArStartFloor? startFloor;
 
   bool get isLocalize => mode == localizeMode;
