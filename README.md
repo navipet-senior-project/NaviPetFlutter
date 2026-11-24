@@ -92,13 +92,15 @@ phone unless a note says so.
      requires a covered indoor destination with a place ID, a nonblank
      `indoorDestinationId`, and a footprint, plus a usable, non-approximate fix
      at most 10 s old within 2 m of that footprint.
-   - Outdoor arrival for a VEC room enters `FlowIndoorHandoff`. The handoff
-     sheet offers **Scan AR** for covered floors regardless of fix age.
+   - Outdoor arrival at a room enters `FlowIndoorHandoff`. The handoff sheet
+     offers **Scan AR** only for covered VEC floors, regardless of fix age.
    - **Verify location** on the VEC building map opens AR after resolving the
      selected room and floor to exactly one backend place ID through search.
      Floors 1–2 combine drawn floor plans with data from the bundled scan
      (`assets/indoor/vec_floors1and2.json`). Floors 3–5 use directory plans.
-     The AR door pose comes from the backend place record.
+     The AR door pose comes from the backend place record. If the room cannot
+     be matched to exactly one place or the lookup fails, AR does not open;
+     try search or retry the lookup.
 2. **Place and door pose.** `IndoorArLaunchScreen` loads the place from the
    backend. A valid `indoor` door pose (map code, `multiset-mapset` frame, door
    key, floor, position, heading) becomes a destination request. A missing or
@@ -113,8 +115,9 @@ phone unless a note says so.
    returns a short-lived `{token, expiresOn}`. The endpoint is authenticated
    and limited to 5 requests per minute per user. Flutter receives only the
    short-lived token and its expiry. It keeps the token in memory and rejects
-   it if one minute or less remains. Never log the token. Private Unity exports
-   may contain MultiSet credentials. See
+   it if one minute or less remains. Never log the token. The MultiSet secret
+   stays on the backend and Flutter never receives it. Private Unity exports
+   may still contain MultiSet credentials. See
    [Unity AR without installing Unity](#unity-ar-without-installing-unity).
 6. **Bridge.** Flutter sends one JSON string over the `navipet/indoor_ar`
    channel. Android starts `UnityHostActivity` (a separate `:unity` process)
@@ -129,7 +132,8 @@ phone unless a note says so.
    status, non-null `checkDistanceM` and `confidence` must be finite numbers,
    and non-null `signRoom`, `localizedMapCode`, and `errorCode` must be strings.
    An `error` also requires a nonempty `errorCode`. If Unity closes without
-   a result, either native host returns `error` / `UNITY_EXITED`. Dart decodes
+   a result, either native host returns `error` / `UNITY_EXITED`. A second launch
+   while AR is running returns `BAD_REQUEST` on Android and `BUSY` on iOS. Dart decodes
    malformed results as `error` / `BAD_RESULT`. An `arrived` result's
    `checkDistanceM`, when supplied, must be finite and nonnegative. Without a
    distance, `arrived` requires a nonempty `signRoom`. For a destination
@@ -558,15 +562,17 @@ fallback. Selecting a destination opens its preview. Places without outdoor
 coordinates have Directions disabled. When a walking route is requested with
 a valid origin and a routable destination, the Mapbox Directions API supplies
 route geometry and maneuver instructions. The Mapbox Maps Flutter SDK handles
-rendering and location.
+rendering and location. The class editor also calls Mapbox Search Box
+directly (`suggestPlaces` and `retrievePlace`) to geocode class locations.
 
 This is a functional foreground walking-navigation experience. Before treating
 it as safety-critical or shipping it broadly, add integration/device tests for
 GPS loss, background execution, route deviations, network loss, accessibility,
 and battery use. Do not rely on it for emergency navigation.
 
-The three most recent selected destinations are kept only on the phone and can
-be cleared from Search. They are not uploaded to Supabase. Class locations are
+The three most recent selected destinations are saved to the signed-in account
+through the backend's `/recent-searches` endpoint, with an on-device copy used
+as a fallback when the backend is unreachable. Search can clear them. Class locations are
 stored in Supabase so Search can adapt to a user's schedule across devices.
 
 ## Wave D floor-pressure measurements
@@ -664,7 +670,7 @@ asset. No real keys are used in CI.
 | No iPhones or simulators are listed | Open Xcode, install an iOS runtime in **Xcode > Settings > Platforms**, then run `open -a Simulator` and `flutter devices`. |
 | Xcode reports a signing error | Select a development team under **Runner > Signing & Capabilities** and use a unique bundle identifier. Do not commit the team id or that bundle-identifier edit. |
 | Android says "AR is not included in this build." | No private `android/unity-ar/unityLibrary-release.aar` is present. The rest of the app still runs. See [Unity AR without installing Unity](#unity-ar-without-installing-unity). |
-| iPhone says "AR mode isn't available on this device." | The private framework or its configuration is missing. See [Unity AR without installing Unity](#unity-ar-without-installing-unity). |
+| iPhone says "AR is not included in this build." | The private framework or its configuration is missing. See [Unity AR without installing Unity](#unity-ar-without-installing-unity). |
 | iOS reports resource-fork/Finder metadata errors | Move the repository out of an iCloud-synced Desktop or Documents folder, then run `flutter clean` and try again. |
 
 The Kotlin Gradle Plugin warning currently emitted by Mapbox/Flutter TTS is a
