@@ -78,22 +78,24 @@ phone unless a note says so.
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| Flutter (`lib/`) | Entry points, the floor question, camera permission, minting a token, building the request, decoding the result, user-facing messages | Localization, camera pose, indoor routing |
+| Flutter (`lib/`) | Entry points, the floor question, camera permission, requesting a token, building the request, decoding the result, user-facing messages | Localization, camera pose, indoor routing |
 | Native hosts (`android/`, `ios/`) | The `navipet/indoor_ar` method channel, starting Unity, returning its result, the device boot clock | Request contents (passed through as one string) |
-| [NaviPetUnity](https://github.com/navipet-senior-project/NaviPetUnity) | AR session, MultiSet localization, sign (OCR) recognition, hallway routing and HUD, floor veto and height hint | Place lookup, tokens |
-| [NavipetBackend](https://github.com/navipet-senior-project/NavipetBackend) | Place records with the saved door pose, `POST /indoor/ar-token`, the MultiSet credentials | Anything on the phone |
+| [NaviPetUnity](https://github.com/navipet-senior-project/NaviPetUnity) | AR session, MultiSet localization, sign (OCR) recognition, hallway routing and HUD, and [build-dependent floor veto and height hints](#sensor-evidence) | Place lookup, tokens |
+| [NavipetBackend](https://github.com/navipet-senior-project/NavipetBackend) | Place records with the saved door pose, token minting through `POST /indoor/ar-token`, the MultiSet credentials | Anything on the phone |
 
 ### Launching indoor AR
 
-1. **Entry.** Scan AR on the navigation handoff sheet and **Verify location** on
-   the VEC building map (`lib/screens/indoor_building_map_screen.dart`) both
-   push `/ar?destination=<place id>`. The map first resolves the selected room
-   to the same backend record search returns; if it cannot match exactly one,
-   AR does not open. The bundled scan asset
-   (`assets/indoor/vec_floors1and2.json`) draws the map only and never supplies
-   AR coordinates. Scan AR appears once a fresh location fix is at or within
-   2 m of the building footprint, and hides when the fix is stale (10 s) or
-   clearly outside.
+1. **Entry.** These controls pass a place ID through `/ar?destination=<place id>`.
+   The launch screen reports indoor AR unavailable if the ID is missing.
+   - During active navigation and on **Confirm your location**, **Scan AR**
+     requires a covered indoor destination with a place ID and footprint, plus
+     a usable, non-approximate fix at most 10 s old within 2 m of that footprint.
+   - After outdoor arrival, **Scan AR** on the handoff sheet and the **AR**
+     map shortcut are shown based on floor coverage regardless of fix age.
+   - **Verify location** on the VEC building map opens AR after resolving the
+     selected room and floor to exactly one backend place ID through search.
+     The bundled scan asset (`assets/indoor/vec_floors1and2.json`) supplies
+     only the map drawing.
 2. **Place and door pose.** `IndoorArLaunchScreen` loads the place from the
    backend. A valid `indoor` door pose (map code, `multiset-mapset` frame, door
    key, floor, position, heading) becomes a destination request. A missing or
@@ -101,51 +103,63 @@ phone unless a note says so.
    scans to find the phone without inventing a destination. Only VEC floors 1 to
    3 (`indoor_floor_coverage.dart`) launch.
 3. **Floor question** (optional). See [sensor evidence](#sensor-evidence).
-4. **Camera permission.** Checked before any token is minted. Denial returns to
-   the map; permanent denial offers Settings.
-5. **Token.** Flutter calls `POST /indoor/ar-token` with the user's session. The
-   backend exchanges its own MultiSet credentials and returns a short-lived
-   `{token, expiresOn}`; the endpoint is authenticated and limited to 5 requests
-   per minute per user. The token lives in memory only and is never logged. A
-   token with one minute or less remaining is rejected. The MultiSet secret
-   never ships in the app.
+4. **Camera permission.** Flutter checks permission before requesting a token.
+   Denying the prompt exits the launch screen. Permanent denial offers Settings.
+5. **Token.** Flutter calls `POST /indoor/ar-token` with the user's session
+   bearer token. The backend exchanges its own MultiSet credentials and
+   returns a short-lived `{token, expiresOn}`. The endpoint is authenticated
+   and limited to 5 requests per minute per user. Flutter keeps the token in
+   memory and rejects it if one minute or less remains. The MultiSet secret
+   never ships in the app. Never log the token.
 6. **Bridge.** Flutter sends one JSON string over the `navipet/indoor_ar`
    channel. Android starts `UnityHostActivity` (a separate `:unity` process)
    with `startActivityForResult`; iOS hands it to `IndoorArHost` in the embedded
-   `UnityFramework`. Android needs the private AAR and iOS a prebuilt
-   `UnityFramework` (see [Unity AR without installing Unity](#unity-ar-without-installing-unity));
-   without it the host answers `unavailable`.
+   `UnityFramework`. Android needs the private AAR. iOS needs both the prebuilt
+   `UnityFramework` and `ios/unity-ar/UnityAr.xcconfig` to set
+   `UNITY_AR_ENABLED`. A build without Unity support returns `unavailable`.
+   See [Unity AR without installing Unity](#unity-ar-without-installing-unity).
 7. **Result.** Unity returns JSON with a `status` of `arrived`, `cancelled`,
-   `localizationFailed`, `unavailable`, or `error`. A malformed result becomes
-   `error` / `BAD_RESULT`. A destination arrival needs a confirmed room sign or
-   a distance; the app shows a message and returns to the map.
+   `localizationFailed`, `unavailable`, or `error`. If Unity closes without a
+   result, either native host returns `error` / `UNITY_EXITED`. Dart decodes
+   malformed results as `error` / `BAD_RESULT`. For a destination result
+   marked `arrived`, Flutter confirms arrival when the room sign matches or
+   reports the distance if provided. A result with neither is invalid.
+   Cancellation exits silently. A localization failure after sending floor
+   evidence stays on the launch screen for retry. Other results show a message
+   and return to the previous screen, or to the map if there is no prior screen.
 
 ### Bridge contract (v2)
 
-Defined in `lib/data/indoor_ar_contract.dart`; Unity's side parses it in
-`IndoorArContract`. Poses are in the MultiSet MapSet frame (metres, +Y up) and
-nothing converts them. A destination request carries `schemaVersion`, `room`,
-`doorKey`, `floor`, `position`, `headingDeg`, `mapCode`, `frame`,
-`capabilities: ["signArrival"]`, `arToken` and optional floor evidence. A
-localize request carries `mode`, `mapCode`, `frame`, `arToken`, optional `room`
-and `floor`, and optional floor evidence. Never log a request.
+Flutter defines the contract in `lib/data/indoor_ar_contract.dart`. Unity
+parses it in `IndoorArContract`. Poses pass through in the MultiSet MapSet
+frame (metres, +Y up). Both modes send `schemaVersion: 2` and accept optional
+floor evidence. A destination request carries `room`, `doorKey`, `floor`,
+`position`, `headingDeg`, `mapCode`, `frame`,
+`capabilities: ["signArrival"]`, and `arToken`. A localization request carries
+`mode: localize`, `mapCode`, `frame`, `arToken`, and optional `room` and
+`floor`. Never log a request.
 
 ### Sensor evidence
 
-Optional evidence that Unity can use to reject a map match on the wrong floor
-and, separately, to narrow the vertical search.
+Unity builds with the floor policy can use this optional evidence to reject
+wrong-floor matches. Older exports ignore it. Narrowing the vertical search
+with a height hint requires the separate provisional Unity build.
 
-- **Floor confirmation.** If a barometer is available, the user chooses the
-  floor they stand on and holds the phone still for about 20 s. They can
-  **Skip**, or **Continue without waiting**. The answer is the user's own, never
-  the destination floor.
-- **What is sent.** `floorEvidenceVersion`, `startFloor`, `startFloorAgeS`,
-  `pressureSinceStart` (`settled`, `moved`, `sampleAgeS`) and, only when pressure
-  moved between 0.30 and 3 hPa, `deltaHpa` with `requestSentAtBootS`. No raw
-  pressure, wall-clock time or location leaves the phone. Ineligible evidence is
-  omitted and Unity localizes as before.
-- **Failure handling.** After a failed floor-assisted scan Flutter offers to
-  confirm the floor again.
+- **Floor confirmation.** Flutter asks which floor the user is standing on
+  before collecting barometer readings. Select **Skip** to proceed without
+  collecting readings. After confirming the floor, hold the phone still for
+  about 20 s or select **Continue without waiting** to proceed without
+  evidence. Phones without a usable barometer can proceed without evidence.
+- **What is sent.** Eligible evidence includes `floorEvidenceVersion`,
+  `startFloor`, `startFloorAgeS`, and `pressureSinceStart` (`settled`,
+  `moved`, `sampleAgeS`). Flutter adds signed `pressureSinceStart.deltaHpa`
+  and `requestSentAtBootS` together when `moved` is true, the absolute delta is
+  0.30–3 hPa inclusive, and a usable boot-clock stamp is available. If the
+  stamp is missing, Flutter still sends the remaining eligible evidence.
+  The evidence contains no raw pressure, wall-clock time, or location.
+- **Failure handling.** After a localization failure with floor evidence,
+  choose **Try again** to confirm the current floor again or **Back to map**
+  to exit.
 - Thresholds, clock handling and limits:
   [docs/indoor-ar-floor-evidence.md](docs/indoor-ar-floor-evidence.md). Unity's
   rules: its `docs/floor-evidence-contract.md`.
@@ -513,9 +527,9 @@ status.
 
 ## Navigation behavior
 
-The app stays on Mapbox for this phase. It uses the native Maps Flutter SDK for
-rendering and location, the Search Box API for destinations, and the Directions
-API's walking profile for route geometry and maneuver instructions.
+Outdoor walking navigation uses Mapbox. The native Maps Flutter SDK handles
+rendering and location, the Search Box API finds destinations, and the Directions
+API's walking profile supplies route geometry and maneuver instructions.
 
 This is a functional foreground walking-navigation experience. Before treating
 it as safety-critical or shipping it broadly, add integration/device tests for
@@ -525,17 +539,6 @@ and battery use. Do not rely on it for emergency navigation.
 The three most recent selected destinations are kept only on the phone and can
 be cleared from Search. They are not uploaded to Supabase. Class locations are
 stored in Supabase so Search can adapt to a user's schedule across devices.
-
-### Indoor AR floor confirmation
-
-When indoor AR asks, choose the floor you are standing on and hold the phone
-still for about 20 seconds to give the app a pressure reference. Select **Skip**
-to proceed without starting the barometer or **Continue without waiting** to
-proceed without floor evidence after the hold starts. If you retry a failed
-floor-assisted scan in Unity, Flutter offers **Try again** to confirm your
-current floor again and **Back to map** to exit.
-See the [floor-evidence guide](docs/indoor-ar-floor-evidence.md) for Unity
-compatibility and device limits.
 
 ## Wave D floor-pressure measurements
 
