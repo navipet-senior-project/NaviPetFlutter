@@ -415,18 +415,8 @@ status.
 
 ### Indoor AR floor confirmation
 
-The floor prompt is skippable. Useful floor evidence requires a paired Unity
-export containing the [NaviPetUnity floor policy](https://github.com/navipet-senior-project/NaviPetUnity/pull/37)
-from PR 37 or later. Older Unity builds ignore the fields.
-
-The thresholds come from measurements on one iPhone in one building. This
-integration has not been verified on a device, and Android remains unverified.
-The iOS Motion & Fitness permission dialog can interrupt the hold.
-
-`sensors_plus` uses a cached boot-to-wall clock offset. A wall-clock adjustment
-or sleep can drop or mis-age readings and cause Flutter to omit floor evidence.
-A clock step before confirmation followed by a fast stair transition can hide
-early movement and make the previously confirmed floor appear valid.
+The floor prompt is skippable. Useful floor evidence requires a paired Unity build with the NaviPetUnity PR 37 floor policy or later.
+The [floor-evidence guide](docs/indoor-ar-floor-evidence.md) covers `sensors_plus` timestamp and clock limits, calibration on one iPhone in one building, iOS Motion & Fitness permission, and device verification still pending on iOS and Android.
 
 ## Navigation behavior
 
