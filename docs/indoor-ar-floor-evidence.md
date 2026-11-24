@@ -15,6 +15,25 @@ confirmation. The serializers reject confirmation ages over 1200 s.
 - `floorEvidenceVersion` 1, `startFloor` (the user's own answer, never the
   destination), `startFloorAgeS`
 - `pressureSinceStart`: `settled` (always `true` when sent), `moved`, `sampleAgeS`
+- For Unity's optional height hint: `requestSentAtBootS` and
+  `pressureSinceStart.deltaHpa`
+
+`requestSentAtBootS` is the device boot clock in seconds, read through the
+`navipet/indoor_ar` channel (`bootClockSeconds`) just before the ages are
+computed, so Unity's added send-to-SDK time can only overstate them. Android
+uses `SystemClock.elapsedRealtimeNanos()` and iOS uses `mach_continuous_time()`
+with `mach_timebase_info`. Both keep counting while the device sleeps, which is
+the clock Unity reads. If the host cannot supply it (unsupported platform, an
+older host build, an error, or a negative or non-finite value) Flutter omits the
+stamp and the delta, and Unity sends no height hint. The rest of the evidence is
+unchanged.
+
+`deltaHpa` is the current settled median minus the anchor median, signed, so a
+negative value means pressure fell and the phone went up. It is relative only
+and is sent only when `moved` is true, the stamp is present, and
+`0.30 <= abs <= 3`. `moved` latches, so if pressure returns to the anchor
+Flutter sends `moved: true` without a delta; Unity rejects a delta that
+disagrees with `moved`, so the delta is dropped rather than risk the evidence.
 
 If evidence is ineligible, Flutter omits all four floor fields and Unity uses
 its existing localization behavior. The summary carries no absolute or raw
@@ -75,4 +94,11 @@ confirmation even if the pressure returns to the anchor.
   and against the mint-start clock advanced by monotonic elapsed time. Either
   check rejects a token with one minute or less remaining. Clock skew already
   present at minting can make the monotonic check early or late.
+- The boot-clock stamp and the delta are covered by Dart tests, and the iOS clock
+  call was checked in a standalone Swift program on macOS, where
+  `mach_continuous_time()` tracked time since boot and exceeded the
+  sleep-excluding uptime. The Android and iOS host methods have not been built
+  or run on a device, and no request with these fields has reached a real Unity
+  build or the MultiSet server. Whether the floor-height hint changes
+  localization is unverified.
 - Nothing here has been verified on a device.

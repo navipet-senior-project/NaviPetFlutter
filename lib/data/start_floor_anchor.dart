@@ -133,7 +133,10 @@ class StartFloorAnchor {
   }
 
   /// Evidence from settled anchor and current windows with fresh samples.
-  IndoorArStartFloor? evidence() {
+  ///
+  /// [requestSentAtBootS] is the device boot clock read immediately before this
+  /// call, so the ages computed here are never older than the stamp.
+  IndoorArStartFloor? evidence({double? requestSentAtBootS}) {
     final floor = _floor;
     if (floor == null) return null;
     final wallTime = _wallClock();
@@ -156,6 +159,8 @@ class StartFloorAnchor {
           (now - _confirmedAt).inMicroseconds / Duration.microsecondsPerSecond,
       moved: _moved,
       sampleAgeS: sampleAge.inMicroseconds / Duration.microsecondsPerSecond,
+      deltaHpa: median - anchor,
+      requestSentAtBootS: requestSentAtBootS,
     );
   }
 

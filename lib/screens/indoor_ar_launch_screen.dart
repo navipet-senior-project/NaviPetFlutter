@@ -25,6 +25,7 @@ class IndoorArLaunchScreen extends StatefulWidget {
     this.anchor,
     this.now = DateTime.now,
     this.monotonicNow,
+    this.bootClock,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
     this.openSettings = openAppSettings,
@@ -42,6 +43,10 @@ class IndoorArLaunchScreen extends StatefulWidget {
   final IndoorArTokenGateway? tokenGateway;
   final DateTime Function() now;
   final Duration Function()? monotonicNow;
+
+  /// Device boot-clock seconds for Unity's evidence aging. Null sends no stamp,
+  /// so Unity sends no height hint.
+  final Future<double?> Function()? bootClock;
   final Future<PermissionStatus> Function() cameraStatus;
   final Future<PermissionStatus> Function() requestCamera;
   final Future<bool> Function() openSettings;
@@ -317,7 +322,18 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
           !token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
         throw const IndoorArTokenException(0);
       }
-      evidence = _anchor?.evidence();
+      // Stamped just before the ages are computed, so Unity's added send-to-SDK
+      // time can only overstate them. A background during the await bumps the
+      // generation, which invalidates the launch.
+      final bootClock = widget.bootClock;
+      final sentAt = _anchor == null || bootClock == null
+          ? null
+          : await bootClock();
+      if (!_active) return;
+      if (generation != _launchGeneration) {
+        throw const IndoorArTokenException(0);
+      }
+      evidence = _anchor?.evidence(requestSentAtBootS: sentAt);
       unawaited(_anchor?.reset());
       final request = _request!.withArToken(token, startFloor: evidence);
       if (!_active) return;

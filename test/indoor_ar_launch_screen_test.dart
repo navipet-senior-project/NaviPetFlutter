@@ -99,6 +99,7 @@ class _Harness {
     Duration Function()? tokenElapsed,
     Future<PermissionStatus>? pendingStatus,
     Future<PermissionStatus>? pendingPermission,
+    Future<double?> Function()? bootClock,
   }) : fake = FakeIndoorArLauncher(result: result) {
     final activeLauncher = launcher ?? fake;
     router = GoRouter(
@@ -146,6 +147,7 @@ class _Harness {
             ),
             now: tokenClock ?? () => DateTime.utc(2026, 1, 1),
             monotonicNow: tokenElapsed,
+            bootClock: bootClock,
             cameraStatus: () async {
               statusChecks++;
               return pendingStatus == null ? status : await pendingStatus;
@@ -261,6 +263,7 @@ void main() {
       Duration Function()? tokenElapsed,
       Future<PermissionStatus>? pendingStatus,
       Future<PermissionStatus>? pendingPermission,
+      Future<double?> Function()? bootClock,
       IndoorArLauncher? launcher,
       IndoorArResult result = _cancelled,
       PermissionStatus status = PermissionStatus.granted,
@@ -277,6 +280,7 @@ void main() {
         tokenElapsed: tokenElapsed,
         pendingStatus: pendingStatus,
         pendingPermission: pendingPermission,
+        bootClock: bootClock,
         launcher: launcher,
         anchor: StartFloorAnchor(
           source: _StreamSource(source.stream),
@@ -345,6 +349,69 @@ void main() {
       expect(source.hasListener, isFalse);
       launcher.resultReady.complete(_cancelled);
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('a boot stamp rides with the evidence; no delta when unmoved', (
+      tester,
+    ) async {
+      final launcher = _PendingLauncher();
+      final harness = build(launcher: launcher, bootClock: () async => 4321.5);
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      await tester.pump();
+      final json = launcher.requests.single.toJson();
+      expect(json['requestSentAtBootS'], 4321.5);
+      expect(json['pressureSinceStart'], {
+        'settled': true,
+        'moved': false,
+        'sampleAgeS': 0,
+      });
+      launcher.resultReady.complete(_cancelled);
+      await tester.pumpAndSettle();
+    });
+
+    for (final (label, bootClock) in <(String, Future<double?> Function()?)>[
+      ('no boot clock', null),
+      ('a boot clock that is unavailable', () async => null),
+    ]) {
+      testWidgets('$label sends evidence without a stamp', (tester) async {
+        final launcher = _PendingLauncher();
+        final harness = build(launcher: launcher, bootClock: bootClock);
+        await harness.pump(tester);
+        await harness.tapAr(tester);
+        await tester.tap(find.text('Floor 2'));
+        await tester.pump();
+        await holdStill(tester, 20);
+        await tester.pump();
+        final json = launcher.requests.single.toJson();
+        expect(json['startFloor'], '2');
+        expect(json, isNot(contains('requestSentAtBootS')));
+        launcher.resultReady.complete(_cancelled);
+        await tester.pumpAndSettle();
+      });
+    }
+
+    testWidgets('backgrounding while the boot clock is read launches nothing', (
+      tester,
+    ) async {
+      final clock = Completer<double?>();
+      final launcher = _PendingLauncher();
+      final harness = build(launcher: launcher, bootClock: () => clock.future);
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      clock.complete(1.0);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(launcher.requests, isEmpty);
     });
 
     testWidgets('floor and hold bypass actions scroll into reach', (

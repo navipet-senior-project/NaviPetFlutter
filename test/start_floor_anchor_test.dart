@@ -660,4 +660,65 @@ void main() {
     expect(rig.anchor.evidence(), isNull);
     expect(rig.anchor.resolved, isTrue);
   });
+
+  group('deltaHpa and boot stamp', () {
+    test(
+      'a step down is a negative delta and passes the stamp through',
+      () async {
+        final rig = _Rig();
+        rig.anchor.confirmFloor('1');
+        await rig.hold(1000, 25);
+        await rig.hold(999.53, 40);
+        final evidence = rig.anchor.evidence(requestSentAtBootS: 12345.5)!;
+        expect(evidence.deltaHpa, closeTo(-0.47, 0.02));
+        expect(evidence.moved, isTrue);
+        expect(evidence.requestSentAtBootS, 12345.5);
+        expect(evidence.toJson()['requestSentAtBootS'], 12345.5);
+        expect(
+          (evidence.toJson()['pressureSinceStart']! as Map)['deltaHpa'],
+          evidence.deltaHpa,
+        );
+      },
+    );
+
+    test('a step up is a positive delta', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('3');
+      await rig.hold(1000, 25);
+      await rig.hold(1000.82, 40);
+      expect(rig.anchor.evidence()!.deltaHpa, closeTo(0.82, 0.02));
+    });
+
+    test('no stamp, no stamp or delta on the wire', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 25);
+      await rig.hold(999.53, 40);
+      final wire = rig.anchor.evidence()!.toJson();
+      expect(wire, isNot(contains('requestSentAtBootS')));
+      expect((wire['pressureSinceStart']! as Map), isNot(contains('deltaHpa')));
+    });
+
+    test('returning to the anchor keeps moved but sends no delta', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 25);
+      await rig.hold(999.53, 25);
+      await rig.hold(1000, 40);
+      final evidence = rig.anchor.evidence(requestSentAtBootS: 9)!;
+      expect(evidence.moved, isTrue);
+      final pressure = evidence.toJson()['pressureSinceStart']! as Map;
+      expect(pressure['moved'], isTrue);
+      expect(pressure, isNot(contains('deltaHpa')));
+    });
+
+    test('an unmoved hold sends no delta', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 40);
+      final wire = rig.anchor.evidence(requestSentAtBootS: 9)!.toJson();
+      expect((wire['pressureSinceStart']! as Map), isNot(contains('deltaHpa')));
+      expect(wire['requestSentAtBootS'], 9);
+    });
+  });
 }

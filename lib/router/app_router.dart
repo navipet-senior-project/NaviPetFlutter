@@ -162,18 +162,22 @@ GoRouter createAppRouter(
     ),
     GoRoute(
       path: '/ar',
-      builder: (context, state) => IndoorArLaunchScreen(
-        launcher: NativeIndoorArLauncher(),
-        destinationId: state.uri.queryParameters['destination'],
-        request: state.extra is IndoorArRequest
-            ? state.extra as IndoorArRequest
-            : null,
-        gateway: context.read<NavigationFlowController>().searchGateway,
-        tokenGateway: indoorArTokenGateway,
-        anchor: floorPressureSource == null
-            ? null
-            : StartFloorAnchor(source: floorPressureSource),
-      ),
+      builder: (context, state) {
+        final launcher = NativeIndoorArLauncher();
+        return IndoorArLaunchScreen(
+          launcher: launcher,
+          bootClock: launcher.bootClockSeconds,
+          destinationId: state.uri.queryParameters['destination'],
+          request: state.extra is IndoorArRequest
+              ? state.extra as IndoorArRequest
+              : null,
+          gateway: context.read<NavigationFlowController>().searchGateway,
+          tokenGateway: indoorArTokenGateway,
+          anchor: floorPressureSource == null
+              ? null
+              : StartFloorAnchor(source: floorPressureSource),
+        );
+      },
     ),
     // #41 transport spike; removed with the real launch screen (build step 3).
     if (kDebugMode)

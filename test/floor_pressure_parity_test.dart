@@ -154,4 +154,26 @@ void main() {
       expect(text, isNot(contains('2026')));
     },
   );
+
+  test(
+    'the stair-sized step reaches Unity as a signed delta plus the boot stamp',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('2');
+      await rig.hold(1000, 25);
+      await rig.hold(999.53, 40); // pressure fell: the phone went up
+
+      final wire = rig.anchor.evidence(requestSentAtBootS: 777.5)!.toJson();
+      expect(wire['requestSentAtBootS'], 777.5);
+      final pressure = wire['pressureSinceStart']! as Map;
+      expect(pressure['moved'], isTrue);
+      expect(pressure['deltaHpa'] as double, closeTo(-0.47, 0.03));
+      expect((pressure['deltaHpa'] as double).abs() >= 0.30, isTrue);
+      // Relative only: no absolute pressure or wall-clock time leaves the phone.
+      final text = jsonEncode(wire);
+      expect(text, isNot(contains('999.')));
+      expect(text, isNot(contains('1000')));
+      expect(text, isNot(contains('2026')));
+    },
+  );
 }
