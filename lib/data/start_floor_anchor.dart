@@ -46,6 +46,7 @@ class StartFloorAnchor {
   static const _timestampTolerance = Duration(milliseconds: 5);
   static const maxRangeHpa = 0.06;
   static const moveHpa = 0.30;
+  static const _pressureRoundoffHpa = 1e-9;
 
   static const anchorDeadline = Duration(seconds: 22);
 
@@ -167,7 +168,7 @@ class StartFloorAnchor {
       ageS:
           (now - _confirmedAt).inMicroseconds / Duration.microsecondsPerSecond,
       settled: true,
-      moved: _moved || (median - anchor).abs() >= moveHpa,
+      moved: _moved || _hasMoved(median, anchor),
       sampleAgeS: sampleAge.inMicroseconds / Duration.microsecondsPerSecond,
     );
   }
@@ -230,12 +231,15 @@ class StartFloorAnchor {
       }
     } else if (!_moved) {
       final median = _settledMedian(at - window, at);
-      _moved = median != null && (median - anchor).abs() >= moveHpa;
+      _moved = median != null && _hasMoved(median, anchor);
     }
     if (_anchor != null) {
       _buffer.removeWhere((s) => s.at < at - window);
     }
   }
+
+  static bool _hasMoved(double median, double anchor) =>
+      (median - anchor).abs() >= moveHpa - _pressureRoundoffHpa;
 
   double? _settledMedian(Duration start, Duration end) {
     final samples = [
@@ -249,7 +253,9 @@ class StartFloorAnchor {
       return null;
     }
     final values = [for (final s in samples) s.hPa]..sort();
-    if (values.last - values.first > maxRangeHpa) return null;
+    if (values.last - values.first > maxRangeHpa + _pressureRoundoffHpa) {
+      return null;
+    }
     final mid = values.length ~/ 2;
     return values.length.isOdd
         ? values[mid]

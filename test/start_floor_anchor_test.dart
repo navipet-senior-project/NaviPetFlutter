@@ -30,18 +30,19 @@ class _Rig {
   var wallOffset = Duration.zero;
   var _noise = 0;
 
-  /// Holds [hPa] for [seconds], with +-0.01 hPa of alternating noise.
+  /// Holds [hPa] for [seconds], with alternating [noiseHpa].
   Future<void> hold(
     double hPa,
     int seconds, {
     Duration age = Duration.zero,
+    double noiseHpa = 0.01,
   }) async {
     for (var i = 0; i < seconds; i++) {
       now += const Duration(seconds: 1);
       _noise++;
       source.controller.add(
         PressureReading(
-          hPa: hPa + (_noise.isEven ? 0.01 : -0.01),
+          hPa: hPa + (_noise.isEven ? noiseHpa : -noiseHpa),
           timestamp: _wall.add(now - age),
         ),
       );
@@ -212,6 +213,37 @@ void main() {
     expect(e.settled, isTrue);
     expect(e.moved, isFalse);
   });
+
+  test('a 0.06 hPa range is settled at confirmation and handoff', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000.01, 19, noiseHpa: 0);
+    await rig.hold(1000.07, 1, noiseHpa: 0);
+    expect(rig.anchor.evidence()?.settled, isTrue);
+  });
+
+  test('a settled 0.30 hPa step latches movement', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 20, noiseHpa: 0);
+    await rig.hold(1000.30, 21, noiseHpa: 0);
+    await rig.hold(1000, 21, noiseHpa: 0);
+    expect(rig.anchor.evidence()?.moved, isTrue);
+  });
+
+  test(
+    'a 0.30 hPa step counts when the window settles between readings',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 20, noiseHpa: 0);
+      await rig.hold(1000.15, 1, noiseHpa: 0);
+      await rig.hold(1000.30, 20, noiseHpa: 0);
+      expect(rig.anchor.evidence(), isNull);
+      rig.now += const Duration(milliseconds: 100);
+      expect(rig.anchor.evidence()?.moved, isTrue);
+    },
+  );
 
   test('hold range 0.2 never anchors, and the deadline resolves it', () async {
     final rig = _Rig();
