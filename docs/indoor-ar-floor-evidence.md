@@ -1,8 +1,9 @@
 # Indoor AR floor evidence (Flutter side)
 
-Flutter uses the barometer to check whether the phone stayed on the floor the
-user confirmed. Unity can use that evidence to reject a map match on another
-floor. Unity's `docs/floor-evidence-contract.md` owns the wire contract.
+After the user confirms their floor, Flutter uses the barometer to detect
+pressure changes that may indicate a floor change. Unity can use the evidence
+to reject a map match on another floor. Unity's `docs/floor-evidence-contract.md`
+owns the wire contract.
 
 ## What is sent
 

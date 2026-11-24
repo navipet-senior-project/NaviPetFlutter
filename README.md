@@ -431,11 +431,11 @@ stored in Supabase so Search can adapt to a user's schedule across devices.
 ### Indoor AR floor confirmation
 
 When indoor AR asks, choose the floor you are standing on and hold the phone
-still for about 20 seconds. Select **Skip** to proceed without starting the
-barometer or **Continue without waiting** to proceed without floor evidence
-after the hold starts. If you retry a failed floor-assisted scan in Unity,
-Flutter offers **Try again** to confirm your current floor again and
-**Back to map** to exit.
+still for about 20 seconds to give the app a pressure reference. Select **Skip**
+to proceed without starting the barometer or **Continue without waiting** to
+proceed without floor evidence after the hold starts. If you retry a failed
+floor-assisted scan in Unity, Flutter offers **Try again** to confirm your
+current floor again and **Back to map** to exit.
 See the [floor-evidence guide](docs/indoor-ar-floor-evidence.md) for Unity
 compatibility and device limits.
 

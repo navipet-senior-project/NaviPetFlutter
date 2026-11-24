@@ -9,7 +9,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>NaviPet uses your location to show where you are on the campus map and to position outdoor AR guidance.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>NaviPet uses Motion &amp; Fitness data to count your steps. In indoor AR, NaviPet uses barometer readings to check which floor you are on if you confirm your starting floor. If you start a debug pressure recording, NaviPet saves the measurements on this device and you can choose to copy them as JSON.</string>
+	<string>NaviPet counts your steps during navigation. If you confirm your floor before indoor AR, it can read the barometer to detect pressure changes that may indicate a floor change. If you start a debug pressure recording, NaviPet saves the measurements on this device and you can choose to copy them as JSON.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>NaviPet lets you choose a photo from your library for your profile picture.</string>
 	<key>CFBundleDevelopmentRegion</key>
