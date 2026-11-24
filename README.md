@@ -554,9 +554,11 @@ Campus destination search uses the backend's `GET /autocomplete`. It searches
 campus records first and can fall back to Mapbox for ordinary queries without
 a campus match that has outdoor coordinates. Flutter Search shows only eligible
 campus records and displays no results when the backend returns only a Mapbox
-fallback. After destination selection, the Mapbox Directions API supplies
-walking route geometry and maneuver instructions. The Mapbox Maps Flutter SDK
-handles rendering and location.
+fallback. Selecting a destination opens its preview. Places without outdoor
+coordinates have Directions disabled. When a walking route is requested with
+a valid origin and a routable destination, the Mapbox Directions API supplies
+route geometry and maneuver instructions. The Mapbox Maps Flutter SDK handles
+rendering and location.
 
 This is a functional foreground walking-navigation experience. Before treating
 it as safety-critical or shipping it broadly, add integration/device tests for
