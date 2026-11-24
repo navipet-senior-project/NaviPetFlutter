@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -5,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:navipet/data/auth_token_provider.dart';
 import 'package:navipet/data/campus_search_gateway.dart';
+import 'package:navipet/data/floor_pressure.dart';
+import 'package:navipet/data/start_floor_anchor.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,6 +49,15 @@ class _ThrowingLauncher implements IndoorArLauncher {
       Future.error(StateError('launch failed'));
 }
 
+class _StreamSource implements PressureSource {
+  const _StreamSource(this.stream);
+
+  final Stream<PressureReading> stream;
+
+  @override
+  Stream<PressureReading> readings() => stream;
+}
+
 class _Session implements AuthTokenProvider {
   var refreshes = 0;
 
@@ -69,6 +81,7 @@ class _Harness {
     this.status = PermissionStatus.denied,
     this.camera = PermissionStatus.granted,
     IndoorArLauncher? launcher,
+    this.anchor,
     String? destinationId = _destinationId,
     Future<http.Response> Function(http.Request)? fetch,
     Future<http.Response> Function(http.Request)? mint,
@@ -95,6 +108,7 @@ class _Harness {
           path: '/ar',
           builder: (context, state) => IndoorArLaunchScreen(
             launcher: activeLauncher,
+            anchor: anchor,
             destinationId: state.uri.queryParameters['destination'],
             gateway: HttpCampusSearchGateway(
               baseUrl: 'https://example.test',
@@ -139,6 +153,7 @@ class _Harness {
   final mintRequests = <http.Request>[];
   final session = _Session();
   final FakeIndoorArLauncher fake;
+  final StartFloorAnchor? anchor;
   late final GoRouter router;
   PermissionStatus status;
   PermissionStatus camera;
@@ -215,6 +230,84 @@ void main() {
       find.text('MultiSet localized this area. Room 120 is 0.5 m away.'),
       findsOneWidget,
     );
+  });
+
+  group('start floor question', () {
+    final source = StreamController<PressureReading>.broadcast();
+    var now = Duration.zero;
+
+    _Harness build() => _Harness(
+      status: PermissionStatus.granted,
+      anchor: StartFloorAnchor(
+        source: _StreamSource(source.stream),
+        clock: () => now,
+      ),
+    );
+
+    Future<void> holdStill(WidgetTester tester, int seconds) async {
+      for (var i = 0; i < seconds; i++) {
+        now += const Duration(seconds: 1);
+        source.add(PressureReading(hPa: 1000, timestamp: DateTime.utc(2026)));
+        await tester.pump();
+      }
+    }
+
+    testWidgets('asks first and launches nothing until answered', (
+      tester,
+    ) async {
+      now = Duration.zero;
+      final harness = build();
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      expect(find.textContaining('Which floor'), findsOneWidget);
+      expect(harness.fake.requests, isEmpty);
+      expect(harness.statusChecks, 0);
+    });
+
+    testWidgets('confirmed floor with a still phone sends the evidence', (
+      tester,
+    ) async {
+      now = Duration.zero;
+      final harness = build();
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await holdStill(tester, 25);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pumpAndSettle();
+      final json = harness.fake.requests.single.toJson();
+      expect(json['floor'], '1', reason: 'destination floor is untouched');
+      expect(json['startFloor'], '2');
+      expect(json['startFloorAgeS'], 0);
+      expect(json['pressureSinceStart'], {
+        'settled': true,
+        'moved': false,
+        'sampleAgeS': 0,
+      });
+    });
+
+    testWidgets('no samples sends no start floor at all', (tester) async {
+      now = Duration.zero;
+      final harness = build();
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pumpAndSettle();
+      final json = harness.fake.requests.single.toJson();
+      expect(json.keys, isNot(contains('startFloor')));
+      expect(json.keys, isNot(contains('pressureSinceStart')));
+    });
+
+    testWidgets('skip launches without a start floor', (tester) async {
+      now = Duration.zero;
+      final harness = build();
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await holdStill(tester, 25);
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+      final json = harness.fake.requests.single.toJson();
+      expect(json.keys, isNot(contains('startFloor')));
+    });
   });
 
   Future<void> expectArrival(

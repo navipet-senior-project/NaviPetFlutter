@@ -32,6 +32,54 @@ class IndoorArToken {
   String toString() => 'IndoorArToken(expiresOn: $expiresOn)';
 }
 
+/// The floor the user confirmed they stand on, with the barometer's verdict on
+/// whether the phone has stayed on one level since. Optional on a request: Unity
+/// trusts it only when settled, not moved and fresh, so anything less is the
+/// same as sending nothing. Never the destination floor; no absolute or raw
+/// pressure, location or wall-clock time is carried.
+class IndoorArStartFloor {
+  IndoorArStartFloor({
+    required this.floor,
+    required this.ageS,
+    required this.settled,
+    required this.moved,
+    required this.sampleAgeS,
+  }) {
+    if (floor.isEmpty) throw ArgumentError('floor must not be empty');
+    // Negated range checks so NaN is rejected too.
+    if (!(ageS >= 0 && ageS.isFinite)) {
+      throw ArgumentError.value(ageS, 'ageS', 'must be finite and >= 0');
+    }
+    if (!(sampleAgeS >= 0 && sampleAgeS.isFinite)) {
+      throw ArgumentError.value(
+        sampleAgeS,
+        'sampleAgeS',
+        'must be finite and >= 0',
+      );
+    }
+  }
+
+  final String floor;
+
+  /// Seconds since the user confirmed the floor, on a monotonic clock.
+  final double ageS;
+  final bool settled;
+  final bool moved;
+
+  /// Seconds since the newest barometer sample.
+  final double sampleAgeS;
+
+  Map<String, Object?> toJson() => {
+    'startFloor': floor,
+    'startFloorAgeS': ageS,
+    'pressureSinceStart': {
+      'settled': settled,
+      'moved': moved,
+      'sampleAgeS': sampleAgeS,
+    },
+  };
+}
+
 /// One AR session: a saved door, or localization with no door pose.
 class IndoorArRequest {
   IndoorArRequest({
@@ -43,6 +91,7 @@ class IndoorArRequest {
     required this.mapCode,
     required this.frame,
     this.arToken,
+    this.startFloor,
   }) : mode = null {
     if (doorKey.isEmpty || floor.isEmpty || mapCode.isEmpty) {
       throw ArgumentError('doorKey, floor and mapCode must not be empty');
@@ -67,6 +116,7 @@ class IndoorArRequest {
     required this.mapCode,
     required this.frame,
     this.arToken,
+    this.startFloor,
   }) : mode = localizeMode,
        doorKey = '',
        position = const IndoorArVector3(0, 0, 0),
@@ -106,15 +156,29 @@ class IndoorArRequest {
   /// localisation, such as the transport spike.
   final IndoorArToken? arToken;
 
+  /// Null when the user skipped the floor question or the barometer gave
+  /// nothing; the fields then stay off the JSON and Unity behaves as before.
+  final IndoorArStartFloor? startFloor;
+
   bool get isLocalize => mode == localizeMode;
 
-  IndoorArRequest withArToken(IndoorArToken token) => isLocalize
+  IndoorArRequest withArToken(IndoorArToken token) =>
+      _copy(arToken: token, startFloor: startFloor);
+
+  IndoorArRequest withStartFloor(IndoorArStartFloor? value) =>
+      _copy(arToken: arToken, startFloor: value);
+
+  IndoorArRequest _copy({
+    required IndoorArToken? arToken,
+    required IndoorArStartFloor? startFloor,
+  }) => isLocalize
       ? IndoorArRequest.localize(
           room: room,
           floor: floor,
           mapCode: mapCode,
           frame: frame,
-          arToken: token,
+          arToken: arToken,
+          startFloor: startFloor,
         )
       : IndoorArRequest(
           room: room,
@@ -124,7 +188,8 @@ class IndoorArRequest {
           headingDeg: headingDeg,
           mapCode: mapCode,
           frame: frame,
-          arToken: token,
+          arToken: arToken,
+          startFloor: startFloor,
         );
 
   Map<String, Object?> toJson() => isLocalize
@@ -136,6 +201,7 @@ class IndoorArRequest {
           if (room.isNotEmpty) 'room': room,
           if (floor.isNotEmpty) 'floor': floor,
           if (arToken != null) 'arToken': arToken!.toJson(),
+          if (startFloor != null) ...startFloor!.toJson(),
         }
       : {
           'schemaVersion': schemaVersion,
@@ -148,6 +214,7 @@ class IndoorArRequest {
           'frame': frame,
           'capabilities': [signArrivalCapability],
           if (arToken != null) 'arToken': arToken!.toJson(),
+          if (startFloor != null) ...startFloor!.toJson(),
         };
 }
 

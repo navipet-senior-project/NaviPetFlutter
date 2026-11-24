@@ -54,6 +54,61 @@ void main() {
       expect(bare.toJson().containsKey('arToken'), isFalse);
     });
 
+    test('start floor adds three optional fields, localize too', () {
+      final start = IndoorArStartFloor(
+        floor: '2',
+        ageS: 12.5,
+        settled: true,
+        moved: false,
+        sampleAgeS: 0.5,
+      );
+      final expected = {
+        'startFloor': '2',
+        'startFloorAgeS': 12.5,
+        'pressureSinceStart': {
+          'settled': true,
+          'moved': false,
+          'sampleAgeS': 0.5,
+        },
+      };
+      final door = vec119Request().withStartFloor(start);
+      expect(door.toJson(), containsPair('floor', '1'));
+      expect(door.toJson(), containsPair('startFloor', '2'));
+      expect(
+        jsonDecode(jsonEncode(door.toJson()))['pressureSinceStart'],
+        expected['pressureSinceStart'],
+      );
+      final localize = IndoorArRequest.localize(
+        mapCode: IndoorArRequest.buildMapCode,
+        frame: IndoorArRequest.buildFrame,
+      ).withStartFloor(start).withArToken(testArToken);
+      expect(localize.toJson(), containsPair('startFloorAgeS', 12.5));
+      expect(localize.toJson(), contains('arToken'));
+      expect(vec119Request().toJson().containsKey('startFloor'), isFalse);
+      expect(
+        door.withStartFloor(null).toJson().containsKey('startFloor'),
+        isFalse,
+      );
+    });
+
+    test('start floor rejects blank floor and bad ages', () {
+      IndoorArStartFloor build({
+        String floor = '1',
+        double ageS = 0,
+        double sampleAgeS = 0,
+      }) => IndoorArStartFloor(
+        floor: floor,
+        ageS: ageS,
+        settled: true,
+        moved: false,
+        sampleAgeS: sampleAgeS,
+      );
+      expect(() => build(floor: ''), throwsArgumentError);
+      expect(() => build(ageS: -1), throwsArgumentError);
+      expect(() => build(ageS: double.nan), throwsArgumentError);
+      expect(() => build(sampleAgeS: double.infinity), throwsArgumentError);
+    });
+
     test('a token never shows in toString', () {
       expect(testArToken.toString(), isNot(contains('test-token')));
     });

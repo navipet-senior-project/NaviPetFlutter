@@ -9,6 +9,7 @@ import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../data/indoor_ar_token_gateway.dart';
 import '../data/indoor_floor_coverage.dart';
+import '../data/start_floor_anchor.dart';
 
 /// Asks for the camera, opens the Unity AR camera and returns to the map.
 /// Opened fresh by every AR tap, so every tap asks again.
@@ -20,6 +21,7 @@ class IndoorArLaunchScreen extends StatefulWidget {
     required this.gateway,
     required this.tokenGateway,
     this.request,
+    this.anchor,
     this.now = DateTime.now,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
@@ -30,6 +32,10 @@ class IndoorArLaunchScreen extends StatefulWidget {
   final String? destinationId;
   final IndoorArRequest? request;
   final CampusSearchGateway gateway;
+
+  /// Null skips the "which floor are you on" question. Owned by this screen,
+  /// which starts and disposes it.
+  final StartFloorAnchor? anchor;
 
   /// Null when the app has no backend session to ask; AR is then unavailable.
   final IndoorArTokenGateway? tokenGateway;
@@ -66,10 +72,18 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   String? _placeLookupFailure;
   var _rationale = false;
   var _blocked = false;
+  var _choosingFloor = false;
+  var _floorAsked = false;
+  StartFloorAnchor? _anchor;
 
   @override
   void initState() {
     super.initState();
+    // Running from the first frame, so a still phone already has a settled
+    // window by the time the user answers.
+    // Kept from the first build: a router rebuild hands the widget a fresh,
+    // unstarted anchor.
+    _anchor = widget.anchor?..start();
     // After the first frame: leaving pops the route, which initState cannot do.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
@@ -152,6 +166,22 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         return;
       }
     }
+    if (_anchor != null && !_floorAsked) {
+      setState(() => _choosingFloor = true);
+      return;
+    }
+    await _checkCamera();
+  }
+
+  /// [floor] is what the user said they stand on; null means they skipped.
+  Future<void> _floorChosen(String? floor) async {
+    _floorAsked = true;
+    if (floor != null) _anchor!.confirmFloor(floor);
+    setState(() => _choosingFloor = false);
+    await _checkCamera();
+  }
+
+  Future<void> _checkCamera() async {
     try {
       final camera = await widget.cameraStatus();
       if (!mounted) return;
@@ -203,7 +233,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       return;
     }
     if (!mounted) return;
-    final result = await widget.launcher.launch(_request!.withArToken(token));
+    final result = await widget.launcher.launch(
+      _request!.withArToken(token).withStartFloor(_anchor?.evidence()),
+    );
     if (!mounted) return;
     _leave(_resultText(result));
   }
@@ -255,9 +287,19 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   @override
+  void dispose() {
+    _anchor?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => Scaffold(
     appBar:
-        _blocked || _rationale || _unavailable || _placeLookupFailure != null
+        _blocked ||
+            _rationale ||
+            _unavailable ||
+            _choosingFloor ||
+            _placeLookupFailure != null
         ? AppBar(title: const Text('AR mode'))
         : null,
     body: Center(
@@ -278,6 +320,30 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
               onAction: _start,
               back: 'Back to map',
               onBack: () => _leave(null),
+            )
+          : _choosingFloor
+          ? Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Which floor are you standing on? Hold still while you '
+                    'answer; the barometer checks you stay on it.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  for (final floor in scannedIndoorFloors.toList()..sort())
+                    FilledButton(
+                      onPressed: () => _floorChosen(floor),
+                      child: Text('Floor $floor'),
+                    ),
+                  TextButton(
+                    onPressed: () => _floorChosen(null),
+                    child: const Text('Skip'),
+                  ),
+                ],
+              ),
             )
           : _blocked
           ? _message(
