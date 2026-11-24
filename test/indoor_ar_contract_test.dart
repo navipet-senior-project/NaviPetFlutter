@@ -56,7 +56,7 @@ void main() {
 
     test('start floor adds all versioned fields to both request modes', () {
       final start = IndoorArStartFloor(
-        floor: '2',
+        floor: ' 2 ',
         ageS: 12.5,
         settled: true,
         moved: false,
@@ -158,19 +158,49 @@ void main() {
       }
     });
 
-    test('start floor rejects blank floor and bad ages', () {
-      IndoorArStartFloor build({
-        String floor = '1',
-        double ageS = 0,
-        double sampleAgeS = 0,
-      }) => IndoorArStartFloor(
-        floor: floor,
-        ageS: ageS,
-        settled: true,
-        moved: false,
-        sampleAgeS: sampleAgeS,
-      );
-      expect(() => build(floor: ''), throwsArgumentError);
+    test('both modes omit all evidence for invalid start floors', () {
+      for (final floor in [
+        '',
+        '  ',
+        'Ground',
+        '0',
+        '-1',
+        '+1',
+        '1.5',
+        '2147483648',
+      ]) {
+        final start = IndoorArStartFloor(
+          floor: floor,
+          ageS: 20,
+          settled: true,
+          moved: false,
+          sampleAgeS: 0,
+        );
+        for (final request in [
+          vec119Request(),
+          IndoorArRequest.localize(
+            mapCode: IndoorArRequest.buildMapCode,
+            frame: IndoorArRequest.buildFrame,
+          ),
+        ]) {
+          expect(
+            request.withArToken(testArToken, startFloor: start).toJson(),
+            request.withArToken(testArToken, startFloor: null).toJson(),
+            reason: floor,
+          );
+        }
+      }
+    });
+
+    test('start floor rejects bad ages', () {
+      IndoorArStartFloor build({double ageS = 0, double sampleAgeS = 0}) =>
+          IndoorArStartFloor(
+            floor: '1',
+            ageS: ageS,
+            settled: true,
+            moved: false,
+            sampleAgeS: sampleAgeS,
+          );
       expect(() => build(ageS: -1), throwsArgumentError);
       expect(() => build(ageS: double.nan), throwsArgumentError);
       expect(() => build(sampleAgeS: double.infinity), throwsArgumentError);

@@ -42,7 +42,7 @@ class StartFloorAnchor {
   static const window = Duration(seconds: 20);
   static const _minSampleSpan = Duration(seconds: 18);
   static const _minSampleSpacing = Duration(milliseconds: 500);
-  static const maxGap = Duration(seconds: 2);
+  static const _maxAnchorGap = Duration(seconds: 2);
   static const _timestampTolerance = Duration(milliseconds: 5);
   static const maxRangeHpa = 0.06;
   static const moveHpa = 0.30;
@@ -95,18 +95,13 @@ class StartFloorAnchor {
     await sub?.cancel();
   }
 
-  Duration get _collectionDeadline => _anchor == null
-      ? _confirmedAt + anchorDeadline
-      : _buffer.last.at + maxGap + maxReadingAge;
-
   Duration get _confirmationExpiry =>
       _confirmedAt + IndoorArStartFloor.maxConfirmationAge;
 
   void _scheduleStop(Duration now) {
     _expiry?.cancel();
-    final deadline = _collectionDeadline + const Duration(milliseconds: 1);
-    final stopAt = deadline < _confirmationExpiry
-        ? deadline
+    final stopAt = _anchor == null
+        ? _confirmedAt + anchorDeadline + const Duration(milliseconds: 1)
         : _confirmationExpiry;
     _expiry = Timer(stopAt - now, invalidate);
   }
@@ -119,15 +114,16 @@ class StartFloorAnchor {
       return;
     }
     if (_sub != null &&
-        (now > _collectionDeadline || now >= _confirmationExpiry)) {
+        (now >= _confirmationExpiry ||
+            (_anchor == null && now - _confirmedAt > anchorDeadline))) {
       invalidate();
     }
   }
 
-  /// Returns false for a blank floor, leaving the previous confirmation.
+  /// Returns false for an invalid floor, leaving the previous confirmation.
   bool confirmFloor(String floor) {
-    final value = floor.trim();
-    if (value.isEmpty) return false;
+    final value = IndoorArStartFloor.normalizeFloor(floor);
+    if (value == null) return false;
     _floor = value;
     _confirmedWallTime = _wallClock();
     _confirmedAt = _clock();
@@ -158,12 +154,12 @@ class StartFloorAnchor {
     final now = _clock();
     _checkContinuity(now, wallTime);
     final anchor = _anchor;
-    if (_sub == null || anchor == null) return null;
+    if (_sub == null || anchor == null || _buffer.isEmpty) return null;
     final last = _buffer.last;
     final elapsedAge = now - last.at;
     final timestampAge = wallTime.difference(last.timestamp);
     final sampleAge = elapsedAge > timestampAge ? elapsedAge : timestampAge;
-    if (sampleAge > maxGap) return null;
+    if (sampleAge > IndoorArStartFloor.maxSampleAge) return null;
     final median = _settledMedian(now - window, now);
     if (median == null) return null;
     return IndoorArStartFloor(
@@ -187,6 +183,7 @@ class StartFloorAnchor {
         now - _confirmedAt - timestamp.difference(_confirmedWallTime);
     final age = timestampAge > elapsedAge ? timestampAge : elapsedAge;
     final at = age.isNegative ? now : now - age;
+    final anchor = _anchor;
     final last = _buffer.isEmpty ? null : _buffer.last;
     if (timestampAge < -_timestampTolerance ||
         elapsedAge < -_timestampTolerance ||
@@ -196,29 +193,40 @@ class StartFloorAnchor {
       return;
     }
     if (last == null) {
-      if (at - _confirmedAt > anchorLead) {
+      if (anchor == null && at - _confirmedAt > anchorLead) {
         invalidate();
         return;
       }
     } else {
       final elapsedGap = at - last.at;
       final timestampGap = timestamp.difference(last.timestamp);
-      if (elapsedGap.isNegative ||
-          timestampGap.isNegative ||
-          elapsedGap > maxGap ||
-          timestampGap > maxGap) {
-        invalidate();
+      if (elapsedGap <= Duration.zero || timestampGap <= Duration.zero) {
+        if (anchor != null) {
+          _buffer.clear();
+        } else if (elapsedGap.isNegative || timestampGap.isNegative) {
+          invalidate();
+        }
         return;
+      }
+      final maxGap = anchor == null
+          ? _maxAnchorGap
+          : IndoorArStartFloor.maxSampleAge;
+      if (elapsedGap > maxGap || timestampGap > maxGap) {
+        if (anchor == null) {
+          invalidate();
+          return;
+        }
+        _buffer.clear();
       }
       if (elapsedGap < _minSampleSpacing || timestampGap < _minSampleSpacing) {
         return;
       }
     }
     _buffer.add((at: at, timestamp: timestamp, hPa: reading.hPa));
-    final anchor = _anchor;
     if (anchor == null) {
       if (at - _confirmedAt >= window) {
         _anchor = _settledMedian(_confirmedAt, at);
+        if (_anchor != null) _scheduleStop(now);
       }
     } else if (!_moved) {
       final median = _settledMedian(at - window, at);
@@ -226,7 +234,6 @@ class StartFloorAnchor {
     }
     if (_anchor != null) {
       _buffer.removeWhere((s) => s.at < at - window);
-      _scheduleStop(now);
     }
   }
 
@@ -239,9 +246,6 @@ class StartFloorAnchor {
         samples.last.at - samples.first.at < _minSampleSpan ||
         samples.last.timestamp.difference(samples.first.timestamp) <
             _minSampleSpan) {
-      return null;
-    }
-    if (samples.first.at - start > maxGap || end - samples.last.at > maxGap) {
       return null;
     }
     final values = [for (final s in samples) s.hPa]..sort();

@@ -478,7 +478,7 @@ void main() {
 
     for (final moved in [false, true]) {
       testWidgets(
-        'camera rationale sends movement only with a live stream ($moved)',
+        'camera rationale sends evidence only with a fresh window ($moved)',
         (tester) async {
           final harness = build(status: PermissionStatus.denied);
           await harness.pump(tester);
@@ -492,14 +492,11 @@ void main() {
           if (moved) {
             await holdStill(tester, 21, hPa: 1000.5);
           } else {
-            final silence =
-                StartFloorAnchor.maxGap +
-                StartFloorAnchor.maxReadingAge +
-                const Duration(seconds: 1);
+            const silence = Duration(seconds: 11);
             now += silence;
             await tester.pump(silence);
           }
-          expect(source.hasListener, moved);
+          expect(source.hasListener, isTrue);
           await tester.tap(find.text('Continue'));
           await tester.pumpAndSettle();
           final evidence = harness.fake.requests.single.startFloor;
@@ -825,7 +822,7 @@ void main() {
         true,
       ),
       ('unsettled current window', Duration.zero, false),
-      ('stopped stream at sample age limit', Duration(seconds: 10), false),
+      ('unsettled at sample age limit', Duration(seconds: 10), false),
       ('over sample age limit', Duration(seconds: 10, microseconds: 1), false),
       ('over floor age limit', Duration(seconds: 1180, microseconds: 1), false),
     ]) {

@@ -43,7 +43,6 @@ class IndoorArStartFloor {
     required this.moved,
     required this.sampleAgeS,
   }) {
-    if (floor.isEmpty) throw ArgumentError('floor must not be empty');
     // Negated range checks so NaN is rejected too.
     if (!(ageS >= 0 && ageS.isFinite)) {
       throw ArgumentError.value(ageS, 'ageS', 'must be finite and >= 0');
@@ -69,22 +68,34 @@ class IndoorArStartFloor {
 
   static const maxConfirmationAge = Duration(minutes: 20);
   static const maxSampleAge = Duration(seconds: 10);
+  static final _floorDigits = RegExp(r'^[0-9]+$');
 
-  Map<String, Object?> toJson() =>
-      settled &&
-          ageS <= maxConfirmationAge.inSeconds &&
-          sampleAgeS <= maxSampleAge.inSeconds
-      ? {
-          'floorEvidenceVersion': 1,
-          'startFloor': floor,
-          'startFloorAgeS': ageS,
-          'pressureSinceStart': {
-            'settled': true,
-            'moved': moved,
-            'sampleAgeS': sampleAgeS,
-          },
-        }
-      : {};
+  static String? normalizeFloor(String floor) {
+    final value = floor.trim();
+    if (!_floorDigits.hasMatch(value)) return null;
+    final number = int.tryParse(value, radix: 10);
+    return number != null && number >= 1 && number <= 2147483647 ? value : null;
+  }
+
+  Map<String, Object?> toJson() {
+    final value = normalizeFloor(floor);
+    if (value == null ||
+        !settled ||
+        ageS > maxConfirmationAge.inSeconds ||
+        sampleAgeS > maxSampleAge.inSeconds) {
+      return {};
+    }
+    return {
+      'floorEvidenceVersion': 1,
+      'startFloor': value,
+      'startFloorAgeS': ageS,
+      'pressureSinceStart': {
+        'settled': true,
+        'moved': moved,
+        'sampleAgeS': sampleAgeS,
+      },
+    };
+  }
 }
 
 /// One AR session: a saved door, or localization with no door pose.

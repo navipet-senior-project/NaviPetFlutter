@@ -65,11 +65,33 @@ void main() {
     expect(rig.anchor.evidence(), isNull, reason: 'earlier samples not kept');
   });
 
-  test('blank floor is refused and reads nothing', () async {
-    final rig = _Rig();
-    expect(rig.anchor.confirmFloor('  '), isFalse);
-    expect(rig.source.controller.hasListener, isFalse);
-  });
+  test(
+    'invalid floors do not start capture or replace a confirmation',
+    () async {
+      final rig = _Rig();
+      const invalid = [
+        '',
+        '  ',
+        'Ground',
+        '0',
+        '-1',
+        '+1',
+        '1.5',
+        '2147483648',
+      ];
+      for (final floor in invalid) {
+        expect(rig.anchor.confirmFloor(floor), isFalse, reason: floor);
+        expect(rig.source.controller.hasListener, isFalse);
+      }
+      rig.anchor.confirmFloor('2');
+      await rig.hold(1000, 20);
+      for (final floor in invalid) {
+        expect(rig.anchor.confirmFloor(floor), isFalse, reason: floor);
+      }
+      expect(rig.anchor.evidence()?.floor, '2');
+      expect(rig.anchor.evidence()?.ageS, 20);
+    },
+  );
 
   test(
     'unchanged level with noise for 60 s is settled and not moved',
@@ -98,35 +120,77 @@ void main() {
     expect(rig.anchor.resolved, isTrue);
   });
 
-  test('a pressure spike 250 ms after an accepted capture is dropped', () async {
-    final rig = _Rig();
-    rig.anchor.confirmFloor('1');
-    await rig.hold(1000, 1);
-    rig.now += const Duration(milliseconds: 250);
-    rig.source.controller.add(
-      PressureReading(hPa: 1000.08, timestamp: _wall.add(rig.now)),
-    );
-    await Future<void>.delayed(Duration.zero);
-    await rig.hold(1000, 19);
-    expect(rig.anchor.evidence()?.moved, isFalse);
-  });
+  test(
+    'a pressure spike 250 ms after an accepted capture is dropped',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 1);
+      rig.now += const Duration(milliseconds: 250);
+      rig.source.controller.add(
+        PressureReading(hPa: 1000.08, timestamp: _wall.add(rig.now)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await rig.hold(1000, 19);
+      expect(rig.anchor.evidence()?.moved, isFalse);
+    },
+  );
 
-  test('a backward capture invalidates the pressure window', () async {
-    final rig = _Rig();
-    rig.anchor.confirmFloor('1');
-    await rig.hold(1000, 20);
-    expect(rig.anchor.evidence(), isNotNull);
-    rig.now += const Duration(milliseconds: 250);
-    rig.source.controller.add(
-      PressureReading(
-        hPa: 1000,
-        timestamp: _wall.add(rig.now - const Duration(milliseconds: 500)),
-      ),
+  for (final ageMs in [250, 500]) {
+    test(
+      'non-increasing capture at age ${ageMs}ms clears the window',
+      () async {
+        final rig = _Rig();
+        rig.anchor.confirmFloor('1');
+        await rig.hold(1000, 20);
+        expect(rig.anchor.evidence(), isNotNull);
+        rig.now += const Duration(milliseconds: 250);
+        rig.source.controller.add(
+          PressureReading(
+            hPa: 1000,
+            timestamp: _wall.add(rig.now - Duration(milliseconds: ageMs)),
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(rig.anchor.evidence(), isNull);
+        expect(rig.source.controller.hasListener, isTrue);
+        await rig.hold(1000, 18);
+        expect(rig.anchor.evidence(), isNull);
+        await rig.hold(1000, 1);
+        expect(rig.anchor.evidence()?.moved, isFalse);
+      },
     );
-    await Future<void>.delayed(Duration.zero);
-    expect(rig.anchor.evidence(), isNull);
-    expect(rig.source.controller.hasListener, isFalse);
-  });
+  }
+
+  for (final (gap, pressure, moved) in [
+    (3, 1000.0, false),
+    (25, 999.53, true),
+  ]) {
+    test('evidence recovers after a ${gap}s capture gap', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 25);
+      expect(rig.anchor.evidence()?.moved, isFalse);
+      rig.gap(gap - 1);
+      await rig.hold(pressure, 40);
+      expect(rig.anchor.evidence()?.floor, '1');
+      expect(rig.anchor.evidence()?.moved, moved);
+      expect(rig.source.controller.hasListener, isTrue);
+    });
+  }
+
+  test(
+    'a long gap keeps movement latched after returning to the anchor',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 25);
+      await rig.hold(1000.5, 25);
+      rig.gap(24);
+      await rig.hold(1000, 40);
+      expect(rig.anchor.evidence()?.moved, isTrue);
+    },
+  );
 
   test('a settled 0.47 hPa step latches movement', () async {
     final rig = _Rig();
@@ -148,22 +212,6 @@ void main() {
     expect(e.settled, isTrue);
     expect(e.moved, isFalse);
   });
-
-  for (final silentSeconds in [2, 8]) {
-    test(
-      'a flat window cannot repair a gap after $silentSeconds silent seconds',
-      () async {
-        final rig = _Rig();
-        rig.anchor.confirmFloor('1');
-        await rig.hold(1000, 25);
-        expect(rig.anchor.evidence()!.settled, isTrue);
-        rig.gap(silentSeconds);
-        await rig.hold(1000, 40);
-        expect(rig.anchor.evidence(), isNull);
-        expect(rig.source.controller.hasListener, isFalse);
-      },
-    );
-  }
 
   test('hold range 0.2 never anchors, and the deadline resolves it', () async {
     final rig = _Rig();
@@ -372,23 +420,18 @@ void main() {
     expect(rig.anchor.resolved, isFalse);
   });
 
-  test('moved stays latched after returning to the anchor level', () async {
-    final rig = _Rig();
-    rig.anchor.confirmFloor('1');
-    await rig.hold(1000, 25);
-    await rig.hold(1000.5, 25);
-    await rig.hold(1000, 25);
-    expect(rig.anchor.evidence()!.moved, isTrue);
-  });
-
-  test('freshness is judged at each use, never cached', () async {
+  test('11 s silence omits evidence until a new window settles', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
     await rig.hold(1000, 25);
     expect(rig.anchor.evidence()!.settled, isTrue);
-    rig.gap(11); // sensor went quiet after the answer
+    rig.gap(11);
     expect(rig.anchor.evidence(), isNull);
-    expect(rig.source.controller.hasListener, isFalse);
+    expect(rig.source.controller.hasListener, isTrue);
+    await rig.hold(1000, 18);
+    expect(rig.anchor.evidence(), isNull);
+    await rig.hold(1000, 1);
+    expect(rig.anchor.evidence()?.moved, isFalse);
   });
 
   test('a 17-second span is unsettled even with both edges covered', () async {
