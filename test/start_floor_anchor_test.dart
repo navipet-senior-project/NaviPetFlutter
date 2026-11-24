@@ -12,9 +12,15 @@ class _FakeSource implements PressureSource {
 }
 
 /// Drives the anchor on a fake monotonic clock; one reading per second.
+final _wall = DateTime.utc(2026);
+
 class _Rig {
   _Rig() {
-    anchor = StartFloorAnchor(source: source, clock: () => now);
+    anchor = StartFloorAnchor(
+      source: source,
+      clock: () => now,
+      wallClock: () => _wall,
+    );
   }
 
   final source = _FakeSource();
@@ -23,14 +29,18 @@ class _Rig {
   var _noise = 0;
 
   /// Holds [hPa] for [seconds], with +-0.01 hPa of alternating noise.
-  Future<void> hold(double hPa, int seconds) async {
+  Future<void> hold(
+    double hPa,
+    int seconds, {
+    Duration age = Duration.zero,
+  }) async {
     for (var i = 0; i < seconds; i++) {
       now += const Duration(seconds: 1);
       _noise++;
       source.controller.add(
         PressureReading(
           hPa: hPa + (_noise.isEven ? 0.01 : -0.01),
-          timestamp: DateTime.utc(2026),
+          timestamp: _wall.subtract(age),
         ),
       );
       await Future<void>.delayed(Duration.zero);
@@ -154,6 +164,14 @@ void main() {
     rig.gap(8); // e.g. a permission dialog delayed the sensor
     await rig.hold(1000, 25);
     expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.anchor.resolved, isTrue);
+  });
+
+  test('readings the sensor stamped as old are never trusted', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 30, age: const Duration(seconds: 10));
+    expect(rig.anchor.evidence(), isNull);
     expect(rig.anchor.resolved, isTrue);
   });
 

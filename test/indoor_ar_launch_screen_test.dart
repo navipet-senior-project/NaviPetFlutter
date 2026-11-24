@@ -244,6 +244,7 @@ void main() {
         anchor: StartFloorAnchor(
           source: _StreamSource(source.stream),
           clock: () => now,
+          wallClock: () => DateTime.utc(2026),
         ),
       );
     }

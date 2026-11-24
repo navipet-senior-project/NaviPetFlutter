@@ -17,13 +17,21 @@ import 'indoor_ar_contract.dart';
 ///
 /// Nothing but two flags and two ages leaves this class: no absolute or raw
 /// pressure, no wall-clock time, no location. Time is the injected monotonic
-/// [clock].
+/// [clock]; the wall clock only rejects readings the sensor stamped as old.
+///
+/// shortcut: assumes the platform stamps readings on the wall clock; verify on
+/// a device. If it does not, every reading is dropped and the evidence stays
+/// `settled: false`, which is the safe side.
 ///
 /// shortcut: one iPhone, one building, one afternoon of data backs the
 /// thresholds; re-measure on a second device and over longer drift.
 class StartFloorAnchor {
-  StartFloorAnchor({required this.source, Duration Function()? clock})
-    : _clock = clock ?? _monotonic();
+  StartFloorAnchor({
+    required this.source,
+    Duration Function()? clock,
+    DateTime Function()? wallClock,
+  }) : _clock = clock ?? _monotonic(),
+       _wallClock = wallClock ?? DateTime.now;
 
   static const window = Duration(seconds: 20);
   static const maxGap = Duration(seconds: 10);
@@ -35,11 +43,18 @@ class StartFloorAnchor {
   /// window then still covers the answer to within [anchorLead] + 2 s.
   static const anchorDeadline = Duration(seconds: 22);
 
+  /// A reading whose own timestamp is older than this is a delayed or replayed
+  /// delivery and is dropped, never stamped with the arrival time.
+  static const maxReadingAge = Duration(seconds: 3);
+
   /// Longest the first anchor sample may trail the start of its window.
   static const anchorLead = Duration(seconds: 3);
 
   final PressureSource source;
   final Duration Function() _clock;
+
+  /// Only compares the sensor's own timestamp with now; never stored or sent.
+  final DateTime Function() _wallClock;
 
   final _buffer = <({Duration at, double hPa})>[];
   StreamSubscription<PressureReading>? _sub;
@@ -103,6 +118,7 @@ class StartFloorAnchor {
   }
 
   void _onReading(PressureReading reading) {
+    if (_wallClock().difference(reading.timestamp) > maxReadingAge) return;
     final now = _clock();
     _buffer.add((at: now, hPa: reading.hPa));
     _buffer.removeWhere((s) => s.at <= now - window);
