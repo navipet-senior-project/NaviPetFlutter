@@ -25,6 +25,7 @@ class IndoorArLaunchScreen extends StatefulWidget {
     this.request,
     this.anchor,
     this.now = DateTime.now,
+    this.monotonicNow,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
     this.openSettings = openAppSettings,
@@ -42,6 +43,7 @@ class IndoorArLaunchScreen extends StatefulWidget {
   /// Null when the app has no backend session to ask; AR is then unavailable.
   final IndoorArTokenGateway? tokenGateway;
   final DateTime Function() now;
+  final Duration Function()? monotonicNow;
   final Future<PermissionStatus> Function() cameraStatus;
   final Future<PermissionStatus> Function() requestCamera;
   final Future<bool> Function() openSettings;
@@ -83,6 +85,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   Timer? _holdPoll;
   Completer<void>? _resumeWait;
   int _launchGeneration = 0;
+  late final Stopwatch _launchClock = Stopwatch()..start();
+
+  Duration _elapsedNow() => widget.monotonicNow?.call() ?? _launchClock.elapsed;
 
   bool get _active => mounted && !_exiting;
   bool get _resumed =>
@@ -113,8 +118,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       _checkHold();
       return;
     }
-    _launchGeneration++;
     if (_isBackgrounded(state)) {
+      _launchGeneration++;
       _holdPoll?.cancel();
       _anchor?.invalidate();
     }
@@ -293,20 +298,32 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
     if (!_active) return;
     // Minted now, after the camera step, so it is as fresh as possible and a
     // refused permission never spends one of the 5-per-minute requests.
-    final IndoorArToken token;
+    final IndoorArStartFloor? evidence;
+    final IndoorArResult result;
     try {
       final gateway = widget.tokenGateway;
       if (gateway == null) throw const IndoorArTokenException(0);
       final generation = _launchGeneration;
-      token = await gateway.fetch();
+      final mintWallTime = widget.now();
+      final mintStarted = _elapsedNow();
+      final token = await gateway.fetch();
       while (_active && !_resumed) {
         await (_resumeWait ??= Completer<void>()).future;
       }
       if (!_active) return;
+      final elapsedWallTime = mintWallTime.add(_elapsedNow() - mintStarted);
       if (generation != _launchGeneration ||
+          !token.expiresOn.isAfter(elapsedWallTime.add(_tokenMargin)) ||
           !token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
         throw const IndoorArTokenException(0);
       }
+      evidence = _anchor?.evidence();
+      unawaited(_anchor?.reset());
+      final request = _request!.withArToken(token, startFloor: evidence);
+      if (!_active) return;
+      // The app can still lose the foreground while the platform call is queued.
+      if (!_resumed) throw const IndoorArTokenException(0);
+      result = await widget.launcher.launch(request);
     } on IndoorArTokenException {
       if (!_active) return;
       unawaited(_anchor?.reset()); // the failure screen collects nothing
@@ -316,13 +333,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       });
       return;
     }
-    final evidence = _anchor?.evidence();
-    unawaited(_anchor?.reset());
-    final result = await widget.launcher.launch(
-      _request!.withArToken(token, startFloor: evidence),
-    );
     if (!_active) return;
-    if (evidence?.isFreshForUnity == true &&
+    if (evidence != null &&
         result.status == IndoorArStatus.localizationFailed) {
       // Unity's "Try again" returns here (Addendum 9): ask the floor afresh.
       setState(() => _retryText = _resultText(result));

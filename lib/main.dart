@@ -121,6 +121,8 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
             baseUrl: AppConfig.backendBaseUrl,
             auth: widget.authTokenProvider!,
           ),
+    // The prompt is skippable. Older Unity builds ignore floor evidence.
+    // Useful evidence requires a paired Unity export with the PR 37 floor policy.
     floorPressureSource: const SensorsPlusPressureSource(),
     initialLocation: kDebugMode && _devStartRoute.isNotEmpty
         ? _devStartRoute

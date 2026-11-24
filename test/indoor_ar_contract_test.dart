@@ -108,7 +108,7 @@ void main() {
       }
     });
 
-    test('Unity freshness checks unrounded ages regardless of movement', () {
+    test('both request modes omit stale evidence at unrounded ages', () {
       for (final (age, sampleAge, fresh) in [
         (0.0, 0.0, true),
         (1200.0, 10.0, true),
@@ -124,10 +124,36 @@ void main() {
           moved: true,
           sampleAgeS: sampleAge,
         );
-        final wire = jsonDecode(jsonEncode(start.toJson())) as Map;
-        expect(wire['startFloorAgeS'], age);
-        expect((wire['pressureSinceStart'] as Map)['sampleAgeS'], sampleAge);
-        expect(start.isFreshForUnity, fresh);
+        for (final request in [
+          vec119Request(),
+          IndoorArRequest.localize(
+            mapCode: IndoorArRequest.buildMapCode,
+            frame: IndoorArRequest.buildFrame,
+          ),
+        ]) {
+          final wire =
+              jsonDecode(
+                    jsonEncode(
+                      request
+                          .withArToken(testArToken, startFloor: start)
+                          .toJson(),
+                    ),
+                  )
+                  as Map;
+          if (fresh) {
+            expect(wire['floorEvidenceVersion'], 1);
+            expect(wire['startFloorAgeS'], age);
+            expect(
+              (wire['pressureSinceStart'] as Map)['sampleAgeS'],
+              sampleAge,
+            );
+          } else {
+            expect(
+              wire,
+              request.withArToken(testArToken, startFloor: null).toJson(),
+            );
+          }
+        }
       }
     });
 

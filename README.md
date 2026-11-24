@@ -413,6 +413,21 @@ ignores the whole `android/unity-ar/` directory.
 See [iPhone testing](docs/ios-testing.md#indoor-ar) for setup and validation
 status.
 
+### Indoor AR floor confirmation
+
+The floor prompt is skippable. Useful floor evidence requires a paired Unity
+export containing the [NaviPetUnity floor policy](https://github.com/navipet-senior-project/NaviPetUnity/pull/37)
+from PR 37 or later. Older Unity builds ignore the fields.
+
+The thresholds come from measurements on one iPhone in one building. This
+integration has not been verified on a device, and Android remains unverified.
+The iOS Motion & Fitness permission dialog can interrupt the hold.
+
+`sensors_plus` uses a cached boot-to-wall clock offset. A wall-clock adjustment
+or sleep can drop or mis-age readings and cause Flutter to omit floor evidence.
+A clock step before confirmation followed by a fast stair transition can hide
+early movement and make the previously confirmed floor appear valid.
+
 ## Navigation behavior
 
 The app stays on Mapbox for this phase. It uses the native Maps Flutter SDK for

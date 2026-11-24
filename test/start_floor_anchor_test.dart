@@ -21,7 +21,7 @@ class _Rig {
       clock: () => now,
       wallClock: () => _wall.add(now + wallOffset),
     );
-    addTearDown(anchor.dispose);
+    addTearDown(anchor.reset);
   }
 
   final source = _FakeSource();
@@ -91,22 +91,22 @@ void main() {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
     await rig.hold(1000, 15);
-    expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.anchor.evidence(), isNull);
     expect(rig.anchor.resolved, isFalse);
     await rig.hold(1000, 5);
     expect(rig.anchor.evidence()!.settled, isTrue);
     expect(rig.anchor.resolved, isTrue);
   });
 
-  test('a 0.47 hPa step stops sampling and stays moved', () async {
+  test('a settled 0.47 hPa step latches movement', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
     await rig.hold(1000, 25);
     await rig.hold(1000.47, 40);
     final e = rig.anchor.evidence()!;
-    expect(e.settled, isFalse);
+    expect(e.settled, isTrue);
     expect(e.moved, isTrue);
-    expect(rig.source.controller.hasListener, isFalse);
+    expect(rig.source.controller.hasListener, isTrue);
   });
 
   test('0.22 posture shift is not a move', () async {
@@ -129,9 +129,7 @@ void main() {
         expect(rig.anchor.evidence()!.settled, isTrue);
         rig.gap(silentSeconds);
         await rig.hold(1000, 40);
-        final e = rig.anchor.evidence()!;
-        expect(e.settled, isFalse);
-        expect(e.moved, isFalse);
+        expect(rig.anchor.evidence(), isNull);
         expect(rig.source.controller.hasListener, isFalse);
       },
     );
@@ -143,9 +141,7 @@ void main() {
     for (var i = 0; i < 31; i++) {
       await rig.hold(1000 + (i.isEven ? 0.1 : -0.1), 1);
     }
-    final e = rig.anchor.evidence()!;
-    expect(e.settled, isFalse);
-    expect(e.moved, isFalse);
+    expect(rig.anchor.evidence(), isNull);
     expect(rig.anchor.resolved, isTrue);
     expect(rig.source.controller.hasListener, isFalse);
   });
@@ -157,9 +153,7 @@ void main() {
       await rig.hold(1000 + i * 0.2, 1); // still climbing
     }
     await rig.hold(1003, 60); // settles, but after the deadline
-    final e = rig.anchor.evidence()!;
-    expect(e.settled, isFalse);
-    expect(e.moved, isFalse);
+    expect(rig.anchor.evidence(), isNull);
     // A fresh confirmation once settled anchors.
     rig.anchor.confirmFloor('2');
     await rig.hold(1003, 25);
@@ -172,18 +166,18 @@ void main() {
     await rig.hold(1000, 1);
     await rig.hold(1000.25, 1);
     await rig.hold(1000.5, 20);
-    expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.anchor.evidence(), isNull);
   });
 
   for (final delta in [-0.5, 0.5]) {
-    test('brief excursion of $delta hPa stays latched', () async {
+    test('brief excursion of $delta hPa does not latch movement', () async {
       final rig = _Rig();
       rig.anchor.confirmFloor('1');
       await rig.hold(1000, 20);
       await rig.hold(1000 + delta, 2);
       await rig.hold(1000, 22);
-      expect(rig.anchor.evidence()!.settled, isFalse);
-      expect(rig.anchor.evidence()!.moved, isTrue);
+      expect(rig.anchor.evidence()!.settled, isTrue);
+      expect(rig.anchor.evidence()!.moved, isFalse);
     });
   }
 
@@ -218,7 +212,7 @@ void main() {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
     await rig.hold(1000, 20, age: const Duration(seconds: 2));
-    expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.anchor.evidence(), isNull);
     await rig.hold(1000, 2, age: const Duration(seconds: 2));
     expect(rig.anchor.evidence()!.settled, isTrue);
     rig.gap(1);
@@ -285,7 +279,7 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
       expect(rig.anchor.resolved, isFalse);
-      expect(rig.anchor.evidence()!.sampleAgeS, 0.102);
+      expect(rig.anchor.evidence(), isNull);
     },
   );
 
@@ -302,7 +296,7 @@ void main() {
       ),
     );
     await Future<void>.delayed(Duration.zero);
-    expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.anchor.evidence(), isNull);
     expect(rig.source.controller.hasListener, isFalse);
   });
 
@@ -311,6 +305,7 @@ void main() {
     () async {
       final rig = _Rig();
       rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 20);
       await rig.hold(1000, 1, age: const Duration(milliseconds: -4));
       expect(rig.anchor.evidence()!.sampleAgeS, 0);
       rig.gap(1);
@@ -345,8 +340,8 @@ void main() {
     }
     await rig.hold(1000, 1, age: const Duration(seconds: 1));
     await rig.hold(1000, 1, age: const Duration(seconds: 2));
-    expect(rig.anchor.evidence()!.settled, isFalse);
-    expect(rig.anchor.evidence()!.sampleAgeS, 2);
+    expect(rig.anchor.evidence(), isNull);
+    expect(rig.anchor.resolved, isFalse);
   });
 
   test('moved stays latched after returning to the anchor level', () async {
@@ -364,10 +359,40 @@ void main() {
     await rig.hold(1000, 25);
     expect(rig.anchor.evidence()!.settled, isTrue);
     rig.gap(11); // sensor went quiet after the answer
-    final stale = rig.anchor.evidence()!;
-    expect(stale.settled, isFalse);
-    expect(stale.sampleAgeS, 11);
-    expect(stale.ageS, 36);
+    expect(rig.anchor.evidence(), isNull);
+    expect(rig.source.controller.hasListener, isFalse);
+  });
+
+  test('a 17-second span is unsettled even with both edges covered', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 20);
+    rig.gap(1);
+    await rig.hold(1000, 18);
+    rig.now += const Duration(milliseconds: 1900);
+    expect(rig.anchor.evidence()!.settled, isFalse);
+  });
+
+  test(
+    'continuous samples cannot extend confirmation past 20 minutes',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 1199);
+      expect(rig.anchor.evidence()!.settled, isTrue);
+      await rig.hold(1000, 1);
+      expect(rig.source.controller.hasListener, isFalse);
+      expect(rig.anchor.evidence(), isNull);
+    },
+  );
+
+  test('a closed stream invalidates a settled anchor', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 20);
+    expect(rig.anchor.evidence()!.settled, isTrue);
+    await rig.source.controller.close();
+    expect(rig.anchor.evidence(), isNull);
   });
 
   test('confirming again drops old samples and restarts the anchor', () async {

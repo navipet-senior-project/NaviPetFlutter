@@ -20,8 +20,9 @@ import 'indoor_ar_contract.dart';
 /// [clock].
 ///
 /// Sensors Plus converts boot-clock timestamps with a cached wall-clock offset.
-/// Clock changes before confirmation or device sleep can leave that offset
-/// wrong. Dart cannot recover true capture times from those timestamps.
+/// Clock changes or sleep can cause dropped or mis-aged readings and omitted
+/// evidence. A clock change before confirmation can hide the start of a fast
+/// stair transition and make the previous floor appear valid.
 ///
 /// shortcut: one iPhone, one building, one afternoon of data backs the
 /// thresholds; re-measure on a second device and over longer drift.
@@ -34,6 +35,7 @@ class StartFloorAnchor {
        _wallClock = wallClock ?? DateTime.now;
 
   static const window = Duration(seconds: 20);
+  static const _minSampleSpan = Duration(seconds: 18);
   static const maxGap = Duration(seconds: 2);
   static const _timestampTolerance = Duration(milliseconds: 5);
   static const maxRangeHpa = 0.06;
@@ -61,7 +63,6 @@ class StartFloorAnchor {
   late DateTime _confirmedWallTime;
   double? _anchor;
   var _moved = false;
-  var _failed = false;
 
   static Duration Function() _monotonic() {
     final watch = Stopwatch()..start();
@@ -74,12 +75,9 @@ class StartFloorAnchor {
     _floor = null;
     _anchor = null;
     _moved = false;
-    _failed = false;
     _buffer.clear();
     await stopped;
   }
-
-  Future<void> dispose() => reset();
 
   void invalidate() => unawaited(_stopReading());
 
@@ -95,23 +93,27 @@ class StartFloorAnchor {
       ? _confirmedAt + anchorDeadline
       : _buffer.last.at + maxGap + maxReadingAge;
 
+  Duration get _confirmationExpiry =>
+      _confirmedAt + IndoorArStartFloor.maxConfirmationAge;
+
   void _scheduleStop(Duration now) {
     _expiry?.cancel();
-    _expiry = Timer(
-      _collectionDeadline - now + const Duration(milliseconds: 1),
-      invalidate,
-    );
+    final deadline = _collectionDeadline + const Duration(milliseconds: 1);
+    final stopAt = deadline < _confirmationExpiry
+        ? deadline
+        : _confirmationExpiry;
+    _expiry = Timer(stopAt - now, invalidate);
   }
 
   void _checkContinuity(Duration now, DateTime wallTime) {
     if (_floor != null &&
         (wallTime.difference(_confirmedWallTime) - (now - _confirmedAt)).abs() >
             _timestampTolerance) {
-      _failed = true;
       invalidate();
       return;
     }
-    if (_sub != null && now > _collectionDeadline) {
+    if (_sub != null &&
+        (now > _collectionDeadline || now >= _confirmationExpiry)) {
       invalidate();
     }
   }
@@ -126,13 +128,10 @@ class StartFloorAnchor {
     _buffer.clear();
     _anchor = null;
     _moved = false;
-    _failed = false;
     _sub ??= source.readings().listen(
       _onReading,
-      onError: (Object _) {
-        _failed = true;
-        invalidate();
-      },
+      onError: (Object _) => invalidate(),
+      onDone: invalidate,
     );
     _scheduleStop(_confirmedAt);
     return true;
@@ -145,27 +144,24 @@ class StartFloorAnchor {
     return _floor != null && (_anchor != null || _sub == null);
   }
 
-  /// Null unless a floor is confirmed and the sensor has produced samples.
+  /// Evidence from a settled anchor with a live stream and fresh samples.
   IndoorArStartFloor? evidence() {
     final floor = _floor;
     if (floor == null) return null;
     final wallTime = _wallClock();
     final now = _clock();
     _checkContinuity(now, wallTime);
-    if (_failed || _buffer.isEmpty) return null;
+    if (_sub == null || _anchor == null) return null;
     final last = _buffer.last;
     final elapsedAge = now - last.at;
     final timestampAge = wallTime.difference(last.timestamp);
     final sampleAge = elapsedAge > timestampAge ? elapsedAge : timestampAge;
+    if (sampleAge > IndoorArStartFloor.maxSampleAge) return null;
     return IndoorArStartFloor(
       floor: floor,
       ageS:
           (now - _confirmedAt).inMicroseconds / Duration.microsecondsPerSecond,
-      settled:
-          _sub != null &&
-          _anchor != null &&
-          sampleAge <= maxGap &&
-          _settledMedian(now - window, now) != null,
+      settled: sampleAge <= maxGap && _settledMedian(now - window, now) != null,
       moved: _moved,
       sampleAgeS: sampleAge.inMicroseconds / Duration.microsecondsPerSecond,
     );
@@ -201,16 +197,16 @@ class StartFloorAnchor {
     }
     _buffer.add((at: at, timestamp: timestamp, hPa: reading.hPa));
     final anchor = _anchor;
-    if (anchor != null && (reading.hPa - anchor).abs() >= moveHpa) {
-      _moved = true; // latched: going up and back is still a move
-      invalidate();
-      return;
-    }
-    if (anchor == null && at - _confirmedAt >= window) {
-      _anchor = _settledMedian(_confirmedAt, at);
+    if (anchor == null) {
+      if (at - _confirmedAt >= window) {
+        _anchor = _settledMedian(_confirmedAt, at);
+      }
+    } else if (!_moved) {
+      final median = _settledMedian(at - window, at);
+      _moved = median != null && (median - anchor).abs() >= moveHpa;
     }
     if (_anchor != null) {
-      _buffer.removeWhere((s) => s.at < now - window);
+      _buffer.removeWhere((s) => s.at < at - window);
       _scheduleStop(now);
     }
   }
@@ -220,7 +216,12 @@ class StartFloorAnchor {
       for (final s in _buffer)
         if (s.at >= start && s.at <= end) s,
     ];
-    if (samples.isEmpty) return null;
+    if (samples.length < 8 ||
+        samples.last.at - samples.first.at < _minSampleSpan ||
+        samples.last.timestamp.difference(samples.first.timestamp) <
+            _minSampleSpan) {
+      return null;
+    }
     if (samples.first.at - start > maxGap || end - samples.last.at > maxGap) {
       return null;
     }

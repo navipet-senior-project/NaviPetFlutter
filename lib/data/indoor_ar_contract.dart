@@ -67,18 +67,23 @@ class IndoorArStartFloor {
   /// Seconds since the newest barometer sample.
   final double sampleAgeS;
 
-  bool get isFreshForUnity => ageS <= 1200 && sampleAgeS <= 10;
+  static const maxConfirmationAge = Duration(minutes: 20);
+  static const maxSampleAge = Duration(seconds: 10);
 
-  Map<String, Object?> toJson() => {
-    'floorEvidenceVersion': 1,
-    'startFloor': floor,
-    'startFloorAgeS': ageS,
-    'pressureSinceStart': {
-      'settled': settled,
-      'moved': moved,
-      'sampleAgeS': sampleAgeS,
-    },
-  };
+  Map<String, Object?> toJson() =>
+      ageS <= maxConfirmationAge.inSeconds &&
+          sampleAgeS <= maxSampleAge.inSeconds
+      ? {
+          'floorEvidenceVersion': 1,
+          'startFloor': floor,
+          'startFloorAgeS': ageS,
+          'pressureSinceStart': {
+            'settled': settled,
+            'moved': moved,
+            'sampleAgeS': sampleAgeS,
+          },
+        }
+      : {};
 }
 
 /// One AR session: a saved door, or localization with no door pose.

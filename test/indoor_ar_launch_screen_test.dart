@@ -96,6 +96,7 @@ class _Harness {
     Future<http.Response> Function(http.Request)? fetch,
     Future<http.Response> Function(http.Request)? mint,
     DateTime Function()? tokenClock,
+    Duration Function()? tokenElapsed,
     Future<PermissionStatus>? pendingStatus,
     Future<PermissionStatus>? pendingPermission,
   }) : fake = FakeIndoorArLauncher(result: result) {
@@ -144,6 +145,7 @@ class _Harness {
               }),
             ),
             now: tokenClock ?? () => DateTime.utc(2026, 1, 1),
+            monotonicNow: tokenElapsed,
             cameraStatus: () async {
               statusChecks++;
               return pendingStatus == null ? status : await pendingStatus;
@@ -256,6 +258,7 @@ void main() {
     _Harness build({
       Future<http.Response> Function(http.Request)? mint,
       DateTime Function()? tokenClock,
+      Duration Function()? tokenElapsed,
       Future<PermissionStatus>? pendingStatus,
       Future<PermissionStatus>? pendingPermission,
       IndoorArLauncher? launcher,
@@ -271,6 +274,7 @@ void main() {
         camera: camera,
         mint: mint,
         tokenClock: tokenClock,
+        tokenElapsed: tokenElapsed,
         pendingStatus: pendingStatus,
         pendingPermission: pendingPermission,
         launcher: launcher,
@@ -467,11 +471,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(_rationale), findsOneWidget);
       expect(source.hasListener, isFalse);
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(harness.fake.requests.single.startFloor, isNull);
     });
 
     for (final moved in [false, true]) {
       testWidgets(
-        'the camera rationale stops sampling on a terminal event ($moved)',
+        'camera rationale sends movement only with a live stream ($moved)',
         (tester) async {
           final harness = build(status: PermissionStatus.denied);
           await harness.pump(tester);
@@ -483,7 +490,7 @@ void main() {
           expect(find.text(_rationale), findsOneWidget);
           expect(source.hasListener, isTrue);
           if (moved) {
-            await holdStill(tester, 1, hPa: 1000.5);
+            await holdStill(tester, 21, hPa: 1000.5);
           } else {
             final silence =
                 StartFloorAnchor.maxGap +
@@ -492,12 +499,17 @@ void main() {
             now += silence;
             await tester.pump(silence);
           }
-          expect(source.hasListener, isFalse);
+          expect(source.hasListener, moved);
           await tester.tap(find.text('Continue'));
           await tester.pumpAndSettle();
-          final json = harness.fake.requests.single.toJson();
-          expect(json['pressureSinceStart'], containsPair('settled', false));
-          expect(json['pressureSinceStart'], containsPair('moved', moved));
+          final evidence = harness.fake.requests.single.startFloor;
+          expect(source.hasListener, isFalse);
+          if (moved) {
+            expect(evidence!.settled, isTrue);
+            expect(evidence.moved, isTrue);
+          } else {
+            expect(evidence, isNull);
+          }
         },
       );
     }
@@ -563,7 +575,7 @@ void main() {
           await tester.pumpAndSettle();
 
           final request = harness.fake.requests.single.toJson();
-          expect(request['pressureSinceStart'], containsPair('settled', false));
+          expect(request, isNot(contains('pressureSinceStart')));
           expect(harness.statusChecks, 1);
         },
       );
@@ -635,6 +647,7 @@ void main() {
       'interrupted',
       'rollback',
       'inactive rollback',
+      'brief inactive',
       'late reply',
       'cancelled',
     ]) {
@@ -643,9 +656,11 @@ void main() {
       ) async {
         final mint = Completer<http.Response>();
         var tokenTime = DateTime.utc(2026);
+        var elapsed = Duration.zero;
         final harness = build(
           mint: (_) => mint.future,
           tokenClock: () => tokenTime,
+          tokenElapsed: () => elapsed,
         );
         await harness.pump(tester);
         await harness.tapAr(tester);
@@ -654,7 +669,8 @@ void main() {
         await holdStill(tester, 20);
         expect(harness.mintRequests, hasLength(1));
 
-        final inactiveOnly = outcome == 'inactive rollback';
+        final brief = outcome == 'brief inactive';
+        final inactiveOnly = brief || outcome == 'inactive rollback';
         tester.binding.handleAppLifecycleStateChanged(
           inactiveOnly ? AppLifecycleState.inactive : AppLifecycleState.paused,
         );
@@ -665,8 +681,12 @@ void main() {
         expect(harness.fake.requests, isEmpty);
         expect(source.hasListener, inactiveOnly);
 
-        if (outcome == 'rollback' || inactiveOnly) {
-          tokenTime = tokenTime.add(const Duration(minutes: 31));
+        if (brief) {
+          elapsed = const Duration(seconds: 1);
+          await tester.pump(elapsed);
+        } else if (outcome == 'rollback' || outcome == 'inactive rollback') {
+          elapsed = const Duration(minutes: 31);
+          tokenTime = tokenTime.add(elapsed);
           await tester.pump(const Duration(minutes: 31));
           tokenTime = tokenTime.subtract(const Duration(minutes: 32));
         } else if (outcome == 'cancelled') {
@@ -685,11 +705,16 @@ void main() {
         }
         await tester.pumpAndSettle();
 
-        expect(harness.fake.requests, isEmpty);
-        expect(
-          find.text(outcome == 'cancelled' ? 'map' : 'Retry'),
-          findsOneWidget,
-        );
+        if (brief) {
+          expect(harness.fake.requests, hasLength(1));
+          expect(find.text('map'), findsOneWidget);
+        } else {
+          expect(harness.fake.requests, isEmpty);
+          expect(
+            find.text(outcome == 'cancelled' ? 'map' : 'Retry'),
+            findsOneWidget,
+          );
+        }
         expect(harness.mintRequests, hasLength(1));
       });
     }
@@ -795,16 +820,16 @@ void main() {
 
     for (final (name, delay, reasks) in [
       ('moved', Duration.zero, true),
-      ('at sample age limit', Duration(seconds: 10), true),
+      ('unsettled current window', Duration(seconds: 1), true),
+      ('stopped stream at sample age limit', Duration(seconds: 10), false),
       ('over sample age limit', Duration(seconds: 10, microseconds: 1), false),
       ('over floor age limit', Duration(seconds: 1180, microseconds: 1), false),
     ]) {
       testWidgets('localization retry follows sent evidence ($name)', (
         tester,
       ) async {
-        final mint = Completer<http.Response>();
         final harness = build(
-          mint: (_) => mint.future,
+          status: PermissionStatus.denied,
           result: const IndoorArResult(
             status: IndoorArStatus.localizationFailed,
             localizationQueries: 1,
@@ -816,30 +841,23 @@ void main() {
         await tester.tap(find.text('Floor 2'));
         await tester.pump();
         await holdStill(tester, 20);
-        expect(harness.mintRequests, hasLength(1));
-        if (delay == Duration.zero) {
-          await holdStill(tester, 1, hPa: 1000.5);
+        await tester.pumpAndSettle();
+        if (reasks) {
+          await holdStill(tester, delay == Duration.zero ? 21 : 1, hPa: 1000.5);
         } else {
           now += delay;
         }
-        mint.complete(http.Response(_mintedBody, 200));
+        await tester.tap(find.text('Continue'));
         await tester.pumpAndSettle();
 
         final request = harness.fake.requests.single;
-        expect(request.toJson()['floorEvidenceVersion'], 1);
-        final evidence = request.startFloor!;
-        expect(evidence.settled, isFalse);
-        expect(evidence.moved, delay == Duration.zero);
-        if (delay != Duration.zero) {
-          expect(
-            evidence.sampleAgeS,
-            delay.inMicroseconds / Duration.microsecondsPerSecond,
-          );
-          expect(
-            evidence.ageS,
-            (const Duration(seconds: 20) + delay).inMicroseconds /
-                Duration.microsecondsPerSecond,
-          );
+        if (reasks) {
+          expect(request.toJson()['floorEvidenceVersion'], 1);
+          expect(request.startFloor!.settled, delay == Duration.zero);
+          expect(request.startFloor!.moved, delay == Duration.zero);
+        } else {
+          expect(request.startFloor, isNull);
+          expect(request.toJson(), isNot(contains('floorEvidenceVersion')));
         }
         expect(find.text('Try again'), reasks ? findsOneWidget : findsNothing);
         expect(find.text('map'), reasks ? findsNothing : findsOneWidget);
