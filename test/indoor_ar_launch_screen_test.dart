@@ -341,6 +341,41 @@ void main() {
       expect(json.keys, isNot(contains('startFloor')), reason: 'old answer');
     });
 
+    testWidgets('a failed Unity run returns to the map; relaunch asks again', (
+      tester,
+    ) async {
+      final harness = _Harness(
+        status: PermissionStatus.granted,
+        result: const IndoorArResult(
+          status: IndoorArStatus.localizationFailed,
+          localizationQueries: 1,
+          durationMs: 1,
+        ),
+        anchor: () {
+          now = Duration.zero;
+          source = StreamController<PressureReading>.broadcast();
+          return StartFloorAnchor(
+            source: _StreamSource(source.stream),
+            clock: () => now,
+            wallClock: () => DateTime.utc(2026),
+          );
+        }(),
+      );
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      await tester.pumpAndSettle();
+      expect(harness.fake.requests.single.toJson()['startFloor'], '2');
+      expect(find.text('map'), findsOneWidget, reason: 'screen left');
+      expect(source.hasListener, isFalse, reason: 'no collection after Unity');
+
+      await harness.tapAr(tester);
+      expect(find.textContaining('Which floor'), findsOneWidget);
+      expect(harness.fake.requests, hasLength(1), reason: 'no silent relaunch');
+    });
+
     testWidgets('skip reads no sensor and sends no start floor', (
       tester,
     ) async {
