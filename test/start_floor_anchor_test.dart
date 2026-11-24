@@ -249,6 +249,75 @@ void main() {
     },
   );
 
+  test(
+    'a 20 ms rollback rejects a queued capture before the window ends',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 19);
+      rig.now = const Duration(milliseconds: 20100);
+      rig.wallOffset = const Duration(milliseconds: -20);
+      rig.source.controller.add(
+        PressureReading(
+          hPa: 1000,
+          timestamp: _wall.add(const Duration(milliseconds: 19990)),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(rig.anchor.evidence(), isNull);
+      expect(rig.source.controller.hasListener, isFalse);
+    },
+  );
+
+  test(
+    'a slight rollback cannot advance a capture into the full window',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 19);
+      rig.now = const Duration(milliseconds: 20100);
+      rig.wallOffset = const Duration(milliseconds: -4);
+      rig.source.controller.add(
+        PressureReading(
+          hPa: 1000,
+          timestamp: _wall.add(const Duration(milliseconds: 19998)),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(rig.anchor.resolved, isFalse);
+      expect(rig.anchor.evidence()!.sampleAgeS, 0.102);
+    },
+  );
+
+  test('a small forward step cannot hide a gap in plugin timestamps', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 19);
+    rig.now = const Duration(milliseconds: 21500);
+    rig.wallOffset = const Duration(milliseconds: 4);
+    rig.source.controller.add(
+      PressureReading(
+        hPa: 1000,
+        timestamp: _wall.add(const Duration(milliseconds: 21002)),
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.source.controller.hasListener, isFalse);
+  });
+
+  test(
+    'a slightly future timestamp cannot make a reading younger than arrival',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 1, age: const Duration(milliseconds: -4));
+      expect(rig.anchor.evidence()!.sampleAgeS, 0);
+      rig.gap(1);
+      expect(rig.anchor.evidence()!.sampleAgeS, 1);
+    },
+  );
+
   for (final step in [-1, 1]) {
     test(
       'a $step s clock step before handoff invalidates existing evidence',

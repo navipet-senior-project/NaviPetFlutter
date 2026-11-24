@@ -19,6 +19,10 @@ import 'indoor_ar_contract.dart';
 /// pressure, no wall-clock time, no location. Time is the injected monotonic
 /// [clock].
 ///
+/// Sensors Plus converts boot-clock timestamps with a cached wall-clock offset.
+/// Clock changes before confirmation or device sleep can leave that offset
+/// wrong. Dart cannot recover true capture times from those timestamps.
+///
 /// shortcut: one iPhone, one building, one afternoon of data backs the
 /// thresholds; re-measure on a second device and over longer drift.
 class StartFloorAnchor {
@@ -31,7 +35,7 @@ class StartFloorAnchor {
 
   static const window = Duration(seconds: 20);
   static const maxGap = Duration(seconds: 2);
-  static const _maxClockSkew = Duration(milliseconds: 25);
+  static const _timestampTolerance = Duration(milliseconds: 5);
   static const maxRangeHpa = 0.06;
   static const moveHpa = 0.30;
 
@@ -49,7 +53,7 @@ class StartFloorAnchor {
 
   final DateTime Function() _wallClock;
 
-  final _buffer = <({Duration at, double hPa})>[];
+  final _buffer = <({Duration at, DateTime timestamp, double hPa})>[];
   StreamSubscription<PressureReading>? _sub;
   Timer? _expiry;
   String? _floor;
@@ -102,7 +106,7 @@ class StartFloorAnchor {
   void _checkContinuity(Duration now, DateTime wallTime) {
     if (_floor != null &&
         (wallTime.difference(_confirmedWallTime) - (now - _confirmedAt)).abs() >
-            _maxClockSkew) {
+            _timestampTolerance) {
       _failed = true;
       invalidate();
       return;
@@ -149,15 +153,20 @@ class StartFloorAnchor {
     final now = _clock();
     _checkContinuity(now, wallTime);
     if (_failed || _buffer.isEmpty) return null;
+    final last = _buffer.last;
+    final elapsedAge = now - last.at;
+    final timestampAge = wallTime.difference(last.timestamp);
+    final sampleAge = elapsedAge > timestampAge ? elapsedAge : timestampAge;
     return IndoorArStartFloor(
       floor: floor,
       ageS: (now - _confirmedAt).inMilliseconds / 1000,
       settled:
           _sub != null &&
           _anchor != null &&
+          sampleAge <= maxGap &&
           _settledMedian(now - window, now) != null,
       moved: _moved,
-      sampleAgeS: (now - _buffer.last.at).inMilliseconds / 1000,
+      sampleAgeS: sampleAge.inMicroseconds / Duration.microsecondsPerSecond,
     );
   }
 
@@ -166,22 +175,30 @@ class StartFloorAnchor {
     final now = _clock();
     _checkContinuity(now, wallTime);
     if (_sub == null) return;
-    final age = wallTime.difference(reading.timestamp);
-    final at = now - age;
-    if (age.isNegative ||
+    final timestamp = reading.timestamp;
+    final timestampAge = wallTime.difference(timestamp);
+    final elapsedAge =
+        now - _confirmedAt - timestamp.difference(_confirmedWallTime);
+    final age = timestampAge > elapsedAge ? timestampAge : elapsedAge;
+    final at = age.isNegative ? now : now - age;
+    final last = _buffer.isEmpty ? null : _buffer.last;
+    if (timestampAge < -_timestampTolerance ||
+        elapsedAge < -_timestampTolerance ||
         age > maxReadingAge ||
         at < _confirmedAt ||
         !reading.hPa.isFinite ||
-        (_buffer.isNotEmpty && at <= _buffer.last.at)) {
+        (last != null &&
+            (at <= last.at || !timestamp.isAfter(last.timestamp)))) {
       return;
     }
-    if (_buffer.isEmpty
+    if (last == null
         ? at - _confirmedAt > anchorLead
-        : at - _buffer.last.at > maxGap) {
+        : at - last.at > maxGap ||
+              timestamp.difference(last.timestamp) > maxGap) {
       invalidate();
       return;
     }
-    _buffer.add((at: at, hPa: reading.hPa));
+    _buffer.add((at: at, timestamp: timestamp, hPa: reading.hPa));
     final anchor = _anchor;
     if (anchor != null && (reading.hPa - anchor).abs() >= moveHpa) {
       _moved = true; // latched: going up and back is still a move

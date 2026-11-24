@@ -10,11 +10,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'data/app_config.dart';
 import 'data/app_state.dart';
-import 'data/ar_floor_pressure_source.dart';
 import 'data/auth_token_provider.dart';
 import 'data/campus_search_controller.dart';
 import 'data/campus_search_gateway.dart';
 import 'data/elbee_gateway.dart';
+import 'data/floor_pressure.dart';
 import 'data/indoor_ar_token_gateway.dart';
 import 'data/location_service.dart';
 import 'data/mapbox_config.dart';
@@ -121,7 +121,7 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
             baseUrl: AppConfig.backendBaseUrl,
             auth: widget.authTokenProvider!,
           ),
-    floorPressureSource: const ArFloorPressureSource(),
+    floorPressureSource: const SensorsPlusPressureSource(),
     initialLocation: kDebugMode && _devStartRoute.isNotEmpty
         ? _devStartRoute
         : null,

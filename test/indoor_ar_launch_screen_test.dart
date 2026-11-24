@@ -631,7 +631,12 @@ void main() {
       );
     }
 
-    for (final outcome in ['fresh', 'expired', 'cancelled']) {
+    for (final outcome in [
+      'interrupted',
+      'rollback',
+      'late reply',
+      'cancelled',
+    ]) {
       testWidgets(
         'token received in background is rechecked on resume ($outcome)',
         (tester) async {
@@ -651,13 +656,16 @@ void main() {
           tester.binding.handleAppLifecycleStateChanged(
             AppLifecycleState.paused,
           );
-          mint.complete(http.Response(_mintedBody, 200));
+          if (outcome != 'late reply') {
+            mint.complete(http.Response(_mintedBody, 200));
+          }
           await tester.pump();
           expect(harness.fake.requests, isEmpty);
           expect(source.hasListener, isFalse);
 
-          if (outcome == 'expired') {
-            tokenTime = tokenTime.add(const Duration(minutes: 31));
+          if (outcome == 'rollback') {
+            await tester.pump(const Duration(minutes: 31));
+            tokenTime = tokenTime.subtract(const Duration(minutes: 1));
           } else if (outcome == 'cancelled') {
             expect(await tester.binding.handlePopRoute(), isTrue);
           }
@@ -669,17 +677,16 @@ void main() {
           tester.binding.handleAppLifecycleStateChanged(
             AppLifecycleState.resumed,
           );
+          if (outcome == 'late reply') {
+            mint.complete(http.Response(_mintedBody, 200));
+          }
           await tester.pumpAndSettle();
 
-          if (outcome == 'fresh') {
-            expect(harness.fake.requests.single.startFloor!.settled, isFalse);
-          } else {
-            expect(harness.fake.requests, isEmpty);
-            expect(
-              find.text(outcome == 'cancelled' ? 'map' : 'Retry'),
-              findsOneWidget,
-            );
-          }
+          expect(harness.fake.requests, isEmpty);
+          expect(
+            find.text(outcome == 'cancelled' ? 'map' : 'Retry'),
+            findsOneWidget,
+          );
           expect(harness.mintRequests, hasLength(1));
         },
       );
