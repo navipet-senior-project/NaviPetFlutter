@@ -268,10 +268,14 @@ void main() {
       );
     }
 
-    Future<void> holdStill(WidgetTester tester, int seconds) async {
+    Future<void> holdStill(
+      WidgetTester tester,
+      int seconds, {
+      double hPa = 1000,
+    }) async {
       for (var i = 0; i < seconds; i++) {
         now += const Duration(seconds: 1);
-        source.add(PressureReading(hPa: 1000, timestamp: wallClock()));
+        source.add(PressureReading(hPa: hPa, timestamp: wallClock()));
         await tester.pump(const Duration(seconds: 1));
       }
     }
@@ -337,6 +341,87 @@ void main() {
       expect(json.keys, isNot(contains('startFloor')));
       expect(json.keys, isNot(contains('pressureSinceStart')));
     });
+
+    testWidgets('stale floor, hold, and camera actions launch only once', (
+      tester,
+    ) async {
+      final harness = build(status: PermissionStatus.denied);
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      final skip = tester
+          .widget<TextButton>(find.widgetWithText(TextButton, 'Skip'))
+          .onPressed!;
+      await tester.tap(find.text('Floor 2'));
+      skip();
+      await tester.pump();
+      final continueEarly = tester
+          .widget<TextButton>(
+            find.widgetWithText(TextButton, 'Continue without waiting'),
+          )
+          .onPressed!;
+      await holdStill(tester, 20);
+      continueEarly();
+      await tester.pumpAndSettle();
+      expect(harness.statusChecks, 1);
+
+      final continueToCamera = tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Continue'))
+          .onPressed!;
+      continueToCamera();
+      continueToCamera();
+      await tester.pumpAndSettle();
+      expect(harness.cameraRequests, 1);
+      expect(harness.mintRequests, hasLength(1));
+      expect(harness.fake.requests.single.toJson()['startFloor'], '2');
+    });
+
+    testWidgets('an expired hold stops sampling before the camera rationale', (
+      tester,
+    ) async {
+      final harness = build(status: PermissionStatus.denied);
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 1, hPa: 1000.5);
+      await holdStill(tester, 22);
+      await tester.pumpAndSettle();
+      expect(find.text(_rationale), findsOneWidget);
+      expect(source.hasListener, isFalse);
+    });
+
+    for (final moved in [false, true]) {
+      testWidgets(
+        'the camera rationale stops sampling on a terminal event ($moved)',
+        (tester) async {
+          final harness = build(status: PermissionStatus.denied);
+          await harness.pump(tester);
+          await harness.tapAr(tester);
+          await tester.tap(find.text('Floor 2'));
+          await tester.pump();
+          await holdStill(tester, 20);
+          await tester.pumpAndSettle();
+          expect(find.text(_rationale), findsOneWidget);
+          expect(source.hasListener, isTrue);
+          if (moved) {
+            await holdStill(tester, 1, hPa: 1000.5);
+          } else {
+            final silence =
+                StartFloorAnchor.maxGap +
+                StartFloorAnchor.maxReadingAge +
+                const Duration(seconds: 1);
+            now += silence;
+            await tester.pump(silence);
+          }
+          expect(source.hasListener, isFalse);
+          await tester.tap(find.text('Continue'));
+          await tester.pumpAndSettle();
+          final json = harness.fake.requests.single.toJson();
+          expect(json['pressureSinceStart'], containsPair('settled', false));
+          expect(json['pressureSinceStart'], containsPair('moved', moved));
+        },
+      );
+    }
 
     for (final initiallyBlocked in [false, true]) {
       testWidgets(

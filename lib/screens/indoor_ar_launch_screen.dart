@@ -75,7 +75,6 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   var _rationale = false;
   var _blocked = false;
   var _choosingFloor = false;
-  var _floorAsked = false;
   var _holding = false;
   String? _retryText;
   StartFloorAnchor? _anchor;
@@ -92,9 +91,14 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   Future<void> _start() async {
     if (!mounted) return;
+    setState(() {
+      _unavailable = false;
+      _tokenFailed = false;
+      _placeLookupFailure = null;
+      _retryText = null;
+    });
     // A retry asks again: an old answer is never reused, and nothing is read
     // until the user confirms a floor once more.
-    _floorAsked = false;
     await _anchor?.reset();
     if (!mounted) return;
     if (defaultTargetPlatform != TargetPlatform.android &&
@@ -102,12 +106,6 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       _leave("AR mode isn't available on this device.");
       return;
     }
-    setState(() {
-      _unavailable = false;
-      _tokenFailed = false;
-      _placeLookupFailure = null;
-      _retryText = null;
-    });
     final request = widget.request;
     final id = widget.destinationId?.trim();
     if (request != null) {
@@ -174,16 +172,22 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         return;
       }
     }
-    if (_anchor != null && !_floorAsked) {
+    if (_anchor != null) {
       setState(() => _choosingFloor = true);
       return;
     }
     await _checkCamera();
   }
 
+  Future<void> _retry() async {
+    if (_unavailable || _retryText != null || _placeLookupFailure != null) {
+      await _start();
+    }
+  }
+
   /// [floor] is what the user said they stand on; null means they skipped.
   Future<void> _floorChosen(String? floor) async {
-    _floorAsked = true;
+    if (!_choosingFloor) return;
     setState(() => _choosingFloor = false);
     if (floor == null || !_anchor!.confirmFloor(floor)) {
       await _checkCamera();
@@ -198,6 +202,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _stopHolding({bool discard = false}) async {
+    if (!_holding) return;
     setState(() => _holding = false);
     if (discard) unawaited(_anchor?.reset());
     await _checkCamera();
@@ -220,6 +225,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _askForCamera() async {
+    if (!_rationale) return;
     setState(() => _rationale = false);
     try {
       final camera = await widget.requestCamera();
@@ -266,7 +272,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     final evidence = _anchor?.evidence();
     unawaited(_anchor?.reset());
     final result = await widget.launcher.launch(
-      _request!.withArToken(token).withStartFloor(evidence),
+      _request!.withArToken(token, startFloor: evidence),
     );
     if (!mounted) return;
     if (evidence != null &&
@@ -348,7 +354,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
           ? _message(
               _placeLookupFailure!,
               action: 'Retry',
-              onAction: _start,
+              onAction: _retry,
               back: 'Back to map',
               onBack: () => _leave(null),
             )
@@ -356,7 +362,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
           ? _message(
               _retryText!,
               action: 'Try again',
-              onAction: _start,
+              onAction: _retry,
               back: 'Back to map',
               onBack: () => _leave(null),
             )
@@ -366,7 +372,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
                   ? "Couldn't start AR. Check your connection and try again."
                   : "Indoor AR isn't available for this room",
               action: 'Retry',
-              onAction: _start,
+              onAction: _retry,
               back: 'Back to map',
               onBack: () => _leave(null),
             )

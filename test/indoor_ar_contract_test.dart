@@ -71,9 +71,10 @@ void main() {
           'sampleAgeS': 0.5,
         },
       };
-      final door = vec119Request().withStartFloor(start);
+      final door = vec119Request().withArToken(testArToken, startFloor: start);
       expect(door.toJson(), containsPair('floor', '1'));
       expect(door.toJson(), containsPair('startFloor', '2'));
+      expect(door.toJson(), containsPair('arToken', testArToken.toJson()));
       expect(
         jsonDecode(jsonEncode(door.toJson()))['pressureSinceStart'],
         expected['pressureSinceStart'],
@@ -81,14 +82,24 @@ void main() {
       final localize = IndoorArRequest.localize(
         mapCode: IndoorArRequest.buildMapCode,
         frame: IndoorArRequest.buildFrame,
-      ).withStartFloor(start).withArToken(testArToken);
+      ).withArToken(testArToken, startFloor: start);
       expect(localize.toJson(), containsPair('startFloorAgeS', 12.5));
       expect(localize.toJson(), contains('arToken'));
       expect(vec119Request().toJson().containsKey('startFloor'), isFalse);
-      expect(
-        door.withStartFloor(null).toJson().containsKey('startFloor'),
-        isFalse,
-      );
+      for (final request in [door, localize]) {
+        final withoutFloor = request
+            .withArToken(testArToken, startFloor: null)
+            .toJson();
+        expect(withoutFloor, containsPair('arToken', testArToken.toJson()));
+        expect(withoutFloor.keys, isNot(contains('startFloor')));
+        expect(withoutFloor.keys, isNot(contains('startFloorAgeS')));
+        expect(withoutFloor.keys, isNot(contains('pressureSinceStart')));
+        expect(
+          withoutFloor,
+          Map.of(request.toJson())
+            ..removeWhere((key, _) => expected.containsKey(key)),
+        );
+      }
     });
 
     test('start floor rejects blank floor and bad ages', () {

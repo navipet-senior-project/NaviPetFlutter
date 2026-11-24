@@ -42,7 +42,7 @@ class StartFloorAnchor {
   static const maxReadingAge = Duration(seconds: 3);
 
   /// Longest the first anchor sample may trail the start of its window.
-  static const anchorLead = Duration(seconds: 3);
+  static const anchorLead = Duration(milliseconds: 1500);
 
   final PressureSource source;
   final Duration Function() _clock;
@@ -51,6 +51,7 @@ class StartFloorAnchor {
 
   final _buffer = <({Duration at, double hPa})>[];
   StreamSubscription<PressureReading>? _sub;
+  Timer? _expiry;
   String? _floor;
   Duration _confirmedAt = Duration.zero;
   double? _anchor;
@@ -64,17 +65,42 @@ class StartFloorAnchor {
 
   /// Stops reading and forgets the confirmation, as if never asked.
   Future<void> reset() async {
-    final sub = _sub;
-    _sub = null;
+    final stopped = _stopReading();
     _floor = null;
     _anchor = null;
     _moved = false;
     _failed = false;
     _buffer.clear();
-    await sub?.cancel();
+    await stopped;
   }
 
   Future<void> dispose() => reset();
+
+  Future<void> _stopReading() async {
+    _expiry?.cancel();
+    _expiry = null;
+    final sub = _sub;
+    _sub = null;
+    await sub?.cancel();
+  }
+
+  Duration get _collectionDeadline => _anchor == null
+      ? _confirmedAt + anchorDeadline
+      : _buffer.last.at + maxGap + maxReadingAge;
+
+  void _scheduleStop(Duration now) {
+    _expiry?.cancel();
+    _expiry = Timer(
+      _collectionDeadline - now + const Duration(milliseconds: 1),
+      () => unawaited(_stopReading()),
+    );
+  }
+
+  void _stopIfExpired(Duration now) {
+    if (_sub != null && now > _collectionDeadline) {
+      unawaited(_stopReading());
+    }
+  }
 
   /// Returns false for a blank floor, leaving the previous confirmation.
   bool confirmFloor(String floor) {
@@ -90,28 +116,32 @@ class StartFloorAnchor {
       _onReading,
       onError: (Object _) {
         _failed = true;
-        _sub?.cancel();
-        _sub = null;
+        unawaited(_stopReading());
       },
     );
+    _scheduleStop(_confirmedAt);
     return true;
   }
 
-  /// True once the answer can no longer change: anchored, the sensor failed, or
-  /// the anchor deadline passed. Always false before a floor is confirmed.
-  bool get resolved =>
-      _floor != null &&
-      (_anchor != null || _failed || _clock() - _confirmedAt > anchorDeadline);
+  /// Whether the hold is complete. Always false before a floor is confirmed.
+  bool get resolved {
+    _stopIfExpired(_clock());
+    return _floor != null && (_anchor != null || _sub == null);
+  }
 
   /// Null unless a floor is confirmed and the sensor has produced samples.
   IndoorArStartFloor? evidence() {
     final floor = _floor;
     if (floor == null || _failed || _buffer.isEmpty) return null;
     final now = _clock();
+    _stopIfExpired(now);
     return IndoorArStartFloor(
       floor: floor,
       ageS: (now - _confirmedAt).inMilliseconds / 1000,
-      settled: _anchor != null && _settledMedian(now - window, now) != null,
+      settled:
+          _sub != null &&
+          _anchor != null &&
+          _settledMedian(now - window, now) != null,
       moved: _moved,
       sampleAgeS: (now - _buffer.last.at).inMilliseconds / 1000,
     );
@@ -120,6 +150,8 @@ class StartFloorAnchor {
   void _onReading(PressureReading reading) {
     final age = _wallClock().difference(reading.timestamp);
     final now = _clock();
+    _stopIfExpired(now);
+    if (_sub == null) return;
     final at = now - age;
     if (age.isNegative ||
         age > maxReadingAge ||
@@ -128,36 +160,35 @@ class StartFloorAnchor {
         (_buffer.isNotEmpty && at <= _buffer.last.at)) {
       return;
     }
+    final missingCoverage = _buffer.isEmpty
+        ? at - _confirmedAt > anchorLead
+        : at - _buffer.last.at > maxGap;
     _buffer.add((at: at, hPa: reading.hPa));
     final anchor = _anchor;
     if (anchor != null && (reading.hPa - anchor).abs() >= moveHpa) {
       _moved = true; // latched: going up and back is still a move
     }
-    if (anchor == null &&
-        at - _confirmedAt >= window &&
-        now - _confirmedAt <= anchorDeadline) {
-      _anchor = _settledMedian(_confirmedAt, at, lead: anchorLead);
+    if (missingCoverage || _moved) {
+      unawaited(_stopReading());
+      return;
     }
-    if (_anchor != null || now - _confirmedAt > anchorDeadline) {
+    if (anchor == null && at - _confirmedAt >= window) {
+      _anchor = _settledMedian(_confirmedAt, at);
+    }
+    if (_anchor != null) {
       _buffer.removeWhere((s) => s.at < now - window);
+      _scheduleStop(now);
     }
   }
 
-  double? _settledMedian(
-    Duration start,
-    Duration end, {
-    Duration lead = maxGap,
-  }) {
+  double? _settledMedian(Duration start, Duration end) {
     final samples = [
       for (final s in _buffer)
         if (s.at >= start && s.at <= end) s,
     ];
     if (samples.length < minSamples) return null;
-    if (samples.first.at - start > lead || end - samples.last.at > maxGap) {
+    if (samples.first.at - start > maxGap || end - samples.last.at > maxGap) {
       return null;
-    }
-    for (var i = 1; i < samples.length; i++) {
-      if (samples[i].at - samples[i - 1].at > maxGap) return null;
     }
     final values = [for (final s in samples) s.hPa]..sort();
     if (values.last - values.first > maxRangeHpa) return null;

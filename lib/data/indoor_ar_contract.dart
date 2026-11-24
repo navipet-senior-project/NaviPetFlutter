@@ -162,14 +162,8 @@ class IndoorArRequest {
 
   bool get isLocalize => mode == localizeMode;
 
-  IndoorArRequest withArToken(IndoorArToken token) =>
-      _copy(arToken: token, startFloor: startFloor);
-
-  IndoorArRequest withStartFloor(IndoorArStartFloor? value) =>
-      _copy(arToken: arToken, startFloor: value);
-
-  IndoorArRequest _copy({
-    required IndoorArToken? arToken,
+  IndoorArRequest withArToken(
+    IndoorArToken token, {
     required IndoorArStartFloor? startFloor,
   }) => isLocalize
       ? IndoorArRequest.localize(
@@ -177,7 +171,7 @@ class IndoorArRequest {
           floor: floor,
           mapCode: mapCode,
           frame: frame,
-          arToken: arToken,
+          arToken: token,
           startFloor: startFloor,
         )
       : IndoorArRequest(
@@ -188,7 +182,7 @@ class IndoorArRequest {
           headingDeg: headingDeg,
           mapCode: mapCode,
           frame: frame,
-          arToken: arToken,
+          arToken: token,
           startFloor: startFloor,
         );
 

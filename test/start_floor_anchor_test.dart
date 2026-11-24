@@ -21,6 +21,7 @@ class _Rig {
       clock: () => now,
       wallClock: () => _wall.add(now),
     );
+    addTearDown(anchor.dispose);
   }
 
   final source = _FakeSource();
@@ -96,14 +97,15 @@ void main() {
     expect(rig.anchor.resolved, isTrue);
   });
 
-  test('step of 0.47 then 40 s hold is settled and moved', () async {
+  test('a 0.47 hPa step stops sampling and stays moved', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
     await rig.hold(1000, 25);
     await rig.hold(1000.47, 40);
     final e = rig.anchor.evidence()!;
-    expect(e.settled, isTrue);
+    expect(e.settled, isFalse);
     expect(e.moved, isTrue);
+    expect(rig.source.controller.hasListener, isFalse);
   });
 
   test('0.22 posture shift is not a move', () async {
@@ -116,19 +118,20 @@ void main() {
     expect(e.moved, isFalse);
   });
 
-  test(
-    '25 s of travel without samples then a hold at a new level moved',
-    () async {
+  for (final resumePressure in [1000.0, 1000.5]) {
+    test('a flat window at $resumePressure hPa cannot repair a gap', () async {
       final rig = _Rig();
       rig.anchor.confirmFloor('1');
       await rig.hold(1000, 25);
-      rig.gap(25);
-      await rig.hold(1000.5, 40);
+      expect(rig.anchor.evidence()!.settled, isTrue);
+      rig.gap(10);
+      await rig.hold(resumePressure, 40);
       final e = rig.anchor.evidence()!;
-      expect(e.settled, isTrue);
-      expect(e.moved, isTrue);
-    },
-  );
+      expect(e.settled, isFalse);
+      expect(e.moved, resumePressure != 1000);
+      expect(rig.source.controller.hasListener, isFalse);
+    });
+  }
 
   test('hold range 0.2 never anchors, and the deadline resolves it', () async {
     final rig = _Rig();
@@ -140,6 +143,7 @@ void main() {
     expect(e.settled, isFalse);
     expect(e.moved, isFalse);
     expect(rig.anchor.resolved, isTrue);
+    expect(rig.source.controller.hasListener, isFalse);
   });
 
   test('unsettled at the answer never anchors later', () async {
@@ -174,18 +178,19 @@ void main() {
       await rig.hold(1000, 20);
       await rig.hold(1000 + delta, 2);
       await rig.hold(1000, 22);
-      expect(rig.anchor.evidence()!.settled, isTrue);
+      expect(rig.anchor.evidence()!.settled, isFalse);
       expect(rig.anchor.evidence()!.moved, isTrue);
     });
   }
 
-  test('first samples arriving late leave the answer uncovered', () async {
+  test('first capture at second two leaves the answer uncovered', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
-    rig.gap(8); // e.g. a permission dialog delayed the sensor
+    rig.gap(1);
     await rig.hold(1000, 25);
     expect(rig.anchor.evidence()!.settled, isFalse);
     expect(rig.anchor.resolved, isTrue);
+    expect(rig.source.controller.hasListener, isFalse);
   });
 
   test('readings the sensor stamped as old are never trusted', () async {
