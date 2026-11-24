@@ -54,6 +54,148 @@ void main() {
       expect(bare.toJson().containsKey('arToken'), isFalse);
     });
 
+    test('start floor adds all versioned fields to both request modes', () {
+      final start = IndoorArStartFloor(
+        floor: ' 2 ',
+        ageS: 12.5,
+        moved: false,
+        sampleAgeS: 0.5,
+      );
+      final expected = {
+        'floorEvidenceVersion': 1,
+        'startFloor': '2',
+        'startFloorAgeS': 12.5,
+        'pressureSinceStart': {
+          'settled': true,
+          'moved': false,
+          'sampleAgeS': 0.5,
+        },
+      };
+      final door = vec119Request().withArToken(testArToken, startFloor: start);
+      expect(door.toJson(), containsPair('floor', '1'));
+      expect(door.toJson(), containsPair('startFloor', '2'));
+      expect(door.toJson(), containsPair('arToken', testArToken.toJson()));
+      expect(
+        jsonDecode(jsonEncode(door.toJson()))['pressureSinceStart'],
+        expected['pressureSinceStart'],
+      );
+      final localize = IndoorArRequest.localize(
+        mapCode: IndoorArRequest.buildMapCode,
+        frame: IndoorArRequest.buildFrame,
+      ).withArToken(testArToken, startFloor: start);
+      expect(localize.toJson(), containsPair('startFloorAgeS', 12.5));
+      expect(localize.toJson(), contains('arToken'));
+      expect(vec119Request().toJson().containsKey('startFloor'), isFalse);
+      for (final request in [door, localize]) {
+        final withoutFloor = request
+            .withArToken(testArToken, startFloor: null)
+            .toJson();
+        expect(withoutFloor, containsPair('arToken', testArToken.toJson()));
+        expect(withoutFloor.keys, isNot(contains('floorEvidenceVersion')));
+        expect(withoutFloor.keys, isNot(contains('startFloor')));
+        expect(withoutFloor.keys, isNot(contains('startFloorAgeS')));
+        expect(withoutFloor.keys, isNot(contains('pressureSinceStart')));
+        expect(jsonDecode(jsonEncode(request.toJson())), {
+          ...withoutFloor,
+          ...expected,
+        });
+      }
+    });
+
+    test('both modes omit stale evidence at unrounded ages', () {
+      for (final (age, sampleAge, eligible) in [
+        (0.0, 0.0, true),
+        (1200.0, 10.0, true),
+        (1200.000001, 10.0, false),
+        (1201.0, 10.0, false),
+        (1200.0, 10.0000001, false),
+        (1200.0, 11.0, false),
+      ]) {
+        final start = IndoorArStartFloor(
+          floor: '2',
+          ageS: age,
+          moved: true,
+          sampleAgeS: sampleAge,
+        );
+        for (final request in [
+          vec119Request(),
+          IndoorArRequest.localize(
+            mapCode: IndoorArRequest.buildMapCode,
+            frame: IndoorArRequest.buildFrame,
+          ),
+        ]) {
+          final wire =
+              jsonDecode(
+                    jsonEncode(
+                      request
+                          .withArToken(testArToken, startFloor: start)
+                          .toJson(),
+                    ),
+                  )
+                  as Map;
+          if (eligible) {
+            expect(wire['floorEvidenceVersion'], 1);
+            expect(wire['startFloorAgeS'], age);
+            expect(
+              (wire['pressureSinceStart'] as Map)['sampleAgeS'],
+              sampleAge,
+            );
+          } else {
+            expect(
+              wire,
+              request.withArToken(testArToken, startFloor: null).toJson(),
+            );
+          }
+        }
+      }
+    });
+
+    test('both modes omit all evidence for invalid start floors', () {
+      for (final floor in [
+        '',
+        '  ',
+        'Ground',
+        '0',
+        '-1',
+        '+1',
+        '1.5',
+        '2147483648',
+      ]) {
+        final start = IndoorArStartFloor(
+          floor: floor,
+          ageS: 20,
+          moved: false,
+          sampleAgeS: 0,
+        );
+        for (final request in [
+          vec119Request(),
+          IndoorArRequest.localize(
+            mapCode: IndoorArRequest.buildMapCode,
+            frame: IndoorArRequest.buildFrame,
+          ),
+        ]) {
+          expect(
+            request.withArToken(testArToken, startFloor: start).toJson(),
+            request.withArToken(testArToken, startFloor: null).toJson(),
+            reason: floor,
+          );
+        }
+      }
+    });
+
+    test('start floor rejects bad ages', () {
+      IndoorArStartFloor build({double ageS = 0, double sampleAgeS = 0}) =>
+          IndoorArStartFloor(
+            floor: '1',
+            ageS: ageS,
+            moved: false,
+            sampleAgeS: sampleAgeS,
+          );
+      expect(() => build(ageS: -1), throwsArgumentError);
+      expect(() => build(ageS: double.nan), throwsArgumentError);
+      expect(() => build(sampleAgeS: double.infinity), throwsArgumentError);
+    });
+
     test('a token never shows in toString', () {
       expect(testArToken.toString(), isNot(contains('test-token')));
     });

@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
+import '../data/floor_pressure.dart';
 import '../data/indoor_ar_contract.dart';
 import '../data/indoor_ar_launcher.dart';
 import '../data/indoor_ar_token_gateway.dart';
 import '../data/navigation_flow_controller.dart';
+import '../data/start_floor_anchor.dart';
 import '../screens/account_settings_screen.dart';
 import '../screens/change_email_screen.dart';
 import '../screens/checklist_screen.dart';
@@ -37,6 +39,7 @@ GoRouter createAppRouter(
   AppState appState, {
   String? initialLocation,
   IndoorArTokenGateway? indoorArTokenGateway,
+  PressureSource? floorPressureSource,
 }) => GoRouter(
   initialLocation:
       initialLocation ?? (appState.isAuthenticated ? '/map' : '/signin'),
@@ -167,6 +170,9 @@ GoRouter createAppRouter(
             : null,
         gateway: context.read<NavigationFlowController>().searchGateway,
         tokenGateway: indoorArTokenGateway,
+        anchor: floorPressureSource == null
+            ? null
+            : StartFloorAnchor(source: floorPressureSource),
       ),
     ),
     // #41 transport spike; removed with the real launch screen (build step 3).

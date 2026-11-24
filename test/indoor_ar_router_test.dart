@@ -115,6 +115,7 @@ class _Harness {
   late final GoRouter router;
 
   Future<void> pump(WidgetTester tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     // Keep cached asset futures inside each test's async zone.
     rootBundle.evict('assets/indoor/vec_floors1and2.json');
     final appState = _SignedInState();
