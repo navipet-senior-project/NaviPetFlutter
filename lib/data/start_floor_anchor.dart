@@ -233,8 +233,9 @@ class StartFloorAnchor {
     }
     _buffer.add((at: at, timestamp: timestamp, hPa: reading.hPa));
     if (anchor == null) {
-      if (at - _confirmedAt >= window) {
-        _anchor = _settledMedian(_confirmedAt, at);
+      if (at - _confirmedAt >= window &&
+          _settledMedian(_confirmedAt, at) != null) {
+        _anchor = _settledMedian(at - window, at);
         if (_anchor != null) _scheduleStop(now);
       }
     } else if (!_moved) {

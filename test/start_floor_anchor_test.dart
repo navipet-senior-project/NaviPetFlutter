@@ -120,6 +120,30 @@ void main() {
     expect(rig.anchor.resolved, isTrue);
   });
 
+  for (final (firstPressure, expectedMoved) in [
+    (1000.04, true),
+    (1000.15, null),
+  ]) {
+    test(
+      'initial hold range and trailing median at $firstPressure hPa',
+      () async {
+        final rig = _Rig();
+        rig.anchor.confirmFloor('1');
+        rig.now = const Duration(milliseconds: 200);
+        rig.source.controller.add(
+          PressureReading(hPa: firstPressure, timestamp: _wall.add(rig.now)),
+        );
+        await Future<void>.delayed(Duration.zero);
+        await rig.hold(1000.04, 10, noiseHpa: 0);
+        await rig.hold(1000, 9, noiseHpa: 0);
+        rig.now += const Duration(milliseconds: 100);
+        await rig.hold(1000, 1, noiseHpa: 0);
+        await rig.hold(1000.33, 21, noiseHpa: 0);
+        expect(rig.anchor.evidence()?.moved, expectedMoved);
+      },
+    );
+  }
+
   test(
     'a pressure spike 250 ms after an accepted capture is dropped',
     () async {
