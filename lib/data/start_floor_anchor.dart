@@ -24,6 +24,11 @@ import 'indoor_ar_contract.dart';
 /// evidence. A clock change before confirmation can hide the start of a fast
 /// stair transition and make the previous floor appear valid.
 ///
+/// The floor question is skippable. It only helps when Unity is a paired build
+/// that contains the floor policy (NaviPetUnity PR 37 or later). An older Unity
+/// build ignores the extra fields and behaves as before; Flutter cannot detect
+/// which build it launches and claims no version capability.
+///
 /// shortcut: one iPhone, one building, one afternoon of data backs the
 /// thresholds; re-measure on a second device and over longer drift.
 class StartFloorAnchor {

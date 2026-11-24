@@ -321,7 +321,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       unawaited(_anchor?.reset());
       final request = _request!.withArToken(token, startFloor: evidence);
       if (!_active) return;
-      // The app can still lose the foreground while the platform call is queued.
+      // Checked synchronously before the channel call. shortcut: the platform
+      // call itself is asynchronous, so Home pressed in that instant can still
+      // reach the native handler; closing it needs a native foreground guard.
       if (!_resumed) throw const IndoorArTokenException(0);
       result = await widget.launcher.launch(request);
     } on IndoorArTokenException {
