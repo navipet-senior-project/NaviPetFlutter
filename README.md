@@ -102,8 +102,9 @@ phone unless a note says so.
      be matched to exactly one place or the lookup fails, AR does not open;
      try search or retry the lookup.
 2. **Place and door pose.** `IndoorArLaunchScreen` loads the place from the
-   backend. A valid `indoor` door pose (map code, `multiset-mapset` frame, door
-   key, floor, position, heading) becomes a destination request. A missing or
+   backend. A well-formed `indoor` door pose (nonempty map code, `multiset-mapset`
+   frame, door key, floor, position, heading) becomes a destination request.
+   Flutter does not check the map code against the Unity build. A missing or
    invalid pose becomes a `mode: localize` request with no door fields, so AR
    scans to find the phone without inventing a destination. Only VEC floors 1 to
    3 (`indoor_floor_coverage.dart`) launch.
@@ -572,7 +573,7 @@ and battery use. Do not rely on it for emergency navigation.
 
 The three most recent selected destinations are saved to the signed-in account
 through the backend's `/recent-searches` endpoint, with an on-device copy used
-as a fallback when the backend is unreachable. Search can clear them. Class locations are
+as a fallback when the backend request fails. Search can clear them. Class locations are
 stored in Supabase so Search can adapt to a user's schedule across devices.
 
 ## Wave D floor-pressure measurements
