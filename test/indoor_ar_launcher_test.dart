@@ -39,6 +39,57 @@ void main() {
     expect(result.durationMs, 900);
   });
 
+  group('bootClockSeconds', () {
+    Future<double?> ask(Object? Function() reply) {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'bootClockSeconds');
+        return reply();
+      });
+      return NativeIndoorArLauncher(
+        isSupportedPlatform: true,
+      ).bootClockSeconds();
+    }
+
+    test('returns the host seconds', () async {
+      expect(await ask(() => 86400.125), 86400.125);
+      expect(await ask(() => 0.0), 0.0);
+    });
+
+    test('is null for a bad value, an old host or a host error', () async {
+      for (final bad in [null, -1.0, double.nan, double.infinity, 5, '5']) {
+        expect(await ask(() => bad), isNull, reason: '$bad');
+      }
+      expect(
+        await ask(() => throw PlatformException(code: 'x')),
+        isNull,
+        reason: 'PlatformException',
+      );
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(
+        await NativeIndoorArLauncher(
+          isSupportedPlatform: true,
+        ).bootClockSeconds(),
+        isNull,
+        reason: 'no plugin',
+      );
+    });
+
+    test('does not ask an unsupported platform', () async {
+      var asked = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        asked = true;
+        return 1.0;
+      });
+      expect(
+        await NativeIndoorArLauncher(
+          isSupportedPlatform: false,
+        ).bootClockSeconds(),
+        isNull,
+      );
+      expect(asked, isFalse);
+    });
+  });
+
   test('sends an outdoor request on the same channel', () async {
     MethodCall? received;
     messenger.setMockMethodCallHandler(channel, (call) async {

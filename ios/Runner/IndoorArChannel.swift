@@ -23,7 +23,20 @@ final class IndoorArChannel {
       .setMethodCallHandler { call, result in host.handle(call, result) }
   }
 
+  /// Seconds on the clock Unity reads for `requestSentAtBootS`:
+  /// `mach_continuous_time()`, which keeps counting while the device sleeps
+  /// (`mach_absolute_time()` does not). Nil if the timebase is unavailable.
+  static func bootClockSeconds() -> Double? {
+    var timebase = mach_timebase_info_data_t()
+    guard mach_timebase_info(&timebase) == KERN_SUCCESS, timebase.denom != 0 else { return nil }
+    return Double(mach_continuous_time()) * Double(timebase.numer) / Double(timebase.denom) / 1e9
+  }
+
   private func handle(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    if call.method == "bootClockSeconds" {
+      result(Self.bootClockSeconds())
+      return
+    }
     guard call.method == "launch" else {
       result(FlutterMethodNotImplemented)
       return

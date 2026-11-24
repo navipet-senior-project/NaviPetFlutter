@@ -25,6 +25,7 @@ class IndoorArLaunchScreen extends StatefulWidget {
     this.anchor,
     this.now = DateTime.now,
     this.monotonicNow,
+    this.bootClock,
     this.cameraStatus = _cameraStatus,
     this.requestCamera = _requestCamera,
     this.openSettings = openAppSettings,
@@ -42,6 +43,10 @@ class IndoorArLaunchScreen extends StatefulWidget {
   final IndoorArTokenGateway? tokenGateway;
   final DateTime Function() now;
   final Duration Function()? monotonicNow;
+
+  /// Device boot-clock seconds for Unity's evidence aging. Null sends no stamp,
+  /// so Unity sends no height hint.
+  final Future<double?> Function()? bootClock;
   final Future<PermissionStatus> Function() cameraStatus;
   final Future<PermissionStatus> Function() requestCamera;
   final Future<bool> Function() openSettings;
@@ -83,6 +88,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   Timer? _holdPoll;
   Completer<void>? _resumeWait;
   int _launchGeneration = 0;
+  int _focusLossGeneration = 0;
   late final Stopwatch _launchClock = Stopwatch()..start();
 
   Duration _elapsedNow() => widget.monotonicNow?.call() ?? _launchClock.elapsed;
@@ -116,6 +122,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       _checkHold();
       return;
     }
+    _focusLossGeneration++;
     if (_isBackgrounded(state)) {
       _launchGeneration++;
       _holdPoll?.cancel();
@@ -304,10 +311,23 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       final generation = _launchGeneration;
       final mintWallTime = widget.now();
       final mintStarted = _elapsedNow();
+      final bootClock = widget.bootClock;
       final token = await gateway.fetch();
-      while (_active && !_resumed) {
-        await (_resumeWait ??= Completer<void>()).future;
-      }
+      double? sentAt;
+      int focusLossGeneration;
+      // Stamped just before the ages are computed, so Unity's added send-to-SDK
+      // time can only overstate them.
+      do {
+        while (_active && !_resumed) {
+          await (_resumeWait ??= Completer<void>()).future;
+        }
+        if (!_active) return;
+        focusLossGeneration = _focusLossGeneration;
+        sentAt =
+            bootClock != null && _anchor?.evidence()?.hasUsableDelta == true
+            ? await bootClock()
+            : null;
+      } while (_active && focusLossGeneration != _focusLossGeneration);
       if (!_active) return;
       // Monotonic elapsed time advances the phone's clock from mint start, so
       // this expiry check inherits any clock skew already present at minting.
@@ -317,7 +337,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
           !token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
         throw const IndoorArTokenException(0);
       }
-      evidence = _anchor?.evidence();
+      evidence = _anchor?.evidence(requestSentAtBootS: sentAt);
       unawaited(_anchor?.reset());
       final request = _request!.withArToken(token, startFloor: evidence);
       if (!_active) return;

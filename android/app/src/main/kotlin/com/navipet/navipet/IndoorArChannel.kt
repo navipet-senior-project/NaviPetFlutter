@@ -25,6 +25,11 @@ class IndoorArChannel(
     private var startedAt = 0L
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        if (call.method == BOOT_CLOCK_METHOD) {
+            // Same clock Unity reads for requestSentAtBootS; includes deep sleep.
+            result.success(SystemClock.elapsedRealtimeNanos() / 1e9)
+            return
+        }
         if (call.method != "launch") {
             result.notImplemented()
             return
@@ -73,6 +78,7 @@ class IndoorArChannel(
     companion object {
         private const val TAG = "IndoorArChannel"
         const val CHANNEL = "navipet/indoor_ar"
+        private const val BOOT_CLOCK_METHOD = "bootClockSeconds"
         const val REQUEST_CODE = 4101
 
         // By name: the class exists only in builds that include the Unity library.

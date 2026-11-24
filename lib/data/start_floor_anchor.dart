@@ -18,6 +18,7 @@ class StartFloorAnchor {
     required this.source,
     Duration Function()? clock,
     DateTime Function()? wallClock,
+    this.bootClock,
   }) : _clock = clock ?? _monotonic(),
        _wallClock = wallClock ?? DateTime.now;
 
@@ -28,8 +29,11 @@ class StartFloorAnchor {
   static const _captureGapLimit = Duration(seconds: 10);
   static const _timestampTolerance = Duration(milliseconds: 5);
   static const maxRangeHpa = 0.06;
-  static const moveHpa = 0.30;
   static const _pressureRoundoffHpa = 1e-9;
+
+  /// Slack between the boot clock and the monotonic clock, covering the native
+  /// call's round trip. Suspend is far longer; shorter gaps fall to the wall check.
+  static const _bootClockTolerance = Duration(milliseconds: 250);
 
   static const anchorDeadline = Duration(seconds: 22);
 
@@ -44,6 +48,12 @@ class StartFloorAnchor {
   final Duration Function() _clock;
 
   final DateTime Function() _wallClock;
+
+  // The suspend-inclusive boot clock the handoff stamp comes from. The monotonic
+  // clock above stops during Android suspend, so the two are compared at handoff.
+  final Future<double?> Function()? bootClock;
+  ({double bootS, Duration at})? _bootBase;
+  var _bootBaseGeneration = 0;
 
   final _buffer = <({Duration at, DateTime timestamp, double hPa})>[];
   StreamSubscription<PressureReading>? _sub;
@@ -64,6 +74,8 @@ class StartFloorAnchor {
   /// Stops reading and forgets the confirmation, as if never asked.
   Future<void> reset() async {
     final stopped = _stopReading();
+    _bootBaseGeneration++;
+    _bootBase = null;
     _floor = null;
     _anchor = null;
     _moved = false;
@@ -113,6 +125,7 @@ class StartFloorAnchor {
     _floor = value;
     _confirmedWallTime = _wallClock();
     _confirmedAt = _clock();
+    _readBootBase();
     _buffer.clear();
     _anchor = null;
     _moved = false;
@@ -125,6 +138,21 @@ class StartFloorAnchor {
     return true;
   }
 
+  void _readBootBase() {
+    final generation = ++_bootBaseGeneration;
+    _bootBase = null;
+    final read = bootClock;
+    if (read == null) return;
+    final before = _clock();
+    unawaited(
+      read().then((bootS) {
+        if (bootS == null || generation != _bootBaseGeneration) return;
+        // The native read happened somewhere in the round trip.
+        _bootBase = (bootS: bootS, at: before + (_clock() - before) ~/ 2);
+      }, onError: (Object _) {}),
+    );
+  }
+
   /// Whether the hold is complete. Always false before a floor is confirmed.
   bool get resolved {
     final wallTime = _wallClock();
@@ -133,12 +161,32 @@ class StartFloorAnchor {
   }
 
   /// Evidence from settled anchor and current windows with fresh samples.
-  IndoorArStartFloor? evidence() {
+  ///
+  /// [requestSentAtBootS] is the device boot clock read immediately before this
+  /// call, so the ages computed here are never older than the stamp. When the
+  /// boot clock also ran ahead of the monotonic clock since confirmation, the
+  /// device was suspended: every reading is old, so the evidence is dropped. A
+  /// stamp that does not match the boot clock is not sent.
+  IndoorArStartFloor? evidence({double? requestSentAtBootS}) {
     final floor = _floor;
     if (floor == null) return null;
     final wallTime = _wallClock();
     final now = _clock();
     _checkContinuity(now, wallTime);
+    final base = _bootBase;
+    var stamp = requestSentAtBootS;
+    if (_sub != null && stamp != null && base != null) {
+      final bootElapsed = Duration(
+        microseconds: ((stamp - base.bootS) * Duration.microsecondsPerSecond)
+            .round(),
+      );
+      final drift = bootElapsed - (now - base.at);
+      if (drift > _bootClockTolerance) {
+        invalidate();
+        return null;
+      }
+      if (drift < -_bootClockTolerance) stamp = null;
+    }
     final anchor = _anchor;
     if (_sub == null || anchor == null || _buffer.isEmpty) return null;
     _latchMovementBetweenCaptures(now, anchor);
@@ -156,6 +204,8 @@ class StartFloorAnchor {
           (now - _confirmedAt).inMicroseconds / Duration.microsecondsPerSecond,
       moved: _moved,
       sampleAgeS: sampleAge.inMicroseconds / Duration.microsecondsPerSecond,
+      deltaHpa: median - anchor,
+      requestSentAtBootS: stamp,
     );
   }
 
@@ -245,7 +295,8 @@ class StartFloorAnchor {
   }
 
   static bool _hasMoved(double median, double anchor) =>
-      (median - anchor).abs() >= moveHpa - _pressureRoundoffHpa;
+      (median - anchor).abs() >=
+      IndoorArStartFloor.moveHpa - _pressureRoundoffHpa;
 
   double? _settledMedian(Duration start, Duration end) {
     final samples = [

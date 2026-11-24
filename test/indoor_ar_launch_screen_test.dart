@@ -91,6 +91,7 @@ class _Harness {
     this.status = PermissionStatus.denied,
     this.camera = PermissionStatus.granted,
     IndoorArLauncher? launcher,
+    IndoorArRequest? request,
     this.anchor,
     String? destinationId = _destinationId,
     Future<http.Response> Function(http.Request)? fetch,
@@ -99,6 +100,7 @@ class _Harness {
     Duration Function()? tokenElapsed,
     Future<PermissionStatus>? pendingStatus,
     Future<PermissionStatus>? pendingPermission,
+    Future<double?> Function()? bootClock,
   }) : fake = FakeIndoorArLauncher(result: result) {
     final activeLauncher = launcher ?? fake;
     router = GoRouter(
@@ -122,6 +124,7 @@ class _Harness {
           path: '/ar',
           builder: (context, state) => IndoorArLaunchScreen(
             launcher: activeLauncher,
+            request: request,
             anchor: anchor,
             destinationId: state.uri.queryParameters['destination'],
             gateway: HttpCampusSearchGateway(
@@ -146,6 +149,7 @@ class _Harness {
             ),
             now: tokenClock ?? () => DateTime.utc(2026, 1, 1),
             monotonicNow: tokenElapsed,
+            bootClock: bootClock,
             cameraStatus: () async {
               statusChecks++;
               return pendingStatus == null ? status : await pendingStatus;
@@ -219,6 +223,7 @@ void main() {
       status: PermissionStatus.granted,
       destinationId: 'another-room',
       fetch: (_) async => http.Response(jsonEncode(json), 200),
+      bootClock: () async => fail('Launch without an anchor read the clock'),
       result: const IndoorArResult(
         status: IndoorArStatus.arrived,
         checkDistanceM: 0.5,
@@ -261,7 +266,9 @@ void main() {
       Duration Function()? tokenElapsed,
       Future<PermissionStatus>? pendingStatus,
       Future<PermissionStatus>? pendingPermission,
+      Future<double?> Function()? bootClock,
       IndoorArLauncher? launcher,
+      IndoorArRequest? request,
       IndoorArResult result = _cancelled,
       PermissionStatus status = PermissionStatus.granted,
       PermissionStatus camera = PermissionStatus.granted,
@@ -277,7 +284,9 @@ void main() {
         tokenElapsed: tokenElapsed,
         pendingStatus: pendingStatus,
         pendingPermission: pendingPermission,
+        bootClock: bootClock,
         launcher: launcher,
+        request: request,
         anchor: StartFloorAnchor(
           source: _StreamSource(source.stream),
           clock: () => now,
@@ -347,11 +356,276 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    for (final localize in [false, true]) {
+      for (final (label, level, returns, sendHint) in [
+        ('unchanged', null, false, false),
+        ('returned', 999.5, true, false),
+        ('out of range', 1003.5, false, false),
+        ('usable', 999.5, false, true),
+      ]) {
+        final mode = localize ? 'localize' : 'door';
+        testWidgets(
+          '$mode sends hint fields only for a usable delta ($label)',
+          (tester) async {
+            var clockReads = 0;
+            final harness = build(
+              request: localize
+                  ? IndoorArRequest.localize(
+                      floor: '1',
+                      mapCode: IndoorArRequest.buildMapCode,
+                      frame: IndoorArRequest.buildFrame,
+                    )
+                  : null,
+              status: PermissionStatus.denied,
+              bootClock: () async {
+                clockReads++;
+                return 4321.5;
+              },
+            );
+            await harness.pump(tester);
+            await harness.tapAr(tester);
+            await tester.tap(find.text('Floor 2'));
+            await tester.pump();
+            await holdStill(tester, 20);
+            if (level != null) await holdStill(tester, 21, hPa: level);
+            if (returns) await holdStill(tester, 21);
+            await tester.pumpAndSettle();
+            await tester.tap(find.text('Continue'));
+            await tester.pumpAndSettle();
+
+            final request = harness.fake.requests.single;
+            expect(request.isLocalize, localize);
+            final wire = request.toJson();
+            expect(clockReads, sendHint ? 1 : 0);
+            expect(wire.containsKey('requestSentAtBootS'), sendHint);
+            expect(wire['requestSentAtBootS'], sendHint ? 4321.5 : null);
+            expect(wire['startFloor'], '2');
+            expect(wire['pressureSinceStart'], {
+              'settled': true,
+              'moved': level != null,
+              'sampleAgeS': 0,
+              if (sendHint) 'deltaHpa': -0.5,
+            });
+          },
+        );
+      }
+    }
+
+    for (final (label, bootClock) in <(String, Future<double?> Function()?)>[
+      ('no boot clock', null),
+      ('a boot clock that is unavailable', () async => null),
+    ]) {
+      testWidgets('$label sends evidence without a stamp', (tester) async {
+        final launcher = _PendingLauncher();
+        final harness = build(
+          launcher: launcher,
+          status: PermissionStatus.denied,
+          bootClock: bootClock,
+        );
+        await harness.pump(tester);
+        await harness.tapAr(tester);
+        await tester.tap(find.text('Floor 2'));
+        await tester.pump();
+        await holdStill(tester, 20);
+        await holdStill(tester, 21, hPa: 999.5);
+        await tester.tap(find.text('Continue'));
+        await tester.pump();
+        final json = launcher.requests.single.toJson();
+        expect(json['startFloor'], '2');
+        expect(json, isNot(contains('requestSentAtBootS')));
+        expect(json['pressureSinceStart'], {
+          'settled': true,
+          'moved': true,
+          'sampleAgeS': 0,
+        });
+        launcher.resultReady.complete(_cancelled);
+        await tester.pumpAndSettle();
+      });
+    }
+
+    for (final (name, lifecycle, wallDelay, elapsedDelay) in [
+      ('inactive', AppLifecycleState.inactive, false, false),
+      ('backgrounded', AppLifecycleState.paused, false, false),
+      ('wall clock advances', AppLifecycleState.resumed, true, false),
+      ('monotonic clock advances', AppLifecycleState.resumed, false, true),
+    ]) {
+      testWidgets('boot clock reply rechecks launch readiness ($name)', (
+        tester,
+      ) async {
+        final clock = Completer<double?>();
+        var clockReads = 0;
+        var tokenTime = DateTime.utc(2026, 1, 1, 0, 28, 59, 900);
+        var elapsed = Duration.zero;
+        const delay = Duration(milliseconds: 200);
+        final harness = build(
+          status: PermissionStatus.denied,
+          tokenClock: () => tokenTime,
+          tokenElapsed: () => elapsed,
+          bootClock: () {
+            clockReads++;
+            return clockReads == 1
+                ? clock.future
+                : Future.value(4280.5 + now.inMilliseconds / 1000);
+          },
+        );
+        await harness.pump(tester);
+        await harness.tapAr(tester);
+        await tester.tap(find.text('Floor 2'));
+        await tester.pump();
+        await holdStill(tester, 20);
+        await holdStill(tester, 21, hPa: 999.5);
+        await tester.tap(find.text('Continue'));
+        await tester.pump();
+        expect(clockReads, 1);
+
+        tester.binding.handleAppLifecycleStateChanged(lifecycle);
+        if (wallDelay) tokenTime = tokenTime.add(delay);
+        if (elapsedDelay) elapsed += delay;
+        clock.complete(4321.5);
+        await tester.pump();
+        expect(harness.fake.requests, isEmpty);
+        if (lifecycle != AppLifecycleState.resumed) {
+          expect(find.text('Retry'), findsNothing);
+          if (lifecycle == AppLifecycleState.inactive) {
+            await holdStill(tester, 12, hPa: 999.5);
+            const sampleAge = Duration(milliseconds: 250);
+            now += sampleAge;
+            await tester.pump(sampleAge);
+            expect(clockReads, 1);
+          }
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+        }
+        await tester.pumpAndSettle();
+        if (lifecycle == AppLifecycleState.inactive) {
+          final evidence = harness.fake.requests.single.startFloor!;
+          expect(clockReads, 2);
+          expect(evidence.requestSentAtBootS, 4333.75);
+          expect(evidence.sampleAgeS, 0.25);
+        } else {
+          expect(clockReads, 1);
+          expect(harness.fake.requests, isEmpty);
+          expect(find.text('Retry'), findsOneWidget);
+        }
+        expect(source.hasListener, isFalse);
+      });
+    }
+
+    for (final localize in [false, true]) {
+      final mode = localize ? 'localize' : 'door';
+      testWidgets('$mode refreshes a boot clock reply received after resume', (
+        tester,
+      ) async {
+        final firstReply = Completer<double?>();
+        var clockReads = 0;
+        final harness = build(
+          request: localize
+              ? IndoorArRequest.localize(
+                  floor: '1',
+                  mapCode: IndoorArRequest.buildMapCode,
+                  frame: IndoorArRequest.buildFrame,
+                )
+              : null,
+          status: PermissionStatus.denied,
+          bootClock: () {
+            clockReads++;
+            return clockReads == 1
+                ? firstReply.future
+                : Future.value(4280.5 + now.inMilliseconds / 1000);
+          },
+        );
+        await harness.pump(tester);
+        await harness.tapAr(tester);
+        await tester.tap(find.text('Floor 2'));
+        await tester.pump();
+        await holdStill(tester, 20);
+        await holdStill(tester, 21, hPa: 999.5);
+        await tester.tap(find.text('Continue'));
+        await tester.pump();
+        expect(clockReads, 1);
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await holdStill(tester, 12, hPa: 999.5);
+        const sampleAge = Duration(milliseconds: 250);
+        now += sampleAge;
+        await tester.pump(sampleAge);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        expect(clockReads, 1);
+        expect(harness.fake.requests, isEmpty);
+
+        firstReply.complete(4321.5);
+        await tester.pumpAndSettle();
+        final request = harness.fake.requests.single;
+        expect(request.isLocalize, localize);
+        expect(clockReads, 2);
+        final wire = request.toJson();
+        expect(wire['requestSentAtBootS'], 4333.75);
+        expect(wire['pressureSinceStart'], {
+          'settled': true,
+          'moved': true,
+          'sampleAgeS': 0.25,
+          'deltaHpa': -0.5,
+        });
+      });
+    }
+
+    testWidgets('a floor window that settles before resume gets a stamp', (
+      tester,
+    ) async {
+      final mint = Completer<http.Response>();
+      var clockReads = 0;
+      final harness = build(
+        mint: (_) => mint.future,
+        bootClock: () async {
+          clockReads++;
+          return 4300 + now.inSeconds.toDouble();
+        },
+      );
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      expect(harness.mintRequests, hasLength(1));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await holdStill(tester, 1, hPa: 1000.5);
+      mint.complete(http.Response(_mintedBody, 200));
+      await tester.pump();
+      await holdStill(tester, 20, hPa: 1000.5);
+      expect(clockReads, 0);
+      expect(harness.fake.requests, isEmpty);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      final json = harness.fake.requests.single.toJson();
+      expect(clockReads, 1);
+      expect(json['requestSentAtBootS'], 4341);
+      expect(json['pressureSinceStart'], {
+        'settled': true,
+        'moved': true,
+        'sampleAgeS': 0,
+        'deltaHpa': 0.5,
+      });
+    });
+
     testWidgets('floor and hold bypass actions scroll into reach', (
       tester,
     ) async {
       useShortLandscape(tester);
-      final harness = build();
+      var clockReads = 0;
+      final harness = build(
+        bootClock: () async {
+          clockReads++;
+          return null;
+        },
+      );
       await harness.pump(tester);
       await harness.tapAr(tester);
       final skip = find.text('Skip');
@@ -374,6 +648,7 @@ void main() {
       expect(harness.fake.requests, hasLength(2));
       expect(harness.fake.requests.last.startFloor, isNull);
       expect(source.hasListener, isFalse);
+      expect(clockReads, 0);
     });
 
     testWidgets('localization retry and exit remain reachable', (tester) async {
@@ -480,7 +755,14 @@ void main() {
       testWidgets(
         'camera rationale sends evidence only with a fresh window ($moved)',
         (tester) async {
-          final harness = build(status: PermissionStatus.denied);
+          var clockReads = 0;
+          final harness = build(
+            status: PermissionStatus.denied,
+            bootClock: () async {
+              clockReads++;
+              return 4321.5;
+            },
+          );
           await harness.pump(tester);
           await harness.tapAr(tester);
           await tester.tap(find.text('Floor 2'));
@@ -501,6 +783,7 @@ void main() {
           await tester.pumpAndSettle();
           final evidence = harness.fake.requests.single.startFloor;
           expect(source.hasListener, isFalse);
+          expect(clockReads, moved ? 1 : 0);
           if (moved) {
             expect(evidence?.moved, isTrue);
           } else {

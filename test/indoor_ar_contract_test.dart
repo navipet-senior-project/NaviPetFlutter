@@ -102,6 +102,101 @@ void main() {
       }
     });
 
+    group('height-hint fields', () {
+      IndoorArStartFloor start({
+        double? deltaHpa,
+        double? sentAt = 5000.25,
+        bool moved = true,
+      }) => IndoorArStartFloor(
+        floor: '1',
+        ageS: 30,
+        moved: moved,
+        sampleAgeS: 1,
+        deltaHpa: deltaHpa,
+        requestSentAtBootS: sentAt,
+      );
+
+      Map<String, Object?> pressure(IndoorArStartFloor s) =>
+          s.toJson()['pressureSinceStart']! as Map<String, Object?>;
+
+      test('send the stamp and the signed delta together', () {
+        final wire = start(deltaHpa: -0.47).toJson();
+        expect(wire['requestSentAtBootS'], 5000.25);
+        expect(pressure(start(deltaHpa: -0.47)), {
+          'settled': true,
+          'moved': true,
+          'sampleAgeS': 1,
+          'deltaHpa': -0.47,
+        });
+        expect(jsonDecode(jsonEncode(wire)), wire);
+      });
+
+      test('both modes send hint fields together only for usable deltas', () {
+        final requests = [
+          vec119Request(),
+          IndoorArRequest.localize(
+            mapCode: IndoorArRequest.buildMapCode,
+            frame: IndoorArRequest.buildFrame,
+          ),
+        ];
+        for (final (delta, moved, sent) in [
+          (-0.3, true, true),
+          (0.3, true, true),
+          (3.0, true, true),
+          (-3.0, true, true),
+          (-0.2999999999, true, false), // latched with a 1e-9 roundoff
+          (0.2999999999, true, false),
+          (-0.29, true, false),
+          (0.0, true, false),
+          (-3.0000001, true, false),
+          (3.0000001, true, false),
+          (-0.47, false, false),
+          (0.0, false, false),
+          (null, true, false),
+        ]) {
+          final evidence = start(deltaHpa: delta, moved: moved);
+          for (final request in requests) {
+            final wire = request
+                .withArToken(testArToken, startFloor: evidence)
+                .toJson();
+            expect(wire.containsKey('requestSentAtBootS'), sent);
+            expect(wire['requestSentAtBootS'], sent ? 5000.25 : null);
+            expect(wire['startFloor'], '1');
+            final measured = wire['pressureSinceStart']! as Map;
+            expect(measured['moved'], moved);
+            expect(measured.containsKey('deltaHpa'), sent, reason: '$delta');
+            expect(measured['deltaHpa'], sent ? delta : null);
+          }
+        }
+      });
+
+      test('a delta without a stamp is never sent', () {
+        final s = start(deltaHpa: -0.47, sentAt: null);
+        expect(s.toJson(), isNot(contains('requestSentAtBootS')));
+        expect(pressure(s), isNot(contains('deltaHpa')));
+      });
+
+      test('reject a stamp that is negative or not finite', () {
+        for (final bad in [-1.0, double.nan, double.infinity]) {
+          expect(() => start(sentAt: bad), throwsArgumentError);
+        }
+        expect(() => start(deltaHpa: double.infinity), throwsArgumentError);
+        expect(() => start(deltaHpa: double.nan), throwsArgumentError);
+      });
+
+      test('stale evidence still sends nothing, stamp included', () {
+        final s = IndoorArStartFloor(
+          floor: '1',
+          ageS: 1200.1,
+          moved: true,
+          sampleAgeS: 1,
+          deltaHpa: -0.47,
+          requestSentAtBootS: 5,
+        );
+        expect(s.toJson(), isEmpty);
+      });
+    });
+
     test('both modes omit stale evidence at unrounded ages', () {
       for (final (age, sampleAge, eligible) in [
         (0.0, 0.0, true),

@@ -41,6 +41,8 @@ class IndoorArStartFloor {
     required this.ageS,
     required this.moved,
     required this.sampleAgeS,
+    this.deltaHpa,
+    this.requestSentAtBootS,
   }) {
     // Negated range checks so NaN is rejected too.
     if (!(ageS >= 0 && ageS.isFinite)) {
@@ -50,6 +52,18 @@ class IndoorArStartFloor {
       throw ArgumentError.value(
         sampleAgeS,
         'sampleAgeS',
+        'must be finite and >= 0',
+      );
+    }
+    final delta = deltaHpa;
+    if (delta != null && !delta.isFinite) {
+      throw ArgumentError.value(delta, 'deltaHpa', 'must be finite');
+    }
+    final sentAt = requestSentAtBootS;
+    if (sentAt != null && !(sentAt >= 0 && sentAt.isFinite)) {
+      throw ArgumentError.value(
+        sentAt,
+        'requestSentAtBootS',
         'must be finite and >= 0',
       );
     }
@@ -64,9 +78,30 @@ class IndoorArStartFloor {
   /// Seconds since the newest barometer sample.
   final double sampleAgeS;
 
+  /// Current settled level minus the level at confirmation, in hPa. Negative
+  /// means pressure fell, so the phone went up. Relative only; never an
+  /// absolute reading. Sent only for a [moved] start, with [requestSentAtBootS]
+  /// (see [toJson]).
+  final double? deltaHpa;
+
+  /// Device boot clock in seconds (includes sleep) taken just before [ageS]
+  /// and [sampleAgeS] were computed. Unity needs it to age the evidence across
+  /// the handoff; without it Unity sends no height hint.
+  final double? requestSentAtBootS;
+
   static const maxConfirmationAge = Duration(minutes: 20);
   static const maxSampleAge = Duration(seconds: 10);
+  static const moveHpa = 0.30;
+  static const maxDeltaHpa = 3.0;
   static final _floorDigits = RegExp(r'^[0-9]+$');
+
+  bool get hasUsableDelta {
+    final delta = deltaHpa;
+    return moved &&
+        delta != null &&
+        delta.abs() >= moveHpa &&
+        delta.abs() <= maxDeltaHpa;
+  }
 
   static String? normalizeFloor(String floor) {
     final value = floor.trim();
@@ -82,14 +117,18 @@ class IndoorArStartFloor {
         sampleAgeS > maxSampleAge.inSeconds) {
       return {};
     }
+    final sentAt = requestSentAtBootS;
+    final sendHint = sentAt != null && hasUsableDelta;
     return {
       'floorEvidenceVersion': 1,
       'startFloor': value,
       'startFloorAgeS': ageS,
+      if (sendHint) 'requestSentAtBootS': sentAt,
       'pressureSinceStart': {
         'settled': true,
         'moved': moved,
         'sampleAgeS': sampleAgeS,
+        if (sendHint) 'deltaHpa': deltaHpa,
       },
     };
   }

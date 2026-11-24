@@ -24,6 +24,7 @@ class NativeIndoorArLauncher implements IndoorArLauncher {
                   defaultTargetPlatform == TargetPlatform.iOS));
 
   static const channelName = 'navipet/indoor_ar';
+  static const bootClockMethod = 'bootClockSeconds';
 
   final MethodChannel _channel;
   final bool _isSupportedPlatform;
@@ -36,6 +37,22 @@ class NativeIndoorArLauncher implements IndoorArLauncher {
   /// time. A Unity library without the outdoor scene rejects the request.
   Future<IndoorArResult> launchOutdoor(OutdoorArRequest request) =>
       _launch(request.toJson());
+
+  /// Device boot clock in seconds, including sleep: Android
+  /// `SystemClock.elapsedRealtimeNanos()`, iOS `mach_continuous_time()`, the
+  /// same clocks Unity reads. Null when unavailable (unsupported platform, a
+  /// host without the method, or a bad value); the request is then unhinted.
+  Future<double?> bootClockSeconds() async {
+    if (!_isSupportedPlatform) return null;
+    try {
+      final raw = await _channel.invokeMethod<Object?>(bootClockMethod);
+      return raw is double && raw >= 0 && raw.isFinite ? raw : null;
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
 
   Future<IndoorArResult> _launch(Map<String, Object?> request) async {
     if (!_isSupportedPlatform) return const IndoorArResult.unavailable();

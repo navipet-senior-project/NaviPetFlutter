@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/floor_pressure.dart';
+import 'package:navipet/data/indoor_ar_contract.dart';
 import 'package:navipet/data/start_floor_anchor.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -113,7 +114,7 @@ void main() {
       // Anchor: the same step crosses the same 0.30 hPa line.
       final evidence = rig.anchor.evidence()!;
       expect(evidence.moved, isTrue);
-      expect(recorded.abs(), greaterThanOrEqualTo(StartFloorAnchor.moveHpa));
+      expect(recorded.abs(), greaterThanOrEqualTo(IndoorArStartFloor.moveHpa));
     },
   );
 
@@ -136,7 +137,7 @@ void main() {
       rig.anchor.confirmFloor('2');
       await rig.hold(1013.25, 30);
 
-      final wire = rig.anchor.evidence()!.toJson();
+      final wire = rig.anchor.evidence(requestSentAtBootS: 777.5)!.toJson();
       expect(wire.keys, {
         'floorEvidenceVersion',
         'startFloor',
@@ -152,6 +153,37 @@ void main() {
       expect(text, isNot(contains('1013')));
       expect(text, isNot(contains('deltaHpa')));
       expect(text, isNot(contains('2026')));
+    },
+  );
+
+  test(
+    'the stair-sized step reaches Unity as a signed delta plus the boot stamp',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('2');
+      await rig.hold(1000, 25);
+      await rig.hold(999.53, 40); // pressure fell: the phone went up
+
+      final wire = rig.anchor.evidence(requestSentAtBootS: 777.5)!.toJson();
+      expect(wire['requestSentAtBootS'], 777.5);
+      final pressure = wire['pressureSinceStart']! as Map;
+      expect(pressure['moved'], isTrue);
+      expect(pressure['deltaHpa'] as double, closeTo(-0.47, 0.03));
+      expect((pressure['deltaHpa'] as double).abs() >= 0.30, isTrue);
+      // Relative only: no absolute pressure or wall-clock time leaves the phone.
+      final text = jsonEncode(wire);
+      expect(text, isNot(contains('999.')));
+      expect(text, isNot(contains('1000')));
+      expect(text, isNot(contains('2026')));
+
+      await rig.hold(1000, 25);
+      final returned = rig.anchor.evidence(requestSentAtBootS: 802.5)!.toJson();
+      expect(returned, isNot(contains('requestSentAtBootS')));
+      expect(returned['pressureSinceStart'], {
+        'settled': true,
+        'moved': true,
+        'sampleAgeS': 0,
+      });
     },
   );
 }
