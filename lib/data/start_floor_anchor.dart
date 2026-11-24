@@ -30,8 +30,7 @@ class StartFloorAnchor {
        _wallClock = wallClock ?? DateTime.now;
 
   static const window = Duration(seconds: 20);
-  static const maxGap = Duration(seconds: 10);
-  static const minSamples = 8;
+  static const maxGap = Duration(seconds: 2);
   static const maxRangeHpa = 0.06;
   static const moveHpa = 0.30;
 
@@ -76,6 +75,8 @@ class StartFloorAnchor {
 
   Future<void> dispose() => reset();
 
+  void invalidate() => unawaited(_stopReading());
+
   Future<void> _stopReading() async {
     _expiry?.cancel();
     _expiry = null;
@@ -92,13 +93,13 @@ class StartFloorAnchor {
     _expiry?.cancel();
     _expiry = Timer(
       _collectionDeadline - now + const Duration(milliseconds: 1),
-      () => unawaited(_stopReading()),
+      invalidate,
     );
   }
 
   void _stopIfExpired(Duration now) {
     if (_sub != null && now > _collectionDeadline) {
-      unawaited(_stopReading());
+      invalidate();
     }
   }
 
@@ -116,7 +117,7 @@ class StartFloorAnchor {
       _onReading,
       onError: (Object _) {
         _failed = true;
-        unawaited(_stopReading());
+        invalidate();
       },
     );
     _scheduleStop(_confirmedAt);
@@ -160,16 +161,17 @@ class StartFloorAnchor {
         (_buffer.isNotEmpty && at <= _buffer.last.at)) {
       return;
     }
-    final missingCoverage = _buffer.isEmpty
+    if (_buffer.isEmpty
         ? at - _confirmedAt > anchorLead
-        : at - _buffer.last.at > maxGap;
+        : at - _buffer.last.at > maxGap) {
+      invalidate();
+      return;
+    }
     _buffer.add((at: at, hPa: reading.hPa));
     final anchor = _anchor;
     if (anchor != null && (reading.hPa - anchor).abs() >= moveHpa) {
       _moved = true; // latched: going up and back is still a move
-    }
-    if (missingCoverage || _moved) {
-      unawaited(_stopReading());
+      invalidate();
       return;
     }
     if (anchor == null && at - _confirmedAt >= window) {
@@ -186,7 +188,7 @@ class StartFloorAnchor {
       for (final s in _buffer)
         if (s.at >= start && s.at <= end) s,
     ];
-    if (samples.length < minSamples) return null;
+    if (samples.isEmpty) return null;
     if (samples.first.at - start > maxGap || end - samples.last.at > maxGap) {
       return null;
     }

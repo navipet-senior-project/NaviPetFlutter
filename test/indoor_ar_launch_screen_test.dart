@@ -451,6 +451,89 @@ void main() {
       );
     }
 
+    for (final duringHold in [false, true]) {
+      testWidgets(
+        'backgrounding invalidates floor evidence (holding: $duringHold)',
+        (tester) async {
+          final harness = build(status: PermissionStatus.denied);
+          await harness.pump(tester);
+          await harness.tapAr(tester);
+          await tester.tap(find.text('Floor 2'));
+          await tester.pump();
+          await holdStill(tester, duringHold ? 1 : 20);
+          expect(source.hasListener, isTrue);
+
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.paused,
+          );
+          try {
+            await tester.pump(const Duration(milliseconds: 500));
+            expect(source.hasListener, isFalse);
+            expect(harness.statusChecks, duringHold ? 0 : 1);
+          } finally {
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.resumed,
+            );
+          }
+          await holdStill(tester, 22);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Continue'));
+          await tester.pumpAndSettle();
+
+          final request = harness.fake.requests.single.toJson();
+          expect(request['pressureSinceStart'], containsPair('settled', false));
+        },
+      );
+    }
+
+    testWidgets('Back during minting stops sampling and ignores the token', (
+      tester,
+    ) async {
+      final mint = Completer<http.Response>();
+      final harness = build(mint: (_) => mint.future);
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      expect(harness.mintRequests, hasLength(1));
+      expect(source.hasListener, isTrue);
+
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pump();
+      expect(
+        find.byType(IndoorArLaunchScreen, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(source.hasListener, isFalse);
+      mint.complete(http.Response(_mintedBody, 200));
+      await tester.pumpAndSettle();
+      expect(harness.fake.requests, isEmpty);
+      expect(find.text('map'), findsOneWidget);
+    });
+
+    testWidgets('Back during Unity ignores a late result', (tester) async {
+      final launcher = _PendingLauncher();
+      final harness = build(launcher: launcher);
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      expect(launcher.requests, hasLength(1));
+
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pump();
+      expect(
+        find.byType(IndoorArLaunchScreen, skipOffstage: false),
+        findsOneWidget,
+      );
+      launcher.resultReady.complete(_error('ARCORE_UNSUPPORTED'));
+      await tester.pumpAndSettle();
+      expect(find.text("This phone doesn't support AR."), findsNothing);
+      expect(find.text('map'), findsOneWidget);
+    });
+
     testWidgets('failure screen stops reading; retry asks again', (
       tester,
     ) async {

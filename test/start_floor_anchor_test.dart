@@ -118,19 +118,22 @@ void main() {
     expect(e.moved, isFalse);
   });
 
-  for (final resumePressure in [1000.0, 1000.5]) {
-    test('a flat window at $resumePressure hPa cannot repair a gap', () async {
-      final rig = _Rig();
-      rig.anchor.confirmFloor('1');
-      await rig.hold(1000, 25);
-      expect(rig.anchor.evidence()!.settled, isTrue);
-      rig.gap(10);
-      await rig.hold(resumePressure, 40);
-      final e = rig.anchor.evidence()!;
-      expect(e.settled, isFalse);
-      expect(e.moved, resumePressure != 1000);
-      expect(rig.source.controller.hasListener, isFalse);
-    });
+  for (final silentSeconds in [2, 8]) {
+    test(
+      'a flat window cannot repair a gap after $silentSeconds silent seconds',
+      () async {
+        final rig = _Rig();
+        rig.anchor.confirmFloor('1');
+        await rig.hold(1000, 25);
+        expect(rig.anchor.evidence()!.settled, isTrue);
+        rig.gap(silentSeconds);
+        await rig.hold(1000, 40);
+        final e = rig.anchor.evidence()!;
+        expect(e.settled, isFalse);
+        expect(e.moved, isFalse);
+        expect(rig.source.controller.hasListener, isFalse);
+      },
+    );
   }
 
   test('hold range 0.2 never anchors, and the deadline resolves it', () async {
@@ -188,7 +191,7 @@ void main() {
     rig.anchor.confirmFloor('1');
     rig.gap(1);
     await rig.hold(1000, 25);
-    expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.anchor.evidence(), isNull);
     expect(rig.anchor.resolved, isTrue);
     expect(rig.source.controller.hasListener, isFalse);
   });
@@ -217,17 +220,19 @@ void main() {
     expect(rig.anchor.evidence()!.settled, isFalse);
     await rig.hold(1000, 2, age: const Duration(seconds: 2));
     expect(rig.anchor.evidence()!.settled, isTrue);
-    rig.gap(2);
+    rig.gap(1);
     await rig.hold(1000, 1, age: const Duration(milliseconds: 2900));
-    expect(rig.anchor.evidence()!.sampleAgeS, 2.9);
+    final delayed = rig.anchor.evidence()!;
+    expect(delayed.sampleAgeS, 2.9);
+    expect(delayed.settled, isFalse);
   });
 
-  test('redelivery does not increase the number of captured samples', () async {
+  test('redelivery does not extend the capture window', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
     await rig.hold(1000, 1);
-    for (var i = 0; i < 6; i++) {
-      rig.gap(2);
+    for (var i = 0; i < 9; i++) {
+      rig.gap(1);
       await rig.hold(1000, 1);
     }
     await rig.hold(1000, 1, age: const Duration(seconds: 1));

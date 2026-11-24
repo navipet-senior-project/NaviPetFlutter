@@ -55,7 +55,8 @@ class IndoorArLaunchScreen extends StatefulWidget {
   State<IndoorArLaunchScreen> createState() => _IndoorArLaunchScreenState();
 }
 
-class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
+class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
+    with WidgetsBindingObserver {
   /// A token this close to expiry could lapse before Unity localises.
   static const _tokenMargin = Duration(minutes: 1);
   static const _cameraOff =
@@ -76,8 +77,18 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   var _blocked = false;
   var _choosingFloor = false;
   var _holding = false;
+  var _exiting = false;
   String? _retryText;
   StartFloorAnchor? _anchor;
+
+  bool get _active => mounted && !_exiting;
+
+  static bool _isBackgrounded(AppLifecycleState? state) => switch (state) {
+    AppLifecycleState.hidden ||
+    AppLifecycleState.paused ||
+    AppLifecycleState.detached => true,
+    _ => false,
+  };
 
   @override
   void initState() {
@@ -85,12 +96,18 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     // Kept from the first build: a router rebuild hands the widget a fresh
     // anchor. It reads no sensor until the user confirms a floor.
     _anchor = widget.anchor;
+    WidgetsBinding.instance.addObserver(this);
     // After the first frame: leaving pops the route, which initState cannot do.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_isBackgrounded(state)) _anchor?.invalidate();
+  }
+
   Future<void> _start() async {
-    if (!mounted) return;
+    if (!_active) return;
     setState(() {
       _unavailable = false;
       _tokenFailed = false;
@@ -100,7 +117,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     // A retry asks again: an old answer is never reused, and nothing is read
     // until the user confirms a floor once more.
     await _anchor?.reset();
-    if (!mounted) return;
+    if (!_active) return;
     if (defaultTargetPlatform != TargetPlatform.android &&
         defaultTargetPlatform != TargetPlatform.iOS) {
       _leave("AR mode isn't available on this device.");
@@ -123,7 +140,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     } else {
       try {
         final place = await widget.gateway.place(id);
-        if (!mounted) return;
+        if (!_active) return;
         final indoor = place.indoor;
         if (!indoorScanCovered(place.buildingCode, place.floorNumber)) {
           setState(() => _unavailable = true);
@@ -150,7 +167,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
           _guideToRoom = true;
         }
       } on CampusSearchException catch (error) {
-        if (mounted) {
+        if (_active) {
           setState(() {
             _placeLookupFailure = switch (error.failure) {
               CampusSearchFailure.offline =>
@@ -164,7 +181,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         }
         return;
       } catch (_) {
-        if (mounted) {
+        if (_active) {
           setState(() {
             _placeLookupFailure = 'Could not load place details. Try again.';
           });
@@ -187,7 +204,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   /// [floor] is what the user said they stand on; null means they skipped.
   Future<void> _floorChosen(String? floor) async {
-    if (!_choosingFloor) return;
+    if (!_active || !_choosingFloor) return;
     setState(() => _choosingFloor = false);
     if (floor == null || !_anchor!.confirmFloor(floor)) {
       await _checkCamera();
@@ -195,14 +212,17 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
     }
     // The barometer needs a still phone for about 20 s after the answer.
     setState(() => _holding = true);
-    while (mounted && _holding && !_anchor!.resolved) {
+    while (_active &&
+        _holding &&
+        (_isBackgrounded(WidgetsBinding.instance.lifecycleState) ||
+            !_anchor!.resolved)) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
-    if (mounted && _holding) await _stopHolding();
+    if (_active && _holding) await _stopHolding();
   }
 
   Future<void> _stopHolding({bool discard = false}) async {
-    if (!_holding) return;
+    if (!_active || !_holding) return;
     setState(() => _holding = false);
     if (discard) unawaited(_anchor?.reset());
     await _checkCamera();
@@ -211,7 +231,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   Future<void> _checkCamera() async {
     try {
       final camera = await widget.cameraStatus();
-      if (!mounted) return;
+      if (!_active) return;
       if (camera.isGranted) {
         await _launch();
       } else if (camera.isPermanentlyDenied) {
@@ -225,11 +245,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _askForCamera() async {
-    if (!_rationale) return;
+    if (!_active || !_rationale) return;
     setState(() => _rationale = false);
     try {
       final camera = await widget.requestCamera();
-      if (!mounted) return;
+      if (!_active) return;
       if (camera.isPermanentlyDenied) {
         _blockCamera();
       } else if (camera.isGranted) {
@@ -255,26 +275,25 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       final gateway = widget.tokenGateway;
       if (gateway == null) throw const IndoorArTokenException(0);
       token = await gateway.fetch();
+      if (!_active) return;
       if (!token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
         throw const IndoorArTokenException(0);
       }
     } on IndoorArTokenException {
+      if (!_active) return;
       unawaited(_anchor?.reset()); // the failure screen collects nothing
-      if (mounted) {
-        setState(() {
-          _unavailable = true;
-          _tokenFailed = true;
-        });
-      }
+      setState(() {
+        _unavailable = true;
+        _tokenFailed = true;
+      });
       return;
     }
-    if (!mounted) return;
     final evidence = _anchor?.evidence();
     unawaited(_anchor?.reset());
     final result = await widget.launcher.launch(
       _request!.withArToken(token, startFloor: evidence),
     );
-    if (!mounted) return;
+    if (!_active) return;
     if (evidence != null &&
         result.status == IndoorArStatus.localizationFailed) {
       // Unity's "Try again" returns here (Addendum 9): ask the floor afresh.
@@ -285,6 +304,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   void _launchFailed(Object error) {
+    if (!_active) return;
     debugPrint('[IndoorAr] launch failed: $error');
     _leave(_errorText['UNITY_EXITED']);
   }
@@ -314,9 +334,15 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   static String _roomKey(String value) =>
       value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
 
-  void _leave(String? message) {
-    if (!mounted) return;
+  void _cancelAttempt() {
+    if (_exiting) return;
+    _exiting = true;
     unawaited(_anchor?.reset());
+  }
+
+  void _leave(String? message) {
+    if (!_active) return;
+    _cancelAttempt();
     if (message != null) {
       ScaffoldMessenger.of(
         context,
@@ -326,6 +352,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   }
 
   Future<void> _openSettings() async {
+    if (!_active) return;
     await widget.openSettings();
     // Back on the map, the next AR tap reads the new setting.
     _leave(null);
@@ -333,12 +360,20 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _anchor?.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => PopScope<Object?>(
+    onPopInvokedWithResult: (didPop, _) {
+      if (didPop) _cancelAttempt();
+    },
+    child: _scaffold(),
+  );
+
+  Widget _scaffold() => Scaffold(
     appBar:
         _blocked ||
             _rationale ||
