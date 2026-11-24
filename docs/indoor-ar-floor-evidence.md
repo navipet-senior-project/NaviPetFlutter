@@ -36,6 +36,16 @@ older host build, an error, or a negative or non-finite value) Flutter omits the
 stamp and the delta, and Unity sends no height hint. The rest of the evidence is
 unchanged.
 
+The evidence ages run on Dart's `Stopwatch`, which on Android is
+`CLOCK_MONOTONIC` and stops during suspend, unlike the stamp's boot clock. When
+the floor is confirmed, Flutter reads the boot clock once more as a base. At
+handoff, if the stamp advanced more than 250 ms beyond the monotonic time since
+that base, the device was suspended: every reading is old, so Flutter sends no
+evidence and stops reading. A stamp that falls behind the base by more than that
+is not sent, and the rest of the evidence goes unhinted. If the base read had not
+returned or failed, only the wall-clock check applies. On iOS `Stopwatch` is
+`CLOCK_MONOTONIC_RAW`, which counts sleep, so the check never fires.
+
 `deltaHpa` is the current settled median minus the anchor median, signed, so a
 negative value means pressure fell and the phone went up. It is relative only
 and is sent together with the stamp only when `moved` is true and
@@ -99,6 +109,10 @@ confirmation even if the pressure returns to the anchor.
   and against the mint-start clock advanced by monotonic elapsed time. Either
   check rejects a token with one minute or less remaining. Clock skew already
   present at minting can make the monotonic check early or late.
+- The suspend check is covered by a Dart test with a fake boot clock that runs
+  ahead of the fake monotonic clock. Android's `Stopwatch` behavior comes from
+  the platform's documented `CLOCK_MONOTONIC` semantics and was not measured on a
+  device.
 - The boot-clock stamp and the delta are covered by Dart tests, and the iOS clock
   call was checked in a standalone Swift program on macOS, where
   `mach_continuous_time()` tracked time since boot and exceeded the

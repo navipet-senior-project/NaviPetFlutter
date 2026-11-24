@@ -175,7 +175,10 @@ GoRouter createAppRouter(
           tokenGateway: indoorArTokenGateway,
           anchor: floorPressureSource == null
               ? null
-              : StartFloorAnchor(source: floorPressureSource),
+              : StartFloorAnchor(
+                  source: floorPressureSource,
+                  bootClock: launcher.bootClockSeconds,
+                ),
         );
       },
     ),

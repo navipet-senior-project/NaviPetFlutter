@@ -20,14 +20,29 @@ class _Rig {
       source: source,
       clock: () => now,
       wallClock: () => _wall.add(now + wallOffset),
+      bootClock: () => bootRead(),
     );
     addTearDown(anchor.reset);
   }
 
   final source = _FakeSource();
   late final StartFloorAnchor anchor;
+
+  /// Confirms and lets the boot clock read land before time moves, as the
+  /// native reply does in the first milliseconds of a real hold.
+  Future<void> confirm(String floor) async {
+    anchor.confirmFloor(floor);
+    await Future<void>.delayed(Duration.zero);
+  }
+
   var now = Duration.zero;
   var wallOffset = Duration.zero;
+
+  /// Time the device spent suspended. The boot clock counts it; the fake
+  /// monotonic clock, like Android's, does not.
+  var asleep = Duration.zero;
+  double get bootS => 5000 + (now + asleep).inMicroseconds / 1e6;
+  late Future<double?> Function() bootRead = () async => bootS;
   var _noise = 0;
 
   /// Holds [hPa] for [seconds], with alternating [noiseHpa].
@@ -322,19 +337,22 @@ void main() {
   });
 
   for (final level in [999.70, 1000.30]) {
-    test('roundoff at $level hPa latches movement but omits the delta', () async {
-      final rig = _Rig();
-      rig.anchor.confirmFloor('1');
-      await rig.hold(1000, 20, noiseHpa: 0);
-      await rig.hold(level, 21, noiseHpa: 0);
-      final evidence = rig.anchor.evidence(requestSentAtBootS: 100)!;
-      expect(evidence.deltaHpa!.abs(), lessThan(0.30));
-      expect(evidence.toJson()['pressureSinceStart'], {
-        'settled': true,
-        'moved': true,
-        'sampleAgeS': 0,
-      });
-    });
+    test(
+      'roundoff at $level hPa latches movement but omits the delta',
+      () async {
+        final rig = _Rig();
+        await rig.confirm('1');
+        await rig.hold(1000, 20, noiseHpa: 0);
+        await rig.hold(level, 21, noiseHpa: 0);
+        final evidence = rig.anchor.evidence(requestSentAtBootS: rig.bootS)!;
+        expect(evidence.deltaHpa!.abs(), lessThan(0.30));
+        expect(evidence.toJson()['pressureSinceStart'], {
+          'settled': true,
+          'moved': true,
+          'sampleAgeS': 0,
+        });
+      },
+    );
   }
 
   test(
@@ -682,14 +700,15 @@ void main() {
       'a step down is a negative delta and passes the stamp through',
       () async {
         final rig = _Rig();
-        rig.anchor.confirmFloor('1');
+        await rig.confirm('1');
         await rig.hold(1000, 25);
         await rig.hold(999.53, 40);
-        final evidence = rig.anchor.evidence(requestSentAtBootS: 12345.5)!;
+        final stamp = rig.bootS;
+        final evidence = rig.anchor.evidence(requestSentAtBootS: stamp)!;
         expect(evidence.deltaHpa, closeTo(-0.47, 0.02));
         expect(evidence.moved, isTrue);
-        expect(evidence.requestSentAtBootS, 12345.5);
-        expect(evidence.toJson()['requestSentAtBootS'], 12345.5);
+        expect(evidence.requestSentAtBootS, stamp);
+        expect(evidence.toJson()['requestSentAtBootS'], stamp);
         expect(
           (evidence.toJson()['pressureSinceStart']! as Map)['deltaHpa'],
           evidence.deltaHpa,
@@ -737,6 +756,98 @@ void main() {
       final wire = rig.anchor.evidence(requestSentAtBootS: 9)!.toJson();
       expect((wire['pressureSinceStart']! as Map), isNot(contains('deltaHpa')));
       expect(wire, isNot(contains('requestSentAtBootS')));
+    });
+  });
+
+  // Android's monotonic clock stops while the device is suspended; the boot
+  // clock the stamp comes from does not. Evidence must not span a suspend.
+  group('suspend-inclusive boot clock', () {
+    Future<_Rig> movedRig() async {
+      final rig = _Rig();
+      await rig.confirm('1');
+      await rig.hold(1000, 25);
+      await rig.hold(999.53, 40);
+      return rig;
+    }
+
+    test('a stamp from the same running clock is kept', () async {
+      final rig = await movedRig();
+      rig.now += const Duration(milliseconds: 200); // reply latency
+      final stamp = rig.bootS - 0.2;
+      final evidence = rig.anchor.evidence(requestSentAtBootS: stamp)!;
+      expect(evidence.requestSentAtBootS, stamp);
+      expect(evidence.toJson()['requestSentAtBootS'], stamp);
+    });
+
+    test('a suspend only the boot clock sees omits the evidence', () async {
+      final rig = await movedRig();
+      expect(rig.anchor.evidence(requestSentAtBootS: rig.bootS), isNotNull);
+      // The wall clock is unreliable here, so only the boot clock shows it.
+      rig.asleep = const Duration(minutes: 10);
+      expect(rig.anchor.evidence(requestSentAtBootS: rig.bootS), isNull);
+      expect(rig.source.controller.hasListener, isFalse);
+      rig.asleep = Duration.zero;
+      expect(rig.anchor.evidence(requestSentAtBootS: rig.bootS), isNull);
+    });
+
+    test('a full suspend, wall clock included, omits the evidence', () async {
+      final rig = await movedRig();
+      rig.asleep = const Duration(seconds: 60);
+      rig.wallOffset = const Duration(seconds: 60);
+      expect(rig.anchor.evidence(requestSentAtBootS: rig.bootS), isNull);
+      expect(rig.anchor.evidence(), isNull);
+      expect(rig.source.controller.hasListener, isFalse);
+    });
+
+    test('the old last reading never looks fresh after a suspend', () async {
+      final rig = await movedRig();
+      rig.asleep = const Duration(seconds: 8);
+      // 8 s asleep is inside the 10 s sample bound if only the monotonic age counts.
+      expect(rig.anchor.evidence(requestSentAtBootS: rig.bootS), isNull);
+    });
+
+    test('a stamp from another clock is not sent, the rest is kept', () async {
+      final rig = await movedRig();
+      final evidence = rig.anchor.evidence(requestSentAtBootS: rig.bootS - 60)!;
+      expect(evidence.moved, isTrue);
+      expect(evidence.requestSentAtBootS, isNull);
+      expect(evidence.toJson(), isNot(contains('requestSentAtBootS')));
+    });
+
+    test('an unreadable boot clock leaves the wall-clock check', () async {
+      final rig = _Rig();
+      rig.bootRead = () async => null;
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 25);
+      await rig.hold(999.53, 40);
+      expect(
+        rig.anchor.evidence(requestSentAtBootS: 77)!.requestSentAtBootS,
+        77,
+      );
+      rig.wallOffset = const Duration(seconds: 60);
+      expect(rig.anchor.evidence(requestSentAtBootS: 77), isNull);
+    });
+
+    test('a failing boot clock read does not break confirmation', () async {
+      final rig = _Rig();
+      rig.bootRead = () async => throw StateError('no host');
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 25);
+      expect(rig.anchor.evidence(), isNotNull);
+    });
+
+    test('a reply that lands after reset or a new floor is ignored', () async {
+      final rig = _Rig();
+      final late = Completer<double?>();
+      rig.bootRead = () => late.future;
+      rig.anchor.confirmFloor('1');
+      await rig.anchor.reset();
+      rig.bootRead = () async => rig.bootS;
+      await rig.confirm('2');
+      await rig.hold(1000, 25);
+      late.complete(1); // would read as a long suspend if it were kept
+      await Future<void>.delayed(Duration.zero);
+      expect(rig.anchor.evidence(requestSentAtBootS: rig.bootS), isNotNull);
     });
   });
 }
