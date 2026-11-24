@@ -233,51 +233,58 @@ void main() {
   });
 
   group('start floor question', () {
-    final source = StreamController<PressureReading>.broadcast();
+    var source = StreamController<PressureReading>.broadcast();
     var now = Duration.zero;
 
-    _Harness build() => _Harness(
-      status: PermissionStatus.granted,
-      anchor: StartFloorAnchor(
-        source: _StreamSource(source.stream),
-        clock: () => now,
-      ),
-    );
+    _Harness build() {
+      now = Duration.zero;
+      source = StreamController<PressureReading>.broadcast();
+      return _Harness(
+        status: PermissionStatus.granted,
+        anchor: StartFloorAnchor(
+          source: _StreamSource(source.stream),
+          clock: () => now,
+        ),
+      );
+    }
 
     Future<void> holdStill(WidgetTester tester, int seconds) async {
       for (var i = 0; i < seconds; i++) {
         now += const Duration(seconds: 1);
         source.add(PressureReading(hPa: 1000, timestamp: DateTime.utc(2026)));
-        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
       }
     }
 
-    testWidgets('asks first and launches nothing until answered', (
+    testWidgets('asks first, reads no sensor, launches nothing', (
       tester,
     ) async {
-      now = Duration.zero;
       final harness = build();
       await harness.pump(tester);
       await harness.tapAr(tester);
       expect(find.textContaining('Which floor'), findsOneWidget);
+      expect(source.hasListener, isFalse);
       expect(harness.fake.requests, isEmpty);
       expect(harness.statusChecks, 0);
     });
 
-    testWidgets('confirmed floor with a still phone sends the evidence', (
+    testWidgets('confirmed floor held still sends the evidence', (
       tester,
     ) async {
-      now = Duration.zero;
       final harness = build();
       await harness.pump(tester);
       await harness.tapAr(tester);
-      await holdStill(tester, 25);
       await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      expect(find.textContaining('Hold still'), findsOneWidget);
+      expect(source.hasListener, isTrue);
+      expect(harness.fake.requests, isEmpty);
+      await holdStill(tester, 20);
       await tester.pumpAndSettle();
       final json = harness.fake.requests.single.toJson();
       expect(json['floor'], '1', reason: 'destination floor is untouched');
       expect(json['startFloor'], '2');
-      expect(json['startFloorAgeS'], 0);
+      expect(json['startFloorAgeS'], 20);
       expect(json['pressureSinceStart'], {
         'settled': true,
         'moved': false,
@@ -285,26 +292,30 @@ void main() {
       });
     });
 
-    testWidgets('no samples sends no start floor at all', (tester) async {
-      now = Duration.zero;
+    testWidgets('continuing without waiting sends no start floor', (
+      tester,
+    ) async {
       final harness = build();
       await harness.pump(tester);
       await harness.tapAr(tester);
       await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await tester.tap(find.text('Continue without waiting'));
       await tester.pumpAndSettle();
       final json = harness.fake.requests.single.toJson();
       expect(json.keys, isNot(contains('startFloor')));
       expect(json.keys, isNot(contains('pressureSinceStart')));
     });
 
-    testWidgets('skip launches without a start floor', (tester) async {
-      now = Duration.zero;
+    testWidgets('skip reads no sensor and sends no start floor', (
+      tester,
+    ) async {
       final harness = build();
       await harness.pump(tester);
       await harness.tapAr(tester);
-      await holdStill(tester, 25);
       await tester.tap(find.text('Skip'));
       await tester.pumpAndSettle();
+      expect(source.hasListener, isFalse);
       final json = harness.fake.requests.single.toJson();
       expect(json.keys, isNot(contains('startFloor')));
     });

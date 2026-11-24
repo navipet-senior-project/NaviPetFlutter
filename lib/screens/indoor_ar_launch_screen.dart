@@ -74,16 +74,15 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   var _blocked = false;
   var _choosingFloor = false;
   var _floorAsked = false;
+  var _holding = false;
   StartFloorAnchor? _anchor;
 
   @override
   void initState() {
     super.initState();
-    // Running from the first frame, so a still phone already has a settled
-    // window by the time the user answers.
-    // Kept from the first build: a router rebuild hands the widget a fresh,
-    // unstarted anchor.
-    _anchor = widget.anchor?..start();
+    // Kept from the first build: a router rebuild hands the widget a fresh
+    // anchor. It reads no sensor until the user confirms a floor.
+    _anchor = widget.anchor;
     // After the first frame: leaving pops the route, which initState cannot do.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
@@ -176,8 +175,21 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   /// [floor] is what the user said they stand on; null means they skipped.
   Future<void> _floorChosen(String? floor) async {
     _floorAsked = true;
-    if (floor != null) _anchor!.confirmFloor(floor);
     setState(() => _choosingFloor = false);
+    if (floor == null || !_anchor!.confirmFloor(floor)) {
+      await _checkCamera();
+      return;
+    }
+    // The barometer needs a still phone for about 20 s after the answer.
+    setState(() => _holding = true);
+    while (mounted && _holding && !_anchor!.resolved) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    if (mounted && _holding) await _stopHolding();
+  }
+
+  Future<void> _stopHolding() async {
+    setState(() => _holding = false);
     await _checkCamera();
   }
 
@@ -299,6 +311,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
             _rationale ||
             _unavailable ||
             _choosingFloor ||
+            _holding ||
             _placeLookupFailure != null
         ? AppBar(title: const Text('AR mode'))
         : null,
@@ -321,6 +334,26 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
               back: 'Back to map',
               onBack: () => _leave(null),
             )
+          : _holding
+          ? Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Hold still for a few seconds while NaviPet checks your '
+                    'floor with the barometer.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  const CircularProgressIndicator(),
+                  TextButton(
+                    onPressed: _stopHolding,
+                    child: const Text('Continue without waiting'),
+                  ),
+                ],
+              ),
+            )
           : _choosingFloor
           ? Padding(
               padding: const EdgeInsets.all(24),
@@ -328,8 +361,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'Which floor are you standing on? Hold still while you '
-                    'answer; the barometer checks you stay on it.',
+                    'Which floor are you standing on? Choosing one turns on the '
+                    "barometer to check you don't change floors. Skip to "
+                    'continue without it.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),

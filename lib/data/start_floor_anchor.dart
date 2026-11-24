@@ -8,11 +8,16 @@ import 'indoor_ar_contract.dart';
 /// user's own confirmation, never the destination and never derived from
 /// pressure. The rule mirrors Unity's `IndoorFloorBarometer` (report addendum 7).
 ///
-/// Nothing but two flags and an age leaves this class: no absolute or raw
+/// The sensor is not read until [confirmFloor]; skipping the question means no
+/// collection at all. Every sample is then taken after the confirmation, and
+/// the anchor is the settled 20 s window that ends 20 to [anchorDeadline]
+/// seconds after the answer, so it covers the answer itself. A phone that
+/// moved first, or settled later, gets no anchor and the user must confirm
+/// again.
+///
+/// Nothing but two flags and two ages leaves this class: no absolute or raw
 /// pressure, no wall-clock time, no location. Time is the injected monotonic
-/// [clock]. The anchor needs a settled window at the moment of
-/// confirmation (it may include samples from just before); otherwise the
-/// evidence stays `settled: false` until the user confirms again.
+/// [clock].
 ///
 /// shortcut: one iPhone, one building, one afternoon of data backs the
 /// thresholds; re-measure on a second device and over longer drift.
@@ -25,6 +30,13 @@ class StartFloorAnchor {
   static const minSamples = 8;
   static const maxRangeHpa = 0.06;
   static const moveHpa = 0.30;
+
+  /// Latest moment, after the answer, that the anchor window may complete: the
+  /// window then still covers the answer to within [anchorLead] + 2 s.
+  static const anchorDeadline = Duration(seconds: 22);
+
+  /// Longest the first anchor sample may trail the start of its window.
+  static const anchorLead = Duration(seconds: 3);
 
   final PressureSource source;
   final Duration Function() _clock;
@@ -42,17 +54,6 @@ class StartFloorAnchor {
     return () => watch.elapsed;
   }
 
-  /// Starts listening. Safe to call once; a sensor error ends the evidence.
-  void start() {
-    _sub ??= source.readings().listen(
-      _onReading,
-      onError: (Object _) {
-        _failed = true;
-        _sub?.cancel();
-      },
-    );
-  }
-
   Future<void> dispose() async {
     await _sub?.cancel();
     _sub = null;
@@ -65,13 +66,26 @@ class StartFloorAnchor {
     if (value.isEmpty) return false;
     _floor = value;
     _confirmedAt = _clock();
-    // Anchored only if the level is settled right now. An unsettled phone gets
-    // no anchor, later or ever: settling afterwards could validate a floor the
-    // user was no longer on when they answered. They must confirm again.
-    _anchor = _settledMedian(_confirmedAt);
+    _buffer.clear();
+    _anchor = null;
     _moved = false;
+    _failed = false;
+    _sub ??= source.readings().listen(
+      _onReading,
+      onError: (Object _) {
+        _failed = true;
+        _sub?.cancel();
+        _sub = null;
+      },
+    );
     return true;
   }
+
+  /// True once the answer can no longer change: anchored, the sensor failed, or
+  /// the anchor deadline passed. Always false before a floor is confirmed.
+  bool get resolved =>
+      _floor != null &&
+      (_anchor != null || _failed || _clock() - _confirmedAt > anchorDeadline);
 
   /// Null unless a floor is confirmed and the sensor has produced samples.
   IndoorArStartFloor? evidence() {
@@ -96,23 +110,31 @@ class StartFloorAnchor {
   }
 
   void _evaluate() {
+    if (_floor == null) return;
+    final now = _clock();
     final anchor = _anchor;
-    if (anchor == null) return;
-    final median = _settledMedian(_clock());
+    if (anchor == null) {
+      final since = now - _confirmedAt;
+      if (since >= window && since <= anchorDeadline) {
+        _anchor = _settledMedian(now, lead: anchorLead);
+      }
+      return;
+    }
+    final median = _settledMedian(now);
     if (median != null && (median - anchor).abs() >= moveHpa) {
       _moved = true; // latched: going up and back is still a move
     }
   }
 
   /// Median of the last [window] if it is dense, gap-free and flat, else null.
-  double? _settledMedian(Duration now) {
+  double? _settledMedian(Duration now, {Duration lead = maxGap}) {
     final start = now - window;
     final samples = [
       for (final s in _buffer)
         if (s.at > start && s.at <= now) s,
     ];
     if (samples.length < minSamples) return null;
-    if (samples.first.at - start > maxGap || now - samples.last.at > maxGap) {
+    if (samples.first.at - start > lead || now - samples.last.at > maxGap) {
       return null;
     }
     for (var i = 1; i < samples.length; i++) {
