@@ -158,6 +158,7 @@ class StartFloorAnchor {
     _checkContinuity(now, wallTime);
     final anchor = _anchor;
     if (_sub == null || anchor == null || _buffer.isEmpty) return null;
+    _latchMovementBetweenCaptures(now, anchor);
     final last = _buffer.last;
     final elapsedAge = now - last.at;
     final timestampAge = wallTime.difference(last.timestamp);
@@ -165,11 +166,12 @@ class StartFloorAnchor {
     if (sampleAge > IndoorArStartFloor.maxSampleAge) return null;
     final median = _settledMedian(now - window, now);
     if (median == null) return null;
+    _moved = _moved || _hasMoved(median, anchor);
     return IndoorArStartFloor(
       floor: floor,
       ageS:
           (now - _confirmedAt).inMicroseconds / Duration.microsecondsPerSecond,
-      moved: _moved || _hasMoved(median, anchor),
+      moved: _moved,
       sampleAgeS: sampleAge.inMicroseconds / Duration.microsecondsPerSecond,
     );
   }
@@ -180,13 +182,17 @@ class StartFloorAnchor {
     _checkContinuity(now, wallTime);
     if (_sub == null) return;
     final timestamp = reading.timestamp;
+    final last = _buffer.isEmpty ? null : _buffer.last;
+    final timestampGap = timestamp.difference(last?.timestamp ?? timestamp);
+    if (last != null && timestampGap.abs() < _minSampleSpacing) {
+      return;
+    }
     final timestampAge = wallTime.difference(timestamp);
     final elapsedAge =
         now - _confirmedAt - timestamp.difference(_confirmedWallTime);
     final age = timestampAge > elapsedAge ? timestampAge : elapsedAge;
     final at = age.isNegative ? now : now - age;
     final anchor = _anchor;
-    final last = _buffer.isEmpty ? null : _buffer.last;
     if (timestampAge < -_timestampTolerance ||
         elapsedAge < -_timestampTolerance ||
         age > maxReadingAge ||
@@ -201,7 +207,7 @@ class StartFloorAnchor {
       }
     } else {
       final elapsedGap = at - last.at;
-      final timestampGap = timestamp.difference(last.timestamp);
+      if (elapsedGap.abs() < _minSampleSpacing) return;
       if (elapsedGap.isNegative || timestampGap.isNegative) {
         if (anchor != null) {
           _buffer.clear();
@@ -210,6 +216,7 @@ class StartFloorAnchor {
         }
         return;
       }
+      if (anchor != null) _latchMovementBetweenCaptures(at, anchor);
       final maxGap = anchor == null
           ? _maxAnchorGap
           : IndoorArStartFloor.maxSampleAge;
@@ -219,9 +226,6 @@ class StartFloorAnchor {
           return;
         }
         _buffer.clear();
-      }
-      if (elapsedGap < _minSampleSpacing || timestampGap < _minSampleSpacing) {
-        return;
       }
     }
     _buffer.add((at: at, timestamp: timestamp, hPa: reading.hPa));
@@ -236,6 +240,19 @@ class StartFloorAnchor {
     }
     if (_anchor != null) {
       _buffer.removeWhere((s) => s.at < at - window);
+    }
+  }
+
+  void _latchMovementBetweenCaptures(Duration end, double anchor) {
+    if (_moved) return;
+    for (final sample in _buffer) {
+      if (sample.at >= end - window) break;
+      final start = sample.at + const Duration(microseconds: 1);
+      final median = _settledMedian(start, start + window);
+      if (median != null && _hasMoved(median, anchor)) {
+        _moved = true;
+        return;
+      }
     }
   }
 

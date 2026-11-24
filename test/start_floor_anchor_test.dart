@@ -139,6 +139,7 @@ void main() {
   for (final (label, delay, pressure) in [
     ('redelivery', Duration.zero, 1000.01),
     ('capture 250 ms later', Duration(milliseconds: 250), 1000.08),
+    ('capture 250 ms earlier', Duration(milliseconds: -250), 1000.08),
   ]) {
     test('$label preserves the settled window and newest sample age', () async {
       final rig = _Rig();
@@ -159,6 +160,22 @@ void main() {
     });
   }
 
+  test('a redelivery survives a 4 ms forward wall-clock adjustment', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 20);
+    rig.now += const Duration(milliseconds: 250);
+    rig.wallOffset = const Duration(milliseconds: 4);
+    rig.source.controller.add(
+      PressureReading(
+        hPa: 1000.01,
+        timestamp: _wall.add(rig.now - const Duration(milliseconds: 250)),
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(rig.anchor.evidence()?.sampleAgeS, 0.254);
+  });
+
   test(
     'a backward capture clears the window but preserves the anchor',
     () async {
@@ -170,7 +187,7 @@ void main() {
       rig.source.controller.add(
         PressureReading(
           hPa: 1000,
-          timestamp: _wall.add(rig.now - const Duration(milliseconds: 500)),
+          timestamp: _wall.add(rig.now - const Duration(milliseconds: 750)),
         ),
       );
       await Future<void>.delayed(Duration.zero);
@@ -260,8 +277,26 @@ void main() {
       expect(rig.anchor.evidence(), isNull);
       rig.now += const Duration(milliseconds: 100);
       expect(rig.anchor.evidence()?.moved, isTrue);
+      await rig.hold(1000, 21, noiseHpa: 0);
+      expect(rig.anchor.evidence()?.moved, isTrue);
     },
   );
+
+  for (final nextCapture in [42, 45]) {
+    test(
+      'a settled step latches before the return sample at ${nextCapture}s',
+      () async {
+        final rig = _Rig();
+        rig.anchor.confirmFloor('1');
+        await rig.hold(1000, 20, noiseHpa: 0);
+        await rig.hold(1000.15, 1, noiseHpa: 0);
+        await rig.hold(1000.30, 20, noiseHpa: 0);
+        rig.gap(nextCapture - 42);
+        await rig.hold(1000, 21, noiseHpa: 0);
+        expect(rig.anchor.evidence()?.moved, isTrue);
+      },
+    );
+  }
 
   test('hold range 0.2 never anchors, and the deadline resolves it', () async {
     final rig = _Rig();
