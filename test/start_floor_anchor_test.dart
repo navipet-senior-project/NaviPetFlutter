@@ -211,6 +211,16 @@ void main() {
     expect(e.ageS, 25);
   });
 
+  test('reset stops reading and forgets the answer', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 25);
+    await rig.anchor.reset();
+    expect(rig.source.controller.hasListener, isFalse);
+    expect(rig.anchor.evidence(), isNull);
+    expect(rig.anchor.resolved, isFalse);
+  });
+
   test('a sensor error ends the evidence and resolves', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');

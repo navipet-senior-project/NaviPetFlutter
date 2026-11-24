@@ -236,11 +236,12 @@ void main() {
     var source = StreamController<PressureReading>.broadcast();
     var now = Duration.zero;
 
-    _Harness build() {
+    _Harness build({Future<http.Response> Function(http.Request)? mint}) {
       now = Duration.zero;
       source = StreamController<PressureReading>.broadcast();
       return _Harness(
         status: PermissionStatus.granted,
+        mint: mint,
         anchor: StartFloorAnchor(
           source: _StreamSource(source.stream),
           clock: () => now,
@@ -306,6 +307,38 @@ void main() {
       final json = harness.fake.requests.single.toJson();
       expect(json.keys, isNot(contains('startFloor')));
       expect(json.keys, isNot(contains('pressureSinceStart')));
+    });
+
+    testWidgets('failure screen stops reading; retry asks again', (
+      tester,
+    ) async {
+      var attempts = 0;
+      final harness = build(
+        mint: (_) async => ++attempts > 1
+            ? http.Response(_mintedBody, 200)
+            : http.Response('no', 500),
+      );
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Floor 2'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      await tester.pumpAndSettle();
+      expect(
+        find.text("Couldn't start AR. Check your connection and try again."),
+        findsOneWidget,
+      );
+      expect(source.hasListener, isFalse);
+      expect(harness.fake.requests, isEmpty);
+
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Which floor'), findsOneWidget);
+      expect(source.hasListener, isFalse);
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+      final json = harness.fake.requests.single.toJson();
+      expect(json.keys, isNot(contains('startFloor')), reason: 'old answer');
     });
 
     testWidgets('skip reads no sensor and sends no start floor', (

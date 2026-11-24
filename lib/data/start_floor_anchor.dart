@@ -69,11 +69,19 @@ class StartFloorAnchor {
     return () => watch.elapsed;
   }
 
-  Future<void> dispose() async {
-    await _sub?.cancel();
+  /// Stops reading and forgets the confirmation, as if never asked.
+  Future<void> reset() async {
+    final sub = _sub;
     _sub = null;
+    _floor = null;
+    _anchor = null;
+    _moved = false;
+    _failed = false;
     _buffer.clear();
+    await sub?.cancel();
   }
+
+  Future<void> dispose() => reset();
 
   /// Returns false for a blank floor, leaving the previous confirmation.
   bool confirmFloor(String floor) {

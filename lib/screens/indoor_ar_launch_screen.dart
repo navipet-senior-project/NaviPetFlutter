@@ -89,6 +89,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
 
   Future<void> _start() async {
     if (!mounted) return;
+    // A retry asks again: an old answer is never reused, and nothing is read
+    // until the user confirms a floor once more.
+    _floorAsked = false;
+    await _anchor?.reset();
+    if (!mounted) return;
     if (defaultTargetPlatform != TargetPlatform.android &&
         defaultTargetPlatform != TargetPlatform.iOS) {
       _leave("AR mode isn't available on this device.");
@@ -236,6 +241,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
         throw const IndoorArTokenException(0);
       }
     } on IndoorArTokenException {
+      _anchor?.reset(); // the failure screen collects nothing
       if (mounted) {
         setState(() {
           _unavailable = true;
