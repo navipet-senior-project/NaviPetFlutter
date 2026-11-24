@@ -91,8 +91,8 @@ phone unless a note says so.
      requires a covered indoor destination with a place ID, a nonblank
      `indoorDestinationId`, and a footprint, plus a usable, non-approximate fix
      at most 10 s old within 2 m of that footprint.
-   - After outdoor arrival, **Scan AR** on the handoff sheet and the **AR**
-     map shortcut are shown based on floor coverage regardless of fix age.
+   - Outdoor arrival for a VEC room enters `FlowIndoorHandoff`. The handoff
+     sheet offers **Scan AR** for covered floors regardless of fix age.
    - **Verify location** on the VEC building map opens AR after resolving the
      selected room and floor to exactly one backend place ID through search.
      Floors 1–2 combine drawn floor plans with data from the bundled scan
