@@ -7,9 +7,10 @@ to veto a map match on the wrong floor. The wire contract is Unity's
 
 ## What is sent
 
-Only when the user confirmed a floor, a settled anchor exists, the confirmation
-is at most 1200 s old, the newest sample is at most 10 s old and the sensor
-stream is alive:
+The app sends the fields below only when the user confirmed a floor, both the
+anchor and current pressure window are settled, the confirmation is at most
+1200 s old, the newest sample is at most 10 s old, and the sensor stream is
+alive.
 
 - `floorEvidenceVersion` 1, `startFloor` (the user's own answer, never the
   destination), `startFloorAgeS`
@@ -23,16 +24,18 @@ reads no sensor.
 
 The pressure recorder (raw `deltaHpa` / `elapsedMs` per floor, stored on the
 phone) and the floor anchor read the same `SensorsPlusPressureSource`: the
-`sensors_plus` barometer at a 1 s sampling period, `BarometerEvent.pressure` in
-hPa, no conversion. `test/floor_pressure_parity_test.dart` drives that source
+`sensors_plus` barometer reports `BarometerEvent.pressure` directly in hPa.
+Flutter requests a 1 s sampling period. iOS ignores that request for the
+barometer, and Android treats it as a hint.
+`test/floor_pressure_parity_test.dart` drives that source
 through the plugin's channels and checks that a 0.47 hPa step is 0.47 in the
 recorder and latches `moved` in the anchor, and that the wire summary holds no
 pressure values. That shows the two paths agree; it does not show the sensor is
 accurate on any device.
 
-The anchor uses the shared rule: 20 s window, settled range at most 0.06 hPa,
-at least 8 samples spanning at least 18 s, `moved` at a settled median
-difference of at least 0.30 hPa.
+The anchor drops captures less than 0.5 s apart. A settled 20 s window has
+at least 8 samples spanning at least 18 s and a range of at most 0.06 hPa.
+A settled median difference of at least 0.30 hPa sets `moved`.
 
 ## Known limits
 

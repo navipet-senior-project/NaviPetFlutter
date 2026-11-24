@@ -41,6 +41,7 @@ class StartFloorAnchor {
 
   static const window = Duration(seconds: 20);
   static const _minSampleSpan = Duration(seconds: 18);
+  static const _minSampleSpacing = Duration(milliseconds: 500);
   static const maxGap = Duration(seconds: 2);
   static const _timestampTolerance = Duration(milliseconds: 5);
   static const maxRangeHpa = 0.06;
@@ -149,25 +150,28 @@ class StartFloorAnchor {
     return _floor != null && (_anchor != null || _sub == null);
   }
 
-  /// Evidence from a settled anchor with a live stream and fresh samples.
+  /// Evidence from settled anchor and current windows with fresh samples.
   IndoorArStartFloor? evidence() {
     final floor = _floor;
     if (floor == null) return null;
     final wallTime = _wallClock();
     final now = _clock();
     _checkContinuity(now, wallTime);
-    if (_sub == null || _anchor == null) return null;
+    final anchor = _anchor;
+    if (_sub == null || anchor == null) return null;
     final last = _buffer.last;
     final elapsedAge = now - last.at;
     final timestampAge = wallTime.difference(last.timestamp);
     final sampleAge = elapsedAge > timestampAge ? elapsedAge : timestampAge;
-    if (sampleAge > IndoorArStartFloor.maxSampleAge) return null;
+    if (sampleAge > maxGap) return null;
+    final median = _settledMedian(now - window, now);
+    if (median == null) return null;
     return IndoorArStartFloor(
       floor: floor,
       ageS:
           (now - _confirmedAt).inMicroseconds / Duration.microsecondsPerSecond,
-      settled: sampleAge <= maxGap && _settledMedian(now - window, now) != null,
-      moved: _moved,
+      settled: true,
+      moved: _moved || (median - anchor).abs() >= moveHpa,
       sampleAgeS: sampleAge.inMicroseconds / Duration.microsecondsPerSecond,
     );
   }
@@ -188,17 +192,27 @@ class StartFloorAnchor {
         elapsedAge < -_timestampTolerance ||
         age > maxReadingAge ||
         at < _confirmedAt ||
-        !reading.hPa.isFinite ||
-        (last != null &&
-            (at <= last.at || !timestamp.isAfter(last.timestamp)))) {
+        !reading.hPa.isFinite) {
       return;
     }
-    if (last == null
-        ? at - _confirmedAt > anchorLead
-        : at - last.at > maxGap ||
-              timestamp.difference(last.timestamp) > maxGap) {
-      invalidate();
-      return;
+    if (last == null) {
+      if (at - _confirmedAt > anchorLead) {
+        invalidate();
+        return;
+      }
+    } else {
+      final elapsedGap = at - last.at;
+      final timestampGap = timestamp.difference(last.timestamp);
+      if (elapsedGap.isNegative ||
+          timestampGap.isNegative ||
+          elapsedGap > maxGap ||
+          timestampGap > maxGap) {
+        invalidate();
+        return;
+      }
+      if (elapsedGap < _minSampleSpacing || timestampGap < _minSampleSpacing) {
+        return;
+      }
     }
     _buffer.add((at: at, timestamp: timestamp, hPa: reading.hPa));
     final anchor = _anchor;

@@ -819,8 +819,12 @@ void main() {
     });
 
     for (final (name, delay, reasks) in [
-      ('moved', Duration.zero, true),
-      ('unsettled current window', Duration(seconds: 1), true),
+      (
+        'settled after a climb between samples',
+        Duration(milliseconds: 100),
+        true,
+      ),
+      ('unsettled current window', Duration.zero, false),
       ('stopped stream at sample age limit', Duration(seconds: 10), false),
       ('over sample age limit', Duration(seconds: 10, microseconds: 1), false),
       ('over floor age limit', Duration(seconds: 1180, microseconds: 1), false),
@@ -842,22 +846,28 @@ void main() {
         await tester.pump();
         await holdStill(tester, 20);
         await tester.pumpAndSettle();
-        if (reasks) {
-          await holdStill(tester, delay == Duration.zero ? 21 : 1, hPa: 1000.5);
-        } else {
-          now += delay;
+        if (reasks || delay == Duration.zero) {
+          await holdStill(tester, 1, hPa: 999.75);
+          if (reasks) await holdStill(tester, 20, hPa: 999.5);
         }
+        now += delay;
         await tester.tap(find.text('Continue'));
         await tester.pumpAndSettle();
 
         final request = harness.fake.requests.single;
         if (reasks) {
           expect(request.toJson()['floorEvidenceVersion'], 1);
-          expect(request.startFloor!.settled, delay == Duration.zero);
-          expect(request.startFloor!.moved, delay == Duration.zero);
+          expect(request.toJson()['pressureSinceStart'], {
+            'settled': true,
+            'moved': true,
+            'sampleAgeS': 0.1,
+          });
         } else {
           expect(request.startFloor, isNull);
-          expect(request.toJson(), isNot(contains('floorEvidenceVersion')));
+          expect(
+            request.toJson(),
+            request.withArToken(testArToken, startFloor: null).toJson(),
+          );
         }
         expect(find.text('Try again'), reasks ? findsOneWidget : findsNothing);
         expect(find.text('map'), reasks ? findsNothing : findsOneWidget);

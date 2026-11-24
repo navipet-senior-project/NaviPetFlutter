@@ -98,6 +98,36 @@ void main() {
     expect(rig.anchor.resolved, isTrue);
   });
 
+  test('a pressure spike 250 ms after an accepted capture is dropped', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 1);
+    rig.now += const Duration(milliseconds: 250);
+    rig.source.controller.add(
+      PressureReading(hPa: 1000.08, timestamp: _wall.add(rig.now)),
+    );
+    await Future<void>.delayed(Duration.zero);
+    await rig.hold(1000, 19);
+    expect(rig.anchor.evidence()?.moved, isFalse);
+  });
+
+  test('a backward capture invalidates the pressure window', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 20);
+    expect(rig.anchor.evidence(), isNotNull);
+    rig.now += const Duration(milliseconds: 250);
+    rig.source.controller.add(
+      PressureReading(
+        hPa: 1000,
+        timestamp: _wall.add(rig.now - const Duration(milliseconds: 500)),
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(rig.anchor.evidence(), isNull);
+    expect(rig.source.controller.hasListener, isFalse);
+  });
+
   test('a settled 0.47 hPa step latches movement', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
@@ -217,9 +247,7 @@ void main() {
     expect(rig.anchor.evidence()!.settled, isTrue);
     rig.gap(1);
     await rig.hold(1000, 1, age: const Duration(milliseconds: 2900));
-    final delayed = rig.anchor.evidence()!;
-    expect(delayed.sampleAgeS, 2.9);
-    expect(delayed.settled, isFalse);
+    expect(rig.anchor.evidence(), isNull);
   });
 
   test(
@@ -370,7 +398,7 @@ void main() {
     rig.gap(1);
     await rig.hold(1000, 18);
     rig.now += const Duration(milliseconds: 1900);
-    expect(rig.anchor.evidence()!.settled, isFalse);
+    expect(rig.anchor.evidence(), isNull);
   });
 
   test(

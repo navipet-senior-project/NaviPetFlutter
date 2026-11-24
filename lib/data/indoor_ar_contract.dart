@@ -71,14 +71,15 @@ class IndoorArStartFloor {
   static const maxSampleAge = Duration(seconds: 10);
 
   Map<String, Object?> toJson() =>
-      ageS <= maxConfirmationAge.inSeconds &&
+      settled &&
+          ageS <= maxConfirmationAge.inSeconds &&
           sampleAgeS <= maxSampleAge.inSeconds
       ? {
           'floorEvidenceVersion': 1,
           'startFloor': floor,
           'startFloorAgeS': ageS,
           'pressureSinceStart': {
-            'settled': settled,
+            'settled': true,
             'moved': moved,
             'sampleAgeS': sampleAgeS,
           },

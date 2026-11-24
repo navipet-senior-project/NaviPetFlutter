@@ -108,19 +108,20 @@ void main() {
       }
     });
 
-    test('both request modes omit stale evidence at unrounded ages', () {
-      for (final (age, sampleAge, fresh) in [
-        (0.0, 0.0, true),
-        (1200.0, 10.0, true),
-        (1200.000001, 10.0, false),
-        (1201.0, 10.0, false),
-        (1200.0, 10.0000001, false),
-        (1200.0, 11.0, false),
+    test('both modes omit unsettled and stale evidence at unrounded ages', () {
+      for (final (age, sampleAge, settled, eligible) in [
+        (0.0, 0.0, true, true),
+        (0.0, 0.0, false, false),
+        (1200.0, 10.0, true, true),
+        (1200.000001, 10.0, true, false),
+        (1201.0, 10.0, true, false),
+        (1200.0, 10.0000001, true, false),
+        (1200.0, 11.0, true, false),
       ]) {
         final start = IndoorArStartFloor(
           floor: '2',
           ageS: age,
-          settled: false,
+          settled: settled,
           moved: true,
           sampleAgeS: sampleAge,
         );
@@ -140,7 +141,7 @@ void main() {
                     ),
                   )
                   as Map;
-          if (fresh) {
+          if (eligible) {
             expect(wire['floorEvidenceVersion'], 1);
             expect(wire['startFloorAgeS'], age);
             expect(
