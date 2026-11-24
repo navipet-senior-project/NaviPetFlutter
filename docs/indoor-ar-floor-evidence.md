@@ -18,6 +18,14 @@ confirmation. The serializers reject confirmation ages over 1200 s.
 - For Unity's optional height hint: `requestSentAtBootS` and
   `pressureSinceStart.deltaHpa`
 
+For floor evidence, the existing floor policy is the only capability provided by
+[NaviPetUnity PR 37](https://github.com/navipet-senior-project/NaviPetUnity/pull/37).
+Earlier builds ignore the floor evidence.
+
+Barometer height hints using `deltaHpa` and `requestSentAtBootS` require the
+separate Unity height-hint candidate, which is provisional and has yet to merge.
+Flutter has no version handshake and cannot identify the paired Unity build.
+
 `requestSentAtBootS` is the device boot clock in seconds, read through the
 `navipet/indoor_ar` channel (`bootClockSeconds`) just before the ages are
 computed, so Unity's added send-to-SDK time can only overstate them. Android
@@ -83,9 +91,6 @@ confirmation even if the pressure returns to the anchor.
 - Thresholds come from one afternoon of readings on one iPhone in one building.
   Android is unverified.
 - The iOS Motion & Fitness permission dialog may interrupt the hold.
-- Useful evidence needs a paired Unity build that contains the floor policy
-  (NaviPetUnity PR 37 or later). Older Unity builds ignore the fields. Flutter
-  has no version handshake and cannot tell which build it launches.
 - The foreground check before launch is Dart-only. Home pressed while the
   platform call is queued can still reach the native handler.
 - A brief loss of focus waits for the app to resume. A hidden, paused, or
