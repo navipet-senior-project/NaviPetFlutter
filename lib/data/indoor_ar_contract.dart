@@ -95,6 +95,14 @@ class IndoorArStartFloor {
   static const maxDeltaHpa = 3.0;
   static final _floorDigits = RegExp(r'^[0-9]+$');
 
+  bool get hasUsableDelta {
+    final delta = deltaHpa;
+    return moved &&
+        delta != null &&
+        delta.abs() >= moveHpa &&
+        delta.abs() <= maxDeltaHpa;
+  }
+
   static String? normalizeFloor(String floor) {
     final value = floor.trim();
     if (!_floorDigits.hasMatch(value)) return null;
@@ -110,26 +118,17 @@ class IndoorArStartFloor {
       return {};
     }
     final sentAt = requestSentAtBootS;
-    final delta = deltaHpa;
-    // Unity reads the delta only for a moved start and drops the whole evidence
-    // if it disagrees with `moved` (abs >= 0.30 exactly). `moved` latches, so a
-    // returned pressure sends no delta and keeps the start-floor evidence.
-    final sendDelta =
-        sentAt != null &&
-        delta != null &&
-        moved &&
-        delta.abs() >= moveHpa &&
-        delta.abs() <= maxDeltaHpa;
+    final sendHint = sentAt != null && hasUsableDelta;
     return {
       'floorEvidenceVersion': 1,
       'startFloor': value,
       'startFloorAgeS': ageS,
-      'requestSentAtBootS': ?sentAt,
+      if (sendHint) 'requestSentAtBootS': sentAt,
       'pressureSinceStart': {
         'settled': true,
         'moved': moved,
         'sampleAgeS': sampleAgeS,
-        if (sendDelta) 'deltaHpa': delta,
+        if (sendHint) 'deltaHpa': deltaHpa,
       },
     };
   }

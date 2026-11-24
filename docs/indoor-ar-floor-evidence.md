@@ -30,10 +30,10 @@ unchanged.
 
 `deltaHpa` is the current settled median minus the anchor median, signed, so a
 negative value means pressure fell and the phone went up. It is relative only
-and is sent only when `moved` is true, the stamp is present, and
-`0.30 <= abs <= 3`. `moved` latches, so if pressure returns to the anchor
-Flutter sends `moved: true` without a delta; Unity rejects a delta that
-disagrees with `moved`, so the delta is dropped rather than risk the evidence.
+and is sent together with the stamp only when `moved` is true and
+`0.30 <= abs <= 3`. Flutter skips the boot-clock read when the delta is
+ineligible. `moved` latches, so if pressure returns to the anchor Flutter sends
+`moved: true` without either hint field.
 
 If evidence is ineligible, Flutter omits all four floor fields and Unity uses
 its existing localization behavior. The summary carries no absolute or raw

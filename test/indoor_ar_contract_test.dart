@@ -131,7 +131,14 @@ void main() {
         expect(jsonDecode(jsonEncode(wire)), wire);
       });
 
-      test('keep the delta exactly in step with moved', () {
+      test('both modes send hint fields together only for usable deltas', () {
+        final requests = [
+          vec119Request(),
+          IndoorArRequest.localize(
+            mapCode: IndoorArRequest.buildMapCode,
+            frame: IndoorArRequest.buildFrame,
+          ),
+        ];
         for (final (delta, moved, sent) in [
           (-0.3, true, true),
           (0.3, true, true),
@@ -140,22 +147,30 @@ void main() {
           (-0.2999999999, true, false), // latched with a 1e-9 roundoff
           (0.2999999999, true, false),
           (-0.29, true, false),
+          (0.0, true, false),
           (-3.0000001, true, false),
+          (3.0000001, true, false),
           (-0.47, false, false),
           (0.0, false, false),
-          (double.nan, true, false),
+          (null, true, false),
         ]) {
-          final s = delta.isNaN ? null : start(deltaHpa: delta, moved: moved);
-          if (s == null) {
+          final evidence = start(deltaHpa: delta, moved: moved);
+          for (final request in requests) {
+            final wire = request
+                .withArToken(testArToken, startFloor: evidence)
+                .toJson();
+            expect(wire.containsKey('requestSentAtBootS'), sent);
+            expect(wire['requestSentAtBootS'], sent ? 5000.25 : null);
+            expect(wire['startFloor'], '1');
+            final measured = wire['pressureSinceStart']! as Map;
+            expect(measured['moved'], moved);
             expect(
-              () => start(deltaHpa: delta),
-              throwsArgumentError,
+              measured.containsKey('deltaHpa'),
+              sent,
               reason: '$delta',
             );
-            continue;
+            expect(measured['deltaHpa'], sent ? delta : null);
           }
-          expect(pressure(s).containsKey('deltaHpa'), sent, reason: '$delta');
-          expect(s.toJson(), contains('startFloor'), reason: '$delta');
         }
       });
 
@@ -170,6 +185,7 @@ void main() {
           expect(() => start(sentAt: bad), throwsArgumentError);
         }
         expect(() => start(deltaHpa: double.infinity), throwsArgumentError);
+        expect(() => start(deltaHpa: double.nan), throwsArgumentError);
       });
 
       test('stale evidence still sends nothing, stamp included', () {

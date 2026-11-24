@@ -319,7 +319,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
           await (_resumeWait ??= Completer<void>()).future;
         }
         if (!_active) return;
-        sentAt = bootClock != null && _anchor?.evidence() != null
+        sentAt = bootClock != null && _anchor?.evidence()?.hasUsableDelta == true
             ? await bootClock()
             : null;
       } while (_active && !_resumed);

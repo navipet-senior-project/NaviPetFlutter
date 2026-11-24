@@ -723,7 +723,9 @@ void main() {
       await rig.hold(1000, 40);
       final evidence = rig.anchor.evidence(requestSentAtBootS: 9)!;
       expect(evidence.moved, isTrue);
-      final pressure = evidence.toJson()['pressureSinceStart']! as Map;
+      final wire = evidence.toJson();
+      expect(wire, isNot(contains('requestSentAtBootS')));
+      final pressure = wire['pressureSinceStart']! as Map;
       expect(pressure['moved'], isTrue);
       expect(pressure, isNot(contains('deltaHpa')));
     });
@@ -734,7 +736,7 @@ void main() {
       await rig.hold(1000, 40);
       final wire = rig.anchor.evidence(requestSentAtBootS: 9)!.toJson();
       expect((wire['pressureSinceStart']! as Map), isNot(contains('deltaHpa')));
-      expect(wire['requestSentAtBootS'], 9);
+      expect(wire, isNot(contains('requestSentAtBootS')));
     });
   });
 }

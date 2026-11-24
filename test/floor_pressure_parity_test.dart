@@ -137,7 +137,7 @@ void main() {
       rig.anchor.confirmFloor('2');
       await rig.hold(1013.25, 30);
 
-      final wire = rig.anchor.evidence()!.toJson();
+      final wire = rig.anchor.evidence(requestSentAtBootS: 777.5)!.toJson();
       expect(wire.keys, {
         'floorEvidenceVersion',
         'startFloor',
@@ -175,6 +175,15 @@ void main() {
       expect(text, isNot(contains('999.')));
       expect(text, isNot(contains('1000')));
       expect(text, isNot(contains('2026')));
+
+      await rig.hold(1000, 25);
+      final returned = rig.anchor.evidence(requestSentAtBootS: 802.5)!.toJson();
+      expect(returned, isNot(contains('requestSentAtBootS')));
+      expect(returned['pressureSinceStart'], {
+        'settled': true,
+        'moved': true,
+        'sampleAgeS': 0,
+      });
     },
   );
 }
