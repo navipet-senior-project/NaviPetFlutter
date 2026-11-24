@@ -341,7 +341,7 @@ void main() {
       expect(json.keys, isNot(contains('startFloor')), reason: 'old answer');
     });
 
-    testWidgets('a failed Unity run returns to the map; relaunch asks again', (
+    testWidgets('localizationFailed after evidence re-asks, never reuses it', (
       tester,
     ) async {
       final harness = _Harness(
@@ -368,12 +368,46 @@ void main() {
       await holdStill(tester, 20);
       await tester.pumpAndSettle();
       expect(harness.fake.requests.single.toJson()['startFloor'], '2');
-      expect(find.text('map'), findsOneWidget, reason: 'screen left');
-      expect(source.hasListener, isFalse, reason: 'no collection after Unity');
+      expect(find.textContaining('Could not match'), findsOneWidget);
+      expect(find.text('map'), findsNothing, reason: 'still on the screen');
+      expect(source.hasListener, isFalse, reason: 'no pressure after Unity');
 
-      await harness.tapAr(tester);
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
       expect(find.textContaining('Which floor'), findsOneWidget);
       expect(harness.fake.requests, hasLength(1), reason: 'no silent relaunch');
+      await tester.tap(find.text('Floor 1'));
+      await tester.pump();
+      await holdStill(tester, 20);
+      await tester.pumpAndSettle();
+      final second = harness.fake.requests.last.toJson();
+      expect(harness.fake.requests, hasLength(2));
+      expect(second['startFloor'], '1', reason: 'new answer, not the old one');
+      expect(second['startFloorAgeS'], 20);
+    });
+
+    testWidgets('localizationFailed without evidence leaves as before', (
+      tester,
+    ) async {
+      final harness = _Harness(
+        status: PermissionStatus.granted,
+        result: const IndoorArResult(
+          status: IndoorArStatus.localizationFailed,
+          localizationQueries: 1,
+          durationMs: 1,
+        ),
+        anchor: StartFloorAnchor(
+          source: _StreamSource(const Stream.empty()),
+          clock: () => Duration.zero,
+          wallClock: () => DateTime.utc(2026),
+        ),
+      );
+      await harness.pump(tester);
+      await harness.tapAr(tester);
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+      expect(find.text('map'), findsOneWidget);
+      expect(find.text('Try again'), findsNothing);
     });
 
     testWidgets('skip reads no sensor and sends no start floor', (

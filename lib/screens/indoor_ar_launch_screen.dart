@@ -75,6 +75,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
   var _choosingFloor = false;
   var _floorAsked = false;
   var _holding = false;
+  String? _retryText;
   StartFloorAnchor? _anchor;
 
   @override
@@ -103,6 +104,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       _unavailable = false;
       _tokenFailed = false;
       _placeLookupFailure = null;
+      _retryText = null;
     });
     final request = widget.request;
     final id = widget.destinationId?.trim();
@@ -251,10 +253,19 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
       return;
     }
     if (!mounted) return;
+    final evidence = _anchor?.evidence();
     final result = await widget.launcher.launch(
-      _request!.withArToken(token).withStartFloor(_anchor?.evidence()),
+      _request!.withArToken(token).withStartFloor(evidence),
     );
     if (!mounted) return;
+    // The evidence is spent: Unity has stopped sampling and never reuses it.
+    _anchor?.reset();
+    if (evidence != null &&
+        result.status == IndoorArStatus.localizationFailed) {
+      // Unity's "Try again" returns here (Addendum 9): ask the floor afresh.
+      setState(() => _retryText = _resultText(result));
+      return;
+    }
     _leave(_resultText(result));
   }
 
@@ -318,6 +329,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
             _unavailable ||
             _choosingFloor ||
             _holding ||
+            _retryText != null ||
             _placeLookupFailure != null
         ? AppBar(title: const Text('AR mode'))
         : null,
@@ -326,6 +338,14 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen> {
           ? _message(
               _placeLookupFailure!,
               action: 'Retry',
+              onAction: _start,
+              back: 'Back to map',
+              onBack: () => _leave(null),
+            )
+          : _retryText != null
+          ? _message(
+              _retryText!,
+              action: 'Try again',
               onAction: _start,
               back: 'Back to map',
               onBack: () => _leave(null),
