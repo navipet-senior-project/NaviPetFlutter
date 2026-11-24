@@ -320,7 +320,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       _request!.withArToken(token, startFloor: evidence),
     );
     if (!_active) return;
-    if (evidence != null &&
+    if (evidence?.isFreshForUnity == true &&
         result.status == IndoorArStatus.localizationFailed) {
       // Unity's "Try again" returns here (Addendum 9): ask the floor afresh.
       setState(() => _retryText = _resultText(result));

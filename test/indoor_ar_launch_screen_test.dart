@@ -791,6 +791,65 @@ void main() {
       expect(second['startFloorAgeS'], 20);
     });
 
+    for (final (name, delay, reasks) in [
+      ('moved', Duration.zero, true),
+      ('at sample age limit', Duration(seconds: 10), true),
+      ('over sample age limit', Duration(seconds: 10, microseconds: 1), false),
+      ('over floor age limit', Duration(seconds: 1180, microseconds: 1), false),
+    ]) {
+      testWidgets('localization retry follows sent evidence ($name)', (
+        tester,
+      ) async {
+        final mint = Completer<http.Response>();
+        final harness = build(
+          mint: (_) => mint.future,
+          result: const IndoorArResult(
+            status: IndoorArStatus.localizationFailed,
+            localizationQueries: 1,
+            durationMs: 1,
+          ),
+        );
+        await harness.pump(tester);
+        await harness.tapAr(tester);
+        await tester.tap(find.text('Floor 2'));
+        await tester.pump();
+        await holdStill(tester, 20);
+        expect(harness.mintRequests, hasLength(1));
+        if (delay == Duration.zero) {
+          await holdStill(tester, 1, hPa: 1000.5);
+        } else {
+          now += delay;
+        }
+        mint.complete(http.Response(_mintedBody, 200));
+        await tester.pumpAndSettle();
+
+        final request = harness.fake.requests.single;
+        expect(request.toJson()['floorEvidenceVersion'], 1);
+        final evidence = request.startFloor!;
+        expect(evidence.settled, isFalse);
+        expect(evidence.moved, delay == Duration.zero);
+        if (delay != Duration.zero) {
+          expect(
+            evidence.sampleAgeS,
+            delay.inMicroseconds / Duration.microsecondsPerSecond,
+          );
+          expect(
+            evidence.ageS,
+            (const Duration(seconds: 20) + delay).inMicroseconds /
+                Duration.microsecondsPerSecond,
+          );
+        }
+        expect(find.text('Try again'), reasks ? findsOneWidget : findsNothing);
+        expect(find.text('map'), reasks ? findsNothing : findsOneWidget);
+        if (reasks) {
+          await tester.tap(find.text('Try again'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining('Which floor'), findsOneWidget);
+          expect(source.hasListener, isFalse);
+        }
+      });
+    }
+
     testWidgets('localizationFailed without evidence leaves as before', (
       tester,
     ) async {
@@ -811,6 +870,10 @@ void main() {
       await harness.tapAr(tester);
       await tester.tap(find.text('Skip'));
       await tester.pumpAndSettle();
+      expect(
+        harness.fake.requests.single.toJson(),
+        isNot(contains('floorEvidenceVersion')),
+      );
       expect(find.text('map'), findsOneWidget);
       expect(find.text('Try again'), findsNothing);
     });

@@ -159,7 +159,8 @@ class StartFloorAnchor {
     final sampleAge = elapsedAge > timestampAge ? elapsedAge : timestampAge;
     return IndoorArStartFloor(
       floor: floor,
-      ageS: (now - _confirmedAt).inMilliseconds / 1000,
+      ageS:
+          (now - _confirmedAt).inMicroseconds / Duration.microsecondsPerSecond,
       settled:
           _sub != null &&
           _anchor != null &&

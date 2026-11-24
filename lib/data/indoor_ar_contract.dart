@@ -33,10 +33,8 @@ class IndoorArToken {
 }
 
 /// The floor the user confirmed they stand on, with the barometer's verdict on
-/// whether the phone has stayed on one level since. Optional on a request: Unity
-/// trusts it only when settled, not moved and fresh, so anything less is the
-/// same as sending nothing. Never the destination floor; no absolute or raw
-/// pressure, location or wall-clock time is carried.
+/// whether the phone has stayed on one level since. The summary carries
+/// no raw pressure, location, or wall-clock time.
 class IndoorArStartFloor {
   IndoorArStartFloor({
     required this.floor,
@@ -69,7 +67,10 @@ class IndoorArStartFloor {
   /// Seconds since the newest barometer sample.
   final double sampleAgeS;
 
+  bool get isFreshForUnity => ageS <= 1200 && sampleAgeS <= 10;
+
   Map<String, Object?> toJson() => {
+    'floorEvidenceVersion': 1,
     'startFloor': floor,
     'startFloorAgeS': ageS,
     'pressureSinceStart': {

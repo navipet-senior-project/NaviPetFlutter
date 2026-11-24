@@ -54,7 +54,7 @@ void main() {
       expect(bare.toJson().containsKey('arToken'), isFalse);
     });
 
-    test('start floor adds three optional fields, localize too', () {
+    test('start floor adds all versioned fields to both request modes', () {
       final start = IndoorArStartFloor(
         floor: '2',
         ageS: 12.5,
@@ -63,6 +63,7 @@ void main() {
         sampleAgeS: 0.5,
       );
       final expected = {
+        'floorEvidenceVersion': 1,
         'startFloor': '2',
         'startFloorAgeS': 12.5,
         'pressureSinceStart': {
@@ -87,10 +88,15 @@ void main() {
       expect(localize.toJson(), contains('arToken'));
       expect(vec119Request().toJson().containsKey('startFloor'), isFalse);
       for (final request in [door, localize]) {
+        final wire = jsonDecode(jsonEncode(request.toJson())) as Map;
+        for (final field in expected.entries) {
+          expect(wire[field.key], field.value);
+        }
         final withoutFloor = request
             .withArToken(testArToken, startFloor: null)
             .toJson();
         expect(withoutFloor, containsPair('arToken', testArToken.toJson()));
+        expect(withoutFloor.keys, isNot(contains('floorEvidenceVersion')));
         expect(withoutFloor.keys, isNot(contains('startFloor')));
         expect(withoutFloor.keys, isNot(contains('startFloorAgeS')));
         expect(withoutFloor.keys, isNot(contains('pressureSinceStart')));
@@ -99,6 +105,29 @@ void main() {
           Map.of(request.toJson())
             ..removeWhere((key, _) => expected.containsKey(key)),
         );
+      }
+    });
+
+    test('Unity freshness checks unrounded ages regardless of movement', () {
+      for (final (age, sampleAge, fresh) in [
+        (0.0, 0.0, true),
+        (1200.0, 10.0, true),
+        (1200.000001, 10.0, false),
+        (1201.0, 10.0, false),
+        (1200.0, 10.0000001, false),
+        (1200.0, 11.0, false),
+      ]) {
+        final start = IndoorArStartFloor(
+          floor: '2',
+          ageS: age,
+          settled: false,
+          moved: true,
+          sampleAgeS: sampleAge,
+        );
+        final wire = jsonDecode(jsonEncode(start.toJson())) as Map;
+        expect(wire['startFloorAgeS'], age);
+        expect((wire['pressureSinceStart'] as Map)['sampleAgeS'], sampleAge);
+        expect(start.isFreshForUnity, fresh);
       }
     });
 
