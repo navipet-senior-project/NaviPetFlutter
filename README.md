@@ -129,9 +129,9 @@ phone unless a note says so.
    malformed results as `error` / `BAD_RESULT`. For a destination result
    marked `arrived`, Flutter confirms arrival when the room sign matches or
    reports the distance if provided. A result with neither is invalid.
-   Cancellation exits silently. A localization failure after sending floor
-   evidence stays on the launch screen for retry. Other results show a message
-   and return to the previous screen, or to the map if there is no prior screen.
+   Cancellation exits silently. See [sensor evidence](#sensor-evidence) for
+   localization retries. Other results show a message and return to the
+   previous screen, or to the map if there is no prior screen.
 
 ### Bridge contract (v2)
 
@@ -157,16 +157,20 @@ the Unity contract.
   collecting readings. After confirming the floor, hold the phone still for
   about 20 s or select **Continue without waiting** to proceed without
   evidence. Phones without a usable barometer can proceed without evidence.
-- **What is sent.** Eligible evidence includes `floorEvidenceVersion`,
-  `startFloor`, `startFloorAgeS`, and `pressureSinceStart` (`settled`,
-  `moved`, `sampleAgeS`). Flutter adds signed `pressureSinceStart.deltaHpa`
-  and `requestSentAtBootS` together when `moved` is true, the absolute delta is
-  0.30–3 hPa inclusive, and a usable boot-clock stamp is available. If the
-  stamp is missing, Flutter still sends the remaining eligible evidence.
-  The evidence contains no raw pressure, wall-clock time, or location.
-- **Failure handling.** After a localization failure with floor evidence,
-  choose **Try again** to confirm the current floor again or **Back to map**
-  to exit.
+- **What is sent.** Flutter can attach the user's confirmed starting floor,
+  the age of the confirmation, and a summary of recent settled barometer
+  readings and whether pressure changed. Unity uses that summary to evaluate
+  floor matches. When eligible, Flutter also sends a signed pressure change
+  with a boot-clock stamp so Unity can estimate a floor-height hint and check
+  freshness. The evidence contains no raw pressure, wall-clock time, or
+  location.
+- **Failure handling.** Without valid floor evidence at launch, Unity's
+  **Try again** retries in the same session. This includes evidence Unity
+  rejects as stale. With valid evidence, Unity's **Try again** returns
+  `localizationFailed` to Flutter. When Flutter receives that result after
+  sending floor evidence, its launch screen offers **Try again** for a fresh
+  floor confirmation or **Back to map** to exit. If Flutter receives that
+  result without having sent evidence, it shows a message and exits.
 - See the [Flutter floor-evidence guide](docs/indoor-ar-floor-evidence.md)
   for thresholds and clock handling and the
   [Unity floor-evidence contract](https://github.com/navipet-senior-project/NaviPetUnity/blob/0203e2206ba8a39e67e5db8eab3854c50351d2d3/docs/floor-evidence-contract.md)
