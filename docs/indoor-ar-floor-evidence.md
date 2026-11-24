@@ -18,12 +18,13 @@ confirmation. The serializers reject confirmation ages over 1200 s.
 - For Unity's optional height hint: `requestSentAtBootS` and
   `pressureSinceStart.deltaHpa`
 
-For floor evidence, the existing floor policy is the only capability provided by
+Unity exports can use the floor policy once they include
 [NaviPetUnity PR 37](https://github.com/navipet-senior-project/NaviPetUnity/pull/37).
 Earlier builds ignore the floor evidence.
 
-Barometer height hints using `deltaHpa` and `requestSentAtBootS` require the
-separate Unity height-hint candidate, which is provisional and has yet to merge.
+Barometer height hints using `deltaHpa` and `requestSentAtBootS` require an
+export that includes
+[NaviPetUnity PR 39](https://github.com/navipet-senior-project/NaviPetUnity/pull/39).
 Flutter has no version handshake and cannot identify the paired Unity build.
 
 `requestSentAtBootS` is the device boot clock in seconds, read through the
