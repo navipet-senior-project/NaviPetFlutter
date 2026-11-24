@@ -95,8 +95,9 @@ phone unless a note says so.
      map shortcut are shown based on floor coverage regardless of fix age.
    - **Verify location** on the VEC building map opens AR after resolving the
      selected room and floor to exactly one backend place ID through search.
-     In this flow, the bundled scan asset (`assets/indoor/vec_floors1and2.json`)
-     draws the map. The AR door pose comes from the backend place record.
+     Floors 1–2 combine drawn floor plans with data from the bundled scan
+     (`assets/indoor/vec_floors1and2.json`). Floors 3–5 use directory plans.
+     The AR door pose comes from the backend place record.
 2. **Place and door pose.** `IndoorArLaunchScreen` loads the place from the
    backend. A valid `indoor` door pose (map code, `multiset-mapset` frame, door
    key, floor, position, heading) becomes a destination request. A missing or
