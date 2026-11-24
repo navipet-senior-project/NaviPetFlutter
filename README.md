@@ -22,21 +22,9 @@ includes:
   leaves the route active on the map. Unity's shared HUD integration is
   coordinated separately; end-to-end behavior is unverified. See
   [docs/outdoor-ar-geospatial.md](docs/outdoor-ar-geospatial.md).
-- Calendar, Pet Shop and Pack, and Account screens. On Android (and on iOS
-  when a prebuilt UnityFramework is present, see `docs/ios-testing.md`), Scan AR
-  appears during navigation to a place with indoor AR once a fresh
-  location fix is at or within 2 m of the building footprint, regardless of GPS
-  accuracy. It hides when the fix goes stale (10 s) or is clearly outside. It
-  loads the selected place and sends its backend door pose, plus a
-  short-lived MultiSet token fetched from the backend (`POST /indoor/ar-token`),
-  to Unity. Without a saved door pose, it starts a localization scan without
-  inventing a destination. Indoor AR points toward a room; it does not provide
-  turn-by-turn indoor routing. The MultiSet secret never ships in the app.
-  Unity AR still requires verification on a physical phone.
-- On the VEC building map, select a floor and room, then choose Verify location
-  to open indoor AR using the same backend room record as search. If the room
-  cannot be matched uniquely or the lookup fails, AR does not open; try search
-  or retry the lookup.
+- Calendar, Pet Shop and Pack, and Account screens.
+- Indoor AR for VEC rooms: see [Indoor navigation architecture](#indoor-navigation-architecture).
+  It is a separate subsystem from the outdoor Mapbox navigation above.
 - Ask Elbee about CSULB buildings and rooms from the map. Elbee returns
   verified places that open existing navigation; schedule access requires
   consent for each request. It can also explain official parking rules. Elbee
@@ -78,6 +66,116 @@ ios/                                iOS native and Xcode configuration
 pubspec.yaml                        Dependencies, assets, and app version
 test/                               Automated tests
 ```
+
+## Indoor navigation architecture
+
+Indoor navigation is separate from the Mapbox outdoor walking navigation and
+the application overview above. It currently covers the Vivian Engineering
+Center (VEC) only. Nothing in this section has been verified on a physical
+phone unless a note says so.
+
+### Who owns what
+
+| Layer | Owns | Does not own |
+| --- | --- | --- |
+| Flutter (`lib/`) | Entry points, the floor question, camera permission, minting a token, building the request, decoding the result, user-facing messages | Localization, camera pose, indoor routing |
+| Native hosts (`android/`, `ios/`) | The `navipet/indoor_ar` method channel, starting Unity, returning its result, the device boot clock | Request contents (passed through as one string) |
+| [NaviPetUnity](https://github.com/navipet-senior-project/NaviPetUnity) | AR session, MultiSet localization, sign (OCR) recognition, hallway routing and HUD, floor veto and height hint | Place lookup, tokens |
+| [NavipetBackend](https://github.com/navipet-senior-project/NavipetBackend) | Place records with the saved door pose, `POST /indoor/ar-token`, the MultiSet credentials | Anything on the phone |
+
+### Launching indoor AR
+
+1. **Entry.** Scan AR on the navigation handoff sheet and **Verify location** on
+   the VEC building map (`lib/screens/indoor_building_map_screen.dart`) both
+   push `/ar?destination=<place id>`. The map first resolves the selected room
+   to the same backend record search returns; if it cannot match exactly one,
+   AR does not open. The bundled scan asset
+   (`assets/indoor/vec_floors1and2.json`) draws the map only and never supplies
+   AR coordinates. Scan AR appears once a fresh location fix is at or within
+   2 m of the building footprint, and hides when the fix is stale (10 s) or
+   clearly outside.
+2. **Place and door pose.** `IndoorArLaunchScreen` loads the place from the
+   backend. A valid `indoor` door pose (map code, `multiset-mapset` frame, door
+   key, floor, position, heading) becomes a destination request. A missing or
+   invalid pose becomes a `mode: localize` request with no door fields, so AR
+   scans to find the phone without inventing a destination. Only VEC floors 1 to
+   3 (`indoor_floor_coverage.dart`) launch.
+3. **Floor question** (optional). See [sensor evidence](#sensor-evidence).
+4. **Camera permission.** Checked before any token is minted. Denial returns to
+   the map; permanent denial offers Settings.
+5. **Token.** Flutter calls `POST /indoor/ar-token` with the user's session. The
+   backend exchanges its own MultiSet credentials and returns a short-lived
+   `{token, expiresOn}`; the endpoint is authenticated and limited to 5 requests
+   per minute per user. The token lives in memory only and is never logged. A
+   token with one minute or less remaining is rejected. The MultiSet secret
+   never ships in the app.
+6. **Bridge.** Flutter sends one JSON string over the `navipet/indoor_ar`
+   channel. Android starts `UnityHostActivity` (a separate `:unity` process)
+   with `startActivityForResult`; iOS hands it to `IndoorArHost` in the embedded
+   `UnityFramework`. Android needs the private AAR and iOS a prebuilt
+   `UnityFramework` (see [Unity AR without installing Unity](#unity-ar-without-installing-unity));
+   without it the host answers `unavailable`.
+7. **Result.** Unity returns JSON with a `status` of `arrived`, `cancelled`,
+   `localizationFailed`, `unavailable`, or `error`. A malformed result becomes
+   `error` / `BAD_RESULT`. A destination arrival needs a confirmed room sign or
+   a distance; the app shows a message and returns to the map.
+
+### Bridge contract (v2)
+
+Defined in `lib/data/indoor_ar_contract.dart`; Unity's side parses it in
+`IndoorArContract`. Poses are in the MultiSet MapSet frame (metres, +Y up) and
+nothing converts them. A destination request carries `schemaVersion`, `room`,
+`doorKey`, `floor`, `position`, `headingDeg`, `mapCode`, `frame`,
+`capabilities: ["signArrival"]`, `arToken` and optional floor evidence. A
+localize request carries `mode`, `mapCode`, `frame`, `arToken`, optional `room`
+and `floor`, and optional floor evidence. Never log a request.
+
+### Sensor evidence
+
+Optional evidence that Unity can use to reject a map match on the wrong floor
+and, separately, to narrow the vertical search.
+
+- **Floor confirmation.** If a barometer is available, the user chooses the
+  floor they stand on and holds the phone still for about 20 s. They can
+  **Skip**, or **Continue without waiting**. The answer is the user's own, never
+  the destination floor.
+- **What is sent.** `floorEvidenceVersion`, `startFloor`, `startFloorAgeS`,
+  `pressureSinceStart` (`settled`, `moved`, `sampleAgeS`) and, only when pressure
+  moved between 0.30 and 3 hPa, `deltaHpa` with `requestSentAtBootS`. No raw
+  pressure, wall-clock time or location leaves the phone. Ineligible evidence is
+  omitted and Unity localizes as before.
+- **Failure handling.** After a failed floor-assisted scan Flutter offers to
+  confirm the floor again.
+- Thresholds, clock handling and limits:
+  [docs/indoor-ar-floor-evidence.md](docs/indoor-ar-floor-evidence.md). Unity's
+  rules: its `docs/floor-evidence-contract.md`.
+
+The debug-only recorder and VEC Wi-Fi survey below are experiments. They do not
+feed the AR request.
+
+### Routing
+
+Flutter does no indoor routing: `IndoorArRequest` carries a destination door
+pose, not a path. Unity runs A* over a walk grid built from the building scan
+and shows a floor ribbon or arrow; if no clear route exists it shows **Route
+unavailable**. The scan has hallways only. Routes exist for floors 1 and 2, and
+floor changes only point at a stair or elevator marker. Unity's own notes say
+the route has not been walked on a device. Outdoor navigation (Mapbox) is
+unrelated and is described above.
+
+### Not yet verified
+
+- No AR session, MultiSet localization, or barometer behavior has been
+  confirmed on an Android or iOS phone in this repository's tests; Dart and
+  Kotlin/Swift unit tests cover the contract only.
+- Android release camera access and the iOS re-entry after Unity unloads need
+  device checks (see [docs/indoor-ar-release-camera.md](docs/indoor-ar-release-camera.md)
+  and [docs/ios-testing.md](docs/ios-testing.md#indoor-ar)).
+- Floor-evidence thresholds come from one iPhone in one building. Android is
+  unverified. Whether the height hint helps localization is unknown.
+- Floors 4 and 5 are not scanned. Step-free routing is not supported.
+- Flutter has no version handshake with Unity, so it cannot tell which Unity
+  build is paired.
 
 ## Fastify backend
 
