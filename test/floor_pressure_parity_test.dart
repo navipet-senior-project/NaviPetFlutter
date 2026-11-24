@@ -112,7 +112,6 @@ void main() {
 
       // Anchor: the same step crosses the same 0.30 hPa line.
       final evidence = rig.anchor.evidence()!;
-      expect(evidence.settled, isTrue);
       expect(evidence.moved, isTrue);
       expect(recorded.abs(), greaterThanOrEqualTo(StartFloorAnchor.moveHpa));
     },
@@ -127,7 +126,6 @@ void main() {
 
     expect(rig.recorder.latestDeltaHpa!.abs(), lessThan(0.03));
     final evidence = rig.anchor.evidence()!;
-    expect(evidence.settled, isTrue);
     expect(evidence.moved, isFalse);
   });
 

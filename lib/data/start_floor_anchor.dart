@@ -167,7 +167,6 @@ class StartFloorAnchor {
       floor: floor,
       ageS:
           (now - _confirmedAt).inMicroseconds / Duration.microsecondsPerSecond,
-      settled: true,
       moved: _moved || _hasMoved(median, anchor),
       sampleAgeS: sampleAge.inMicroseconds / Duration.microsecondsPerSecond,
     );

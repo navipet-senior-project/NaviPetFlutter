@@ -502,8 +502,7 @@ void main() {
           final evidence = harness.fake.requests.single.startFloor;
           expect(source.hasListener, isFalse);
           if (moved) {
-            expect(evidence!.settled, isTrue);
-            expect(evidence.moved, isTrue);
+            expect(evidence?.moved, isTrue);
           } else {
             expect(evidence, isNull);
           }

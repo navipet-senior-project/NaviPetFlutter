@@ -311,6 +311,8 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
         await (_resumeWait ??= Completer<void>()).future;
       }
       if (!_active) return;
+      // Monotonic elapsed time advances the phone's clock from mint start, so
+      // this expiry check inherits any clock skew already present at minting.
       final elapsedWallTime = mintWallTime.add(_elapsedNow() - mintStarted);
       if (generation != _launchGeneration ||
           !token.expiresOn.isAfter(elapsedWallTime.add(_tokenMargin)) ||

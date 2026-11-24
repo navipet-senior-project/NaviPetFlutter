@@ -102,7 +102,6 @@ void main() {
       await rig.hold(1000, 60);
       final e = rig.anchor.evidence()!;
       expect(e.floor, '2');
-      expect(e.settled, isTrue);
       expect(e.moved, isFalse);
       expect(e.ageS, 60);
       expect(e.sampleAgeS, 0);
@@ -117,7 +116,7 @@ void main() {
     expect(rig.anchor.evidence(), isNull);
     expect(rig.anchor.resolved, isFalse);
     await rig.hold(1000, 5);
-    expect(rig.anchor.evidence()!.settled, isTrue);
+    expect(rig.anchor.evidence(), isNotNull);
     expect(rig.anchor.resolved, isTrue);
   });
 
@@ -199,7 +198,6 @@ void main() {
     await rig.hold(1000, 25);
     await rig.hold(1000.47, 40);
     final e = rig.anchor.evidence()!;
-    expect(e.settled, isTrue);
     expect(e.moved, isTrue);
     expect(rig.source.controller.hasListener, isTrue);
   });
@@ -210,7 +208,6 @@ void main() {
     await rig.hold(1000, 25);
     await rig.hold(1000.22, 40);
     final e = rig.anchor.evidence()!;
-    expect(e.settled, isTrue);
     expect(e.moved, isFalse);
   });
 
@@ -219,7 +216,7 @@ void main() {
     rig.anchor.confirmFloor('1');
     await rig.hold(1000.01, 19, noiseHpa: 0);
     await rig.hold(1000.07, 1, noiseHpa: 0);
-    expect(rig.anchor.evidence()?.settled, isTrue);
+    expect(rig.anchor.evidence(), isNotNull);
   });
 
   test('a settled 0.30 hPa step latches movement', () async {
@@ -267,7 +264,7 @@ void main() {
     // A fresh confirmation once settled anchors.
     rig.anchor.confirmFloor('2');
     await rig.hold(1003, 25);
-    expect(rig.anchor.evidence()!.settled, isTrue);
+    expect(rig.anchor.evidence(), isNotNull);
   });
 
   test('a transition in the first two seconds rules out the answer', () async {
@@ -286,7 +283,7 @@ void main() {
       await rig.hold(1000, 20);
       await rig.hold(1000 + delta, 2);
       await rig.hold(1000, 22);
-      expect(rig.anchor.evidence()!.settled, isTrue);
+      expect(rig.anchor.evidence(), isNotNull);
       expect(rig.anchor.evidence()!.moved, isFalse);
     });
   }
@@ -324,7 +321,7 @@ void main() {
     await rig.hold(1000, 20, age: const Duration(seconds: 2));
     expect(rig.anchor.evidence(), isNull);
     await rig.hold(1000, 2, age: const Duration(seconds: 2));
-    expect(rig.anchor.evidence()!.settled, isTrue);
+    expect(rig.anchor.evidence(), isNotNull);
     rig.gap(1);
     await rig.hold(1000, 1, age: const Duration(milliseconds: 2900));
     expect(rig.anchor.evidence(), isNull);
@@ -428,7 +425,7 @@ void main() {
         final rig = _Rig();
         rig.anchor.confirmFloor('1');
         await rig.hold(1000, 20);
-        expect(rig.anchor.evidence()!.settled, isTrue);
+        expect(rig.anchor.evidence(), isNotNull);
         rig.wallOffset = Duration(seconds: step);
         expect(rig.anchor.evidence(), isNull);
         expect(rig.source.controller.hasListener, isFalse);
@@ -456,7 +453,7 @@ void main() {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
     await rig.hold(1000, 25);
-    expect(rig.anchor.evidence()!.settled, isTrue);
+    expect(rig.anchor.evidence(), isNotNull);
     rig.gap(11);
     expect(rig.anchor.evidence(), isNull);
     expect(rig.source.controller.hasListener, isTrue);
@@ -482,7 +479,7 @@ void main() {
       final rig = _Rig();
       rig.anchor.confirmFloor('1');
       await rig.hold(1000, 1199);
-      expect(rig.anchor.evidence()!.settled, isTrue);
+      expect(rig.anchor.evidence(), isNotNull);
       await rig.hold(1000, 1);
       expect(rig.source.controller.hasListener, isFalse);
       expect(rig.anchor.evidence(), isNull);
@@ -493,7 +490,7 @@ void main() {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');
     await rig.hold(1000, 20);
-    expect(rig.anchor.evidence()!.settled, isTrue);
+    expect(rig.anchor.evidence(), isNotNull);
     await rig.source.controller.close();
     expect(rig.anchor.evidence(), isNull);
   });
@@ -508,7 +505,6 @@ void main() {
     await rig.hold(1000.5, 25);
     final e = rig.anchor.evidence()!;
     expect(e.floor, '2');
-    expect(e.settled, isTrue);
     expect(e.moved, isFalse);
     expect(e.ageS, 25);
   });

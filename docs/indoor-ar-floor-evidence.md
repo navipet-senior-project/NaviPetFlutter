@@ -13,17 +13,19 @@ old, the newest sample is at most 10 s old, and the sensor stream is alive.
 
 - `floorEvidenceVersion` 1, `startFloor` (the user's own answer, never the
   destination), `startFloorAgeS`
-- `pressureSinceStart`: `settled`, `moved`, `sampleAgeS`
+- `pressureSinceStart`: `settled` (always `true` when sent), `moved`, `sampleAgeS`
 
-Otherwise nothing is sent and Unity behaves as it did before. No absolute or
-raw pressure, wall-clock time or location leaves the phone. Skipping the prompt
-reads no sensor.
+Otherwise nothing is sent and Unity behaves as it did before. The AR floor
+summary carries no absolute or raw pressure, wall-clock time, or location.
+Skipping the prompt reads no sensor.
 
 ## Same pressure as the recorder
 
-The pressure recorder (raw `deltaHpa` / `elapsedMs` per floor, stored on the
-phone) and the floor anchor read the same `SensorsPlusPressureSource`: the
-`sensors_plus` barometer reports `BarometerEvent.pressure` directly in hPa.
+The floor anchor and the optional debug recorder both use
+`SensorsPlusPressureSource`. The `sensors_plus` barometer reports
+`BarometerEvent.pressure` directly in hPa. Starting a debug recording saves
+per-floor `deltaHpa` and `elapsedMs` measurements on the device. The user can
+choose to copy the recording as JSON.
 Flutter requests a 1 s sampling period. iOS ignores that request for the
 barometer, and Android treats it as a hint.
 `test/floor_pressure_parity_test.dart` drives that source
@@ -57,4 +59,8 @@ and any movement already detected stays latched.
   build it launches.
 - The foreground check before launch is Dart-only. Home pressed while the
   platform call is queued can still reach the native handler.
+- Token expiry uses the phone's clock at mint start plus monotonic elapsed
+  time, so skew already present at minting can make the check early or late.
+  The launch also checks the current phone clock and rejects the token if
+  either check indicates expiry within the one-minute launch margin.
 - Nothing here has been verified on a device.

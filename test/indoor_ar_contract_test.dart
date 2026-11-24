@@ -58,7 +58,6 @@ void main() {
       final start = IndoorArStartFloor(
         floor: ' 2 ',
         ageS: 12.5,
-        settled: true,
         moved: false,
         sampleAgeS: 0.5,
       );
@@ -88,10 +87,6 @@ void main() {
       expect(localize.toJson(), contains('arToken'));
       expect(vec119Request().toJson().containsKey('startFloor'), isFalse);
       for (final request in [door, localize]) {
-        final wire = jsonDecode(jsonEncode(request.toJson())) as Map;
-        for (final field in expected.entries) {
-          expect(wire[field.key], field.value);
-        }
         final withoutFloor = request
             .withArToken(testArToken, startFloor: null)
             .toJson();
@@ -100,28 +95,25 @@ void main() {
         expect(withoutFloor.keys, isNot(contains('startFloor')));
         expect(withoutFloor.keys, isNot(contains('startFloorAgeS')));
         expect(withoutFloor.keys, isNot(contains('pressureSinceStart')));
-        expect(
-          withoutFloor,
-          Map.of(request.toJson())
-            ..removeWhere((key, _) => expected.containsKey(key)),
-        );
+        expect(jsonDecode(jsonEncode(request.toJson())), {
+          ...withoutFloor,
+          ...expected,
+        });
       }
     });
 
-    test('both modes omit unsettled and stale evidence at unrounded ages', () {
-      for (final (age, sampleAge, settled, eligible) in [
-        (0.0, 0.0, true, true),
-        (0.0, 0.0, false, false),
-        (1200.0, 10.0, true, true),
-        (1200.000001, 10.0, true, false),
-        (1201.0, 10.0, true, false),
-        (1200.0, 10.0000001, true, false),
-        (1200.0, 11.0, true, false),
+    test('both modes omit stale evidence at unrounded ages', () {
+      for (final (age, sampleAge, eligible) in [
+        (0.0, 0.0, true),
+        (1200.0, 10.0, true),
+        (1200.000001, 10.0, false),
+        (1201.0, 10.0, false),
+        (1200.0, 10.0000001, false),
+        (1200.0, 11.0, false),
       ]) {
         final start = IndoorArStartFloor(
           floor: '2',
           ageS: age,
-          settled: settled,
           moved: true,
           sampleAgeS: sampleAge,
         );
@@ -172,7 +164,6 @@ void main() {
         final start = IndoorArStartFloor(
           floor: floor,
           ageS: 20,
-          settled: true,
           moved: false,
           sampleAgeS: 0,
         );
@@ -197,7 +188,6 @@ void main() {
           IndoorArStartFloor(
             floor: '1',
             ageS: ageS,
-            settled: true,
             moved: false,
             sampleAgeS: sampleAgeS,
           );

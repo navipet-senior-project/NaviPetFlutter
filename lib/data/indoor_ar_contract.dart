@@ -39,7 +39,6 @@ class IndoorArStartFloor {
   IndoorArStartFloor({
     required this.floor,
     required this.ageS,
-    required this.settled,
     required this.moved,
     required this.sampleAgeS,
   }) {
@@ -60,7 +59,6 @@ class IndoorArStartFloor {
 
   /// Seconds since the user confirmed the floor, on a monotonic clock.
   final double ageS;
-  final bool settled;
   final bool moved;
 
   /// Seconds since the newest barometer sample.
@@ -80,7 +78,6 @@ class IndoorArStartFloor {
   Map<String, Object?> toJson() {
     final value = normalizeFloor(floor);
     if (value == null ||
-        !settled ||
         ageS > maxConfirmationAge.inSeconds ||
         sampleAgeS > maxSampleAge.inSeconds) {
       return {};
