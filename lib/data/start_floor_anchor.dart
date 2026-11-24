@@ -28,7 +28,6 @@ class StartFloorAnchor {
   static const _captureGapLimit = Duration(seconds: 10);
   static const _timestampTolerance = Duration(milliseconds: 5);
   static const maxRangeHpa = 0.06;
-  static const moveHpa = 0.30;
   static const _pressureRoundoffHpa = 1e-9;
 
   static const anchorDeadline = Duration(seconds: 22);
@@ -250,7 +249,8 @@ class StartFloorAnchor {
   }
 
   static bool _hasMoved(double median, double anchor) =>
-      (median - anchor).abs() >= moveHpa - _pressureRoundoffHpa;
+      (median - anchor).abs() >=
+      IndoorArStartFloor.moveHpa - _pressureRoundoffHpa;
 
   double? _settledMedian(Duration start, Duration end) {
     final samples = [

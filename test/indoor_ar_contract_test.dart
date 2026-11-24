@@ -138,6 +138,7 @@ void main() {
           (3.0, true, true),
           (-3.0, true, true),
           (-0.2999999999, true, false), // latched with a 1e-9 roundoff
+          (0.2999999999, true, false),
           (-0.29, true, false),
           (-3.0000001, true, false),
           (-0.47, false, false),

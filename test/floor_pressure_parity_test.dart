@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:navipet/data/floor_pressure.dart';
+import 'package:navipet/data/indoor_ar_contract.dart';
 import 'package:navipet/data/start_floor_anchor.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -113,7 +114,7 @@ void main() {
       // Anchor: the same step crosses the same 0.30 hPa line.
       final evidence = rig.anchor.evidence()!;
       expect(evidence.moved, isTrue);
-      expect(recorded.abs(), greaterThanOrEqualTo(StartFloorAnchor.moveHpa));
+      expect(recorded.abs(), greaterThanOrEqualTo(IndoorArStartFloor.moveHpa));
     },
   );
 

@@ -310,6 +310,13 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       final mintWallTime = widget.now();
       final mintStarted = _elapsedNow();
       final token = await gateway.fetch();
+      if (!_active) return;
+      // Stamped just before the ages are computed, so Unity's added send-to-SDK
+      // time can only overstate them.
+      final bootClock = widget.bootClock;
+      final sentAt = bootClock != null && _anchor?.evidence() != null
+          ? await bootClock()
+          : null;
       while (_active && !_resumed) {
         await (_resumeWait ??= Completer<void>()).future;
       }
@@ -320,17 +327,6 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       if (generation != _launchGeneration ||
           !token.expiresOn.isAfter(elapsedWallTime.add(_tokenMargin)) ||
           !token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
-        throw const IndoorArTokenException(0);
-      }
-      // Stamped just before the ages are computed, so Unity's added send-to-SDK
-      // time can only overstate them. A background during the await bumps the
-      // generation, which invalidates the launch.
-      final bootClock = widget.bootClock;
-      final sentAt = _anchor == null || bootClock == null
-          ? null
-          : await bootClock();
-      if (!_active) return;
-      if (generation != _launchGeneration) {
         throw const IndoorArTokenException(0);
       }
       evidence = _anchor?.evidence(requestSentAtBootS: sentAt);

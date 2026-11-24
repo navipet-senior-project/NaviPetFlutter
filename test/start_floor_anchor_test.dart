@@ -321,6 +321,22 @@ void main() {
     expect(rig.anchor.evidence()?.moved, isTrue);
   });
 
+  for (final level in [999.70, 1000.30]) {
+    test('roundoff at $level hPa latches movement but omits the delta', () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 20, noiseHpa: 0);
+      await rig.hold(level, 21, noiseHpa: 0);
+      final evidence = rig.anchor.evidence(requestSentAtBootS: 100)!;
+      expect(evidence.deltaHpa!.abs(), lessThan(0.30));
+      expect(evidence.toJson()['pressureSinceStart'], {
+        'settled': true,
+        'moved': true,
+        'sampleAgeS': 0,
+      });
+    });
+  }
+
   test(
     'a 0.30 hPa step counts when the window settles between readings',
     () async {
