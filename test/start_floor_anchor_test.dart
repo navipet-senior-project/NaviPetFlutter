@@ -298,6 +298,25 @@ void main() {
     );
   }
 
+  test('a backward capture reset preserves settled movement', () async {
+    final rig = _Rig();
+    rig.anchor.confirmFloor('1');
+    await rig.hold(1000, 20, noiseHpa: 0);
+    await rig.hold(1000.15, 1, noiseHpa: 0);
+    await rig.hold(1000.30, 20, noiseHpa: 0);
+    rig.gap(1);
+    rig.source.controller.add(
+      PressureReading(
+        hPa: 1000,
+        timestamp: _wall.add(rig.now - const Duration(milliseconds: 1500)),
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(rig.anchor.evidence(), isNull);
+    await rig.hold(1000, 21, noiseHpa: 0);
+    expect(rig.anchor.evidence()?.moved, isTrue);
+  });
+
   test('hold range 0.2 never anchors, and the deadline resolves it', () async {
     final rig = _Rig();
     rig.anchor.confirmFloor('1');

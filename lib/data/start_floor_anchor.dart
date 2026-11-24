@@ -208,7 +208,11 @@ class StartFloorAnchor {
     } else {
       final elapsedGap = at - last.at;
       if (elapsedGap.abs() < _minSampleSpacing) return;
-      if (elapsedGap.isNegative || timestampGap.isNegative) {
+      final backward = elapsedGap.isNegative || timestampGap.isNegative;
+      if (anchor != null) {
+        _latchMovementBetweenCaptures(backward ? now : at, anchor);
+      }
+      if (backward) {
         if (anchor != null) {
           _buffer.clear();
         } else {
@@ -216,7 +220,6 @@ class StartFloorAnchor {
         }
         return;
       }
-      if (anchor != null) _latchMovementBetweenCaptures(at, anchor);
       final maxGap = anchor == null
           ? _maxAnchorGap
           : IndoorArStartFloor.maxSampleAge;
