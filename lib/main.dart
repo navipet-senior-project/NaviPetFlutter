@@ -121,7 +121,12 @@ class _NaviPetAppState extends State<NaviPetApp> with WidgetsBindingObserver {
             baseUrl: AppConfig.backendBaseUrl,
             auth: widget.authTokenProvider!,
           ),
-    floorPressureSource: const SensorsPlusPressureSource(),
+    // Held on iOS: the barometer needs Motion & Fitness access and the current
+    // disclosure covers steps only. No source means no floor question and no
+    // collection until the captain picks the privacy wording.
+    floorPressureSource: defaultTargetPlatform == TargetPlatform.iOS
+        ? null
+        : const SensorsPlusPressureSource(),
     initialLocation: kDebugMode && _devStartRoute.isNotEmpty
         ? _devStartRoute
         : null,

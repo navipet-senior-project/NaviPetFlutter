@@ -155,6 +155,18 @@ void main() {
     expect(e.sampleAgeS, 15);
   });
 
+  test('freshness is judged at each use, never cached', () async {
+    final rig = _Rig();
+    await rig.hold(1000, 25);
+    rig.anchor.confirmFloor('1');
+    expect(rig.anchor.evidence()!.settled, isTrue);
+    rig.gap(11); // sensor went quiet after the answer
+    final stale = rig.anchor.evidence()!;
+    expect(stale.settled, isFalse);
+    expect(stale.sampleAgeS, 11);
+    expect(stale.ageS, 11);
+  });
+
   test('confirming again restarts the anchor and age', () async {
     final rig = _Rig();
     await rig.hold(1000, 25);
