@@ -125,8 +125,10 @@ phone unless a note says so.
    See [Unity AR without installing Unity](#unity-ar-without-installing-unity).
 7. **Result.** Unity returns JSON with a `status` of `arrived`, `cancelled`,
    `localizationFailed`, `unavailable`, or `error`. Every status requires
-   nonnegative integers for `localizationQueries` and `durationMs`. An
-   `error` also requires a nonempty string `errorCode`. If Unity closes without
+   nonnegative integers for `localizationQueries` and `durationMs`. For every
+   status, non-null `checkDistanceM` and `confidence` must be finite numbers,
+   and non-null `signRoom`, `localizedMapCode`, and `errorCode` must be strings.
+   An `error` also requires a nonempty `errorCode`. If Unity closes without
    a result, either native host returns `error` / `UNITY_EXITED`. Dart decodes
    malformed results as `error` / `BAD_RESULT`. An `arrived` result's
    `checkDistanceM`, when supplied, must be finite and nonnegative. Without a
@@ -134,8 +136,8 @@ phone unless a note says so.
    request, Flutter confirms arrival when `signRoom` matches the destination
    `doorKey` after ignoring case and non-alphanumeric characters. Otherwise
    it reports the distance if supplied or shows the `BAD_RESULT` message.
-   Cancellation exits silently. See [sensor evidence](#sensor-evidence) for
-   localization retries. Other results show a message and return to the
+   A valid `cancelled` result exits silently. See [sensor evidence](#sensor-evidence)
+   for localization retries. Other results show a message and return to the
    previous screen, or to the map if there is no prior screen.
 
 ### Bridge contract (v2)
@@ -550,9 +552,11 @@ status.
 
 Campus destination search uses the backend's `GET /autocomplete`. It searches
 campus records first and can fall back to Mapbox for ordinary queries without
-a campus match that has outdoor coordinates. After destination selection, the
-Mapbox Directions API supplies walking route geometry and maneuver
-instructions. The Mapbox Maps Flutter SDK handles rendering and location.
+a campus match that has outdoor coordinates. Flutter Search shows only eligible
+campus records and displays no results when the backend returns only a Mapbox
+fallback. After destination selection, the Mapbox Directions API supplies
+walking route geometry and maneuver instructions. The Mapbox Maps Flutter SDK
+handles rendering and location.
 
 This is a functional foreground walking-navigation experience. Before treating
 it as safety-critical or shipping it broadly, add integration/device tests for
