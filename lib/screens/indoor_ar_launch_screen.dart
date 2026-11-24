@@ -82,7 +82,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   StartFloorAnchor? _anchor;
   Timer? _holdPoll;
   Completer<void>? _resumeWait;
-  int _backgroundGeneration = 0;
+  int _launchGeneration = 0;
 
   bool get _active => mounted && !_exiting;
   bool get _resumed =>
@@ -108,13 +108,15 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_isBackgrounded(state)) {
-      _backgroundGeneration++;
-      _holdPoll?.cancel();
-      _anchor?.invalidate();
-    } else if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed) {
       _releaseResumeWait();
       _checkHold();
+      return;
+    }
+    _launchGeneration++;
+    if (_isBackgrounded(state)) {
+      _holdPoll?.cancel();
+      _anchor?.invalidate();
     }
   }
 
@@ -295,13 +297,13 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
     try {
       final gateway = widget.tokenGateway;
       if (gateway == null) throw const IndoorArTokenException(0);
-      final generation = _backgroundGeneration;
+      final generation = _launchGeneration;
       token = await gateway.fetch();
       while (_active && !_resumed) {
         await (_resumeWait ??= Completer<void>()).future;
       }
       if (!_active) return;
-      if (generation != _backgroundGeneration ||
+      if (generation != _launchGeneration ||
           !token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
         throw const IndoorArTokenException(0);
       }

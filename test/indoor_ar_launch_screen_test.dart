@@ -634,62 +634,64 @@ void main() {
     for (final outcome in [
       'interrupted',
       'rollback',
+      'inactive rollback',
       'late reply',
       'cancelled',
     ]) {
-      testWidgets(
-        'token received in background is rechecked on resume ($outcome)',
-        (tester) async {
-          final mint = Completer<http.Response>();
-          var tokenTime = DateTime.utc(2026);
-          final harness = build(
-            mint: (_) => mint.future,
-            tokenClock: () => tokenTime,
-          );
-          await harness.pump(tester);
-          await harness.tapAr(tester);
-          await tester.tap(find.text('Floor 2'));
-          await tester.pump();
-          await holdStill(tester, 20);
-          expect(harness.mintRequests, hasLength(1));
+      testWidgets('interrupted token is rechecked on resume ($outcome)', (
+        tester,
+      ) async {
+        final mint = Completer<http.Response>();
+        var tokenTime = DateTime.utc(2026);
+        final harness = build(
+          mint: (_) => mint.future,
+          tokenClock: () => tokenTime,
+        );
+        await harness.pump(tester);
+        await harness.tapAr(tester);
+        await tester.tap(find.text('Floor 2'));
+        await tester.pump();
+        await holdStill(tester, 20);
+        expect(harness.mintRequests, hasLength(1));
 
-          tester.binding.handleAppLifecycleStateChanged(
-            AppLifecycleState.paused,
-          );
-          if (outcome != 'late reply') {
-            mint.complete(http.Response(_mintedBody, 200));
-          }
-          await tester.pump();
-          expect(harness.fake.requests, isEmpty);
-          expect(source.hasListener, isFalse);
+        final inactiveOnly = outcome == 'inactive rollback';
+        tester.binding.handleAppLifecycleStateChanged(
+          inactiveOnly ? AppLifecycleState.inactive : AppLifecycleState.paused,
+        );
+        if (outcome != 'late reply') {
+          mint.complete(http.Response(_mintedBody, 200));
+        }
+        await tester.pump();
+        expect(harness.fake.requests, isEmpty);
+        expect(source.hasListener, inactiveOnly);
 
-          if (outcome == 'rollback') {
-            await tester.pump(const Duration(minutes: 31));
-            tokenTime = tokenTime.subtract(const Duration(minutes: 1));
-          } else if (outcome == 'cancelled') {
-            expect(await tester.binding.handlePopRoute(), isTrue);
-          }
-          tester.binding.handleAppLifecycleStateChanged(
-            AppLifecycleState.inactive,
-          );
-          await tester.pump();
-          expect(harness.fake.requests, isEmpty);
-          tester.binding.handleAppLifecycleStateChanged(
-            AppLifecycleState.resumed,
-          );
-          if (outcome == 'late reply') {
-            mint.complete(http.Response(_mintedBody, 200));
-          }
-          await tester.pumpAndSettle();
+        if (outcome == 'rollback' || inactiveOnly) {
+          tokenTime = tokenTime.add(const Duration(minutes: 31));
+          await tester.pump(const Duration(minutes: 31));
+          tokenTime = tokenTime.subtract(const Duration(minutes: 32));
+        } else if (outcome == 'cancelled') {
+          expect(await tester.binding.handlePopRoute(), isTrue);
+        }
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pump();
+        expect(harness.fake.requests, isEmpty);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        if (outcome == 'late reply') {
+          mint.complete(http.Response(_mintedBody, 200));
+        }
+        await tester.pumpAndSettle();
 
-          expect(harness.fake.requests, isEmpty);
-          expect(
-            find.text(outcome == 'cancelled' ? 'map' : 'Retry'),
-            findsOneWidget,
-          );
-          expect(harness.mintRequests, hasLength(1));
-        },
-      );
+        expect(harness.fake.requests, isEmpty);
+        expect(
+          find.text(outcome == 'cancelled' ? 'map' : 'Retry'),
+          findsOneWidget,
+        );
+        expect(harness.mintRequests, hasLength(1));
+      });
     }
 
     testWidgets('Back during Unity ignores a late result', (tester) async {
