@@ -95,6 +95,9 @@ class _Harness {
     String? destinationId = _destinationId,
     Future<http.Response> Function(http.Request)? fetch,
     Future<http.Response> Function(http.Request)? mint,
+    DateTime Function()? tokenClock,
+    Future<PermissionStatus>? pendingStatus,
+    Future<PermissionStatus>? pendingPermission,
   }) : fake = FakeIndoorArLauncher(result: result) {
     final activeLauncher = launcher ?? fake;
     router = GoRouter(
@@ -140,14 +143,16 @@ class _Harness {
                     : http.Response(_mintedBody, 200);
               }),
             ),
-            now: () => DateTime.utc(2026, 1, 1),
+            now: tokenClock ?? () => DateTime.utc(2026, 1, 1),
             cameraStatus: () async {
               statusChecks++;
-              return status;
+              return pendingStatus == null ? status : await pendingStatus;
             },
             requestCamera: () async {
               cameraRequests++;
-              return camera;
+              return pendingPermission == null
+                  ? camera
+                  : await pendingPermission;
             },
             openSettings: () async {
               settingsOpened++;
@@ -183,6 +188,7 @@ class _Harness {
   }
 
   Future<void> pump(WidgetTester tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
   }
@@ -249,6 +255,9 @@ void main() {
 
     _Harness build({
       Future<http.Response> Function(http.Request)? mint,
+      DateTime Function()? tokenClock,
+      Future<PermissionStatus>? pendingStatus,
+      Future<PermissionStatus>? pendingPermission,
       IndoorArLauncher? launcher,
       IndoorArResult result = _cancelled,
       PermissionStatus status = PermissionStatus.granted,
@@ -261,6 +270,9 @@ void main() {
         status: status,
         camera: camera,
         mint: mint,
+        tokenClock: tokenClock,
+        pendingStatus: pendingStatus,
+        pendingPermission: pendingPermission,
         launcher: launcher,
         anchor: StartFloorAnchor(
           source: _StreamSource(source.stream),
@@ -582,6 +594,96 @@ void main() {
       expect(harness.fake.requests, isEmpty);
       expect(find.text('map'), findsOneWidget);
     });
+
+    for (final fromPrompt in [false, true]) {
+      testWidgets(
+        'permission received in background waits to mint (prompt: $fromPrompt)',
+        (tester) async {
+          final granted = Completer<PermissionStatus>();
+          final harness = build(
+            status: PermissionStatus.denied,
+            pendingStatus: fromPrompt ? null : granted.future,
+            pendingPermission: fromPrompt ? granted.future : null,
+          );
+          await harness.pump(tester);
+          await harness.tapAr(tester);
+          await tester.tap(find.text('Skip'));
+          await tester.pump();
+          if (fromPrompt) {
+            await tester.tap(find.text('Continue'));
+            await tester.pump();
+          }
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.paused,
+          );
+          granted.complete(PermissionStatus.granted);
+          await tester.pump();
+          expect(harness.mintRequests, isEmpty);
+          expect(harness.fake.requests, isEmpty);
+
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+          await tester.pumpAndSettle();
+          expect(harness.mintRequests, hasLength(1));
+          expect(harness.fake.requests, hasLength(1));
+        },
+      );
+    }
+
+    for (final outcome in ['fresh', 'expired', 'cancelled']) {
+      testWidgets(
+        'token received in background is rechecked on resume ($outcome)',
+        (tester) async {
+          final mint = Completer<http.Response>();
+          var tokenTime = DateTime.utc(2026);
+          final harness = build(
+            mint: (_) => mint.future,
+            tokenClock: () => tokenTime,
+          );
+          await harness.pump(tester);
+          await harness.tapAr(tester);
+          await tester.tap(find.text('Floor 2'));
+          await tester.pump();
+          await holdStill(tester, 20);
+          expect(harness.mintRequests, hasLength(1));
+
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.paused,
+          );
+          mint.complete(http.Response(_mintedBody, 200));
+          await tester.pump();
+          expect(harness.fake.requests, isEmpty);
+          expect(source.hasListener, isFalse);
+
+          if (outcome == 'expired') {
+            tokenTime = tokenTime.add(const Duration(minutes: 31));
+          } else if (outcome == 'cancelled') {
+            expect(await tester.binding.handlePopRoute(), isTrue);
+          }
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.inactive,
+          );
+          await tester.pump();
+          expect(harness.fake.requests, isEmpty);
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+          await tester.pumpAndSettle();
+
+          if (outcome == 'fresh') {
+            expect(harness.fake.requests.single.startFloor!.settled, isFalse);
+          } else {
+            expect(harness.fake.requests, isEmpty);
+            expect(
+              find.text(outcome == 'cancelled' ? 'map' : 'Retry'),
+              findsOneWidget,
+            );
+          }
+          expect(harness.mintRequests, hasLength(1));
+        },
+      );
+    }
 
     testWidgets('Back during Unity ignores a late result', (tester) async {
       final launcher = _PendingLauncher();

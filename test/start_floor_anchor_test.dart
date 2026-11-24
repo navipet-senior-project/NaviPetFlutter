@@ -19,7 +19,7 @@ class _Rig {
     anchor = StartFloorAnchor(
       source: source,
       clock: () => now,
-      wallClock: () => _wall.add(now),
+      wallClock: () => _wall.add(now + wallOffset),
     );
     addTearDown(anchor.dispose);
   }
@@ -27,6 +27,7 @@ class _Rig {
   final source = _FakeSource();
   late final StartFloorAnchor anchor;
   var now = Duration.zero;
+  var wallOffset = Duration.zero;
   var _noise = 0;
 
   /// Holds [hPa] for [seconds], with +-0.01 hPa of alternating noise.
@@ -226,6 +227,44 @@ void main() {
     expect(delayed.sampleAgeS, 2.9);
     expect(delayed.settled, isFalse);
   });
+
+  test(
+    'a backward clock step cannot complete the hold with an old capture',
+    () async {
+      final rig = _Rig();
+      rig.anchor.confirmFloor('1');
+      await rig.hold(1000, 19);
+      rig.now = const Duration(milliseconds: 20900);
+      rig.wallOffset = const Duration(seconds: -1);
+      rig.source.controller.add(
+        PressureReading(
+          hPa: 1000,
+          timestamp: _wall.add(const Duration(milliseconds: 19700)),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(rig.source.controller.hasListener, isFalse);
+      expect(rig.anchor.resolved, isTrue);
+      expect(rig.anchor.evidence(), isNull);
+    },
+  );
+
+  for (final step in [-1, 1]) {
+    test(
+      'a $step s clock step before handoff invalidates existing evidence',
+      () async {
+        final rig = _Rig();
+        rig.anchor.confirmFloor('1');
+        await rig.hold(1000, 20);
+        expect(rig.anchor.evidence()!.settled, isTrue);
+        rig.wallOffset = Duration(seconds: step);
+        expect(rig.anchor.evidence(), isNull);
+        expect(rig.source.controller.hasListener, isFalse);
+        rig.wallOffset = Duration.zero;
+        expect(rig.anchor.evidence(), isNull);
+      },
+    );
+  }
 
   test('redelivery does not extend the capture window', () async {
     final rig = _Rig();

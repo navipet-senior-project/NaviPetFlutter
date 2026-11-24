@@ -31,6 +31,7 @@ class StartFloorAnchor {
 
   static const window = Duration(seconds: 20);
   static const maxGap = Duration(seconds: 2);
+  static const _maxClockSkew = Duration(milliseconds: 25);
   static const maxRangeHpa = 0.06;
   static const moveHpa = 0.30;
 
@@ -53,6 +54,7 @@ class StartFloorAnchor {
   Timer? _expiry;
   String? _floor;
   Duration _confirmedAt = Duration.zero;
+  late DateTime _confirmedWallTime;
   double? _anchor;
   var _moved = false;
   var _failed = false;
@@ -97,7 +99,14 @@ class StartFloorAnchor {
     );
   }
 
-  void _stopIfExpired(Duration now) {
+  void _checkContinuity(Duration now, DateTime wallTime) {
+    if (_floor != null &&
+        (wallTime.difference(_confirmedWallTime) - (now - _confirmedAt)).abs() >
+            _maxClockSkew) {
+      _failed = true;
+      invalidate();
+      return;
+    }
     if (_sub != null && now > _collectionDeadline) {
       invalidate();
     }
@@ -108,6 +117,7 @@ class StartFloorAnchor {
     final value = floor.trim();
     if (value.isEmpty) return false;
     _floor = value;
+    _confirmedWallTime = _wallClock();
     _confirmedAt = _clock();
     _buffer.clear();
     _anchor = null;
@@ -126,16 +136,19 @@ class StartFloorAnchor {
 
   /// Whether the hold is complete. Always false before a floor is confirmed.
   bool get resolved {
-    _stopIfExpired(_clock());
+    final wallTime = _wallClock();
+    _checkContinuity(_clock(), wallTime);
     return _floor != null && (_anchor != null || _sub == null);
   }
 
   /// Null unless a floor is confirmed and the sensor has produced samples.
   IndoorArStartFloor? evidence() {
     final floor = _floor;
-    if (floor == null || _failed || _buffer.isEmpty) return null;
+    if (floor == null) return null;
+    final wallTime = _wallClock();
     final now = _clock();
-    _stopIfExpired(now);
+    _checkContinuity(now, wallTime);
+    if (_failed || _buffer.isEmpty) return null;
     return IndoorArStartFloor(
       floor: floor,
       ageS: (now - _confirmedAt).inMilliseconds / 1000,
@@ -149,10 +162,11 @@ class StartFloorAnchor {
   }
 
   void _onReading(PressureReading reading) {
-    final age = _wallClock().difference(reading.timestamp);
+    final wallTime = _wallClock();
     final now = _clock();
-    _stopIfExpired(now);
+    _checkContinuity(now, wallTime);
     if (_sub == null) return;
+    final age = wallTime.difference(reading.timestamp);
     final at = now - age;
     if (age.isNegative ||
         age > maxReadingAge ||

@@ -81,8 +81,11 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   String? _retryText;
   StartFloorAnchor? _anchor;
   Timer? _holdPoll;
+  Completer<void>? _resumeWait;
 
   bool get _active => mounted && !_exiting;
+  bool get _resumed =>
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 
   static bool _isBackgrounded(AppLifecycleState state) => switch (state) {
     AppLifecycleState.hidden ||
@@ -108,6 +111,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       _holdPoll?.cancel();
       _anchor?.invalidate();
     } else if (state == AppLifecycleState.resumed) {
+      _releaseResumeWait();
       _checkHold();
     }
   }
@@ -226,7 +230,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   }
 
   void _checkHold() {
-    if (_active && _holding && _anchor!.resolved) {
+    if (_active && _resumed && _holding && _anchor!.resolved) {
       unawaited(_stopHolding());
     }
   }
@@ -279,6 +283,10 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   }
 
   Future<void> _launch() async {
+    while (_active && !_resumed) {
+      await (_resumeWait ??= Completer<void>()).future;
+    }
+    if (!_active) return;
     // Minted now, after the camera step, so it is as fresh as possible and a
     // refused permission never spends one of the 5-per-minute requests.
     final IndoorArToken token;
@@ -286,6 +294,9 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
       final gateway = widget.tokenGateway;
       if (gateway == null) throw const IndoorArTokenException(0);
       token = await gateway.fetch();
+      while (_active && !_resumed) {
+        await (_resumeWait ??= Completer<void>()).future;
+      }
       if (!_active) return;
       if (!token.expiresOn.isAfter(widget.now().add(_tokenMargin))) {
         throw const IndoorArTokenException(0);
@@ -345,9 +356,16 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   static String _roomKey(String value) =>
       value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
 
+  void _releaseResumeWait() {
+    final wait = _resumeWait;
+    _resumeWait = null;
+    wait?.complete();
+  }
+
   void _cancelAttempt() {
     if (_exiting) return;
     _exiting = true;
+    _releaseResumeWait();
     _holdPoll?.cancel();
     unawaited(_anchor?.reset());
   }
@@ -373,8 +391,7 @@ class _IndoorArLaunchScreenState extends State<IndoorArLaunchScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _holdPoll?.cancel();
-    _anchor?.dispose();
+    _cancelAttempt();
     super.dispose();
   }
 
