@@ -81,7 +81,7 @@ phone unless a note says so.
 | --- | --- | --- |
 | Flutter (`lib/`) | Entry points, the floor question, camera permission, requesting a token, building the request, decoding the result, user-facing messages | Localization, camera pose, indoor routing |
 | Native hosts (`android/`, `ios/`) | The `navipet/indoor_ar` method channel, starting Unity, returning its result, the device boot clock | Request contents (passed through as one string) |
-| [NaviPetUnity](https://github.com/navipet-senior-project/NaviPetUnity) | AR session, MultiSet localization, sign (OCR) recognition, hallway routing and HUD, [floor veto](#sensor-evidence), and height hints in exports that include [Unity PR 39](https://github.com/navipet-senior-project/NaviPetUnity/pull/39) | Place lookup, tokens |
+| [NaviPetUnity](https://github.com/navipet-senior-project/NaviPetUnity) | AR session, MultiSet localization, sign (OCR) recognition, hallway routing and HUD, [floor policy](#sensor-evidence), and height hints in exports that include [Unity PR 39](https://github.com/navipet-senior-project/NaviPetUnity/pull/39) | Place lookup, tokens |
 | [NavipetBackend](https://github.com/navipet-senior-project/NavipetBackend) | Place records with the saved door pose, token minting through `POST /indoor/ar-token`, the MultiSet credentials | Anything on the phone |
 
 ### Launching indoor AR
@@ -563,7 +563,8 @@ fallback. Selecting a destination opens its preview. Places without outdoor
 coordinates have Directions disabled. When a walking route is requested with
 a valid origin and a routable destination, the Mapbox Directions API supplies
 route geometry and maneuver instructions. The Mapbox Maps Flutter SDK handles
-rendering and location. The class editor also calls Mapbox Search Box
+rendering and the location puck, and `geolocator` supplies device fixes. The
+class editor also calls Mapbox Search Box
 directly (`suggestPlaces` and `retrievePlace`) to geocode class locations.
 
 This is a functional foreground walking-navigation experience. Before treating
