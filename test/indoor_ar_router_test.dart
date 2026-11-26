@@ -372,18 +372,22 @@ void main() {
     const pin132 = Offset(552.36, 136.43);
     const pin136 = Offset(456.46, 135.82);
     final exposedDoors = find.bySemanticsLabel(RegExp(r'^Select room \d+$'));
+    Key? exploredDoorAt(Offset point) {
+      final hits = exposedDoors.evaluate().where((element) {
+        final box = element.renderObject! as RenderBox;
+        final node = tester.getSemantics(find.byWidget(element.widget));
+        return node.rect.contains(box.globalToLocal(point));
+      });
+      return hits.isEmpty ? null : hits.single.widget.key;
+    }
+
     final above132 = pinAt(pin132) - const Offset(0, 8);
     for (final (room, point) in [
       ('119', pinAt(pin119)),
       ('120', pinAt(pin120)),
       ('132', above132),
     ]) {
-      final explored = exposedDoors.evaluate().where((element) {
-        final box = element.renderObject! as RenderBox;
-        final node = tester.getSemantics(find.byWidget(element.widget));
-        return node.rect.contains(box.globalToLocal(point));
-      });
-      expect(explored.single.widget.key, ValueKey('door-$room'));
+      expect(exploredDoorAt(point), ValueKey('door-$room'));
     }
     await tester.tapAt(above132);
     await tester.pumpAndSettle();
@@ -393,10 +397,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Room 128'), findsOneWidget);
 
+    final beside132 = pinAt(pin132) + const Offset(4, -1);
+    expect(exploredDoorAt(beside132), isNull);
+    await tester.tapAt(beside132);
+    await tester.pumpAndSettle();
+    expect(find.text('Room 128'), findsOneWidget);
+
     final center = pinAt(pin136);
+    expect(exploredDoorAt(center + const Offset(0, 21)), isNull);
     await tester.tapAt(center + const Offset(0, 21));
     await tester.pumpAndSettle();
     expect(find.text('Room 128'), findsOneWidget);
+    final corner136 = center + const Offset(-18, -18);
+    expect(exploredDoorAt(corner136), const ValueKey('door-136'));
+    await tester.tapAt(corner136);
+    await tester.pumpAndSettle();
+    expect(find.text('Room 136'), findsOneWidget);
+    expect(
+      exploredDoorAt(center + const Offset(0, 12)),
+      const ValueKey('door-136'),
+    );
     await tester.tapAt(center + const Offset(0, 12));
     await tester.pumpAndSettle();
     expect(find.text('Room 136'), findsOneWidget);
@@ -419,7 +439,9 @@ void main() {
     await tester.drag(viewer, const Offset(30, 0));
     await tester.pumpAndSettle();
     expect(pinAt(pin120).dx, greaterThan(beforePan.dx));
-    await tester.tapAt(pinAt(pin120) + const Offset(5, 0));
+    final near120 = pinAt(pin120) + const Offset(5, 0);
+    expect(exploredDoorAt(near120), const ValueKey('door-120'));
+    await tester.tapAt(near120);
     await tester.pumpAndSettle();
     expect(
       tester.getSemantics(door('120')),
@@ -435,6 +457,47 @@ void main() {
     await tester.tap(find.byTooltip('Exit full-screen map'));
     await tester.pumpAndSettle();
     expect(find.text('Room 119'), findsOneWidget);
+  });
+
+  testWidgets('pinch zooms out after the button in both map layouts', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await _Harness().pump(tester);
+
+    final viewer = find.byType(InteractiveViewer);
+    double scale() => tester
+        .widget<InteractiveViewer>(viewer)
+        .transformationController!
+        .value
+        .getMaxScaleOnAxis();
+
+    for (final expanded in [false, true]) {
+      if (expanded) {
+        await tester.tap(find.byTooltip('Full-screen map'));
+        await tester.pumpAndSettle();
+      }
+      final fit = scale();
+      await tester.tap(find.byTooltip('Zoom out'));
+      await tester.pumpAndSettle();
+      final afterButton = scale();
+      expect(afterButton, lessThan(fit));
+
+      final center = tester.getCenter(viewer);
+      final left = await tester.startGesture(center - const Offset(80, 0));
+      final right = await tester.startGesture(center + const Offset(80, 0));
+      await tester.pump();
+      await left.moveBy(const Offset(65, 0));
+      await right.moveBy(const Offset(-65, 0));
+      await tester.pump();
+      await left.up();
+      await right.up();
+      await tester.pumpAndSettle();
+      expect(scale(), closeTo(.2, .001));
+    }
   });
 
   testWidgets('short body leaves the map controls reachable at large text', (

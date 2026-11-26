@@ -15,6 +15,8 @@ import '../data/navigation_flow_controller.dart';
 import '../theme/app_theme.dart';
 
 const _viewportRadius = Radius.circular(18);
+const _minMapScale = .2;
+const _maxMapScale = 4.0;
 const _ink = Color(0xFF00244E);
 const _slate = Color(0xFF5D6B82);
 const _doorFill = Color(0xFFF2E7B9);
@@ -91,7 +93,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     final current = _mapTransform.value;
     final currentScale = current.getMaxScaleOnAxis();
     if (currentScale <= 0 || _mapViewportSize.isEmpty) return;
-    final nextScale = (currentScale * factor).clamp(.2, 4.0).toDouble();
+    final nextScale = (currentScale * factor)
+        .clamp(_minMapScale, _maxMapScale)
+        .toDouble();
     final ratio = nextScale / currentScale;
     final centerX = _mapViewportSize.width / 2;
     final centerY = _mapViewportSize.height / 2;
@@ -107,7 +111,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     final mapSize = _FloorPlanPainter.canvasSize;
     final scale = math
         .min(viewport.width / mapSize.width, viewport.height / mapSize.height)
-        .clamp(.2, 4.0)
+        .clamp(_minMapScale, _maxMapScale)
         .toDouble();
     _mapTransform.value = Matrix4.identity()
       ..translateByDouble(
@@ -392,35 +396,29 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
 
   Widget _mapSection(List<_IndoorObject> objects, int pinCount, bool pending) {
     final directory = _directoryOnlyRooms[_floor] ?? const <String>[];
-    final viewport = ClipRRect(
-      borderRadius: const BorderRadius.all(_viewportRadius),
-      child: ColoredBox(
-        color: const Color(0xFFF4F7FB),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final size = Size(constraints.maxWidth, constraints.maxHeight);
-            _mapViewportSize = size;
-            if (_lastViewportSize != size) {
-              _lastViewportSize = size;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted && _lastViewportSize == size) _fitMap(size);
-              });
-            }
-            return _FloorPlan(
-              transformationController: _mapTransform,
-              floor: _floor,
-              objects: objects,
-              pending: pending,
-              viewport: RRect.fromRectAndRadius(
-                Offset.zero & size,
-                _viewportRadius,
-              ),
-              selectedRoom: _selectedRoom,
-              onSelectRoom: _selectRoom,
-            );
-          },
-        ),
-      ),
+    final viewport = LayoutBuilder(
+      builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        _mapViewportSize = size;
+        if (_lastViewportSize != size) {
+          _lastViewportSize = size;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _lastViewportSize == size) _fitMap(size);
+          });
+        }
+        return _FloorPlan(
+          transformationController: _mapTransform,
+          floor: _floor,
+          objects: objects,
+          pending: pending,
+          viewport: RRect.fromRectAndRadius(
+            Offset.zero & size,
+            _viewportRadius,
+          ),
+          selectedRoom: _selectedRoom,
+          onSelectRoom: _selectRoom,
+        );
+      },
     );
     return Container(
       padding: _expanded
@@ -815,7 +813,7 @@ class _FloorPlan extends StatelessWidget {
   final String? selectedRoom;
   final ValueChanged<String> onSelectRoom;
 
-  static Rect _semanticsBounds(
+  static Rect _doorHitBounds(
     Offset center,
     List<(String, Offset)> targets,
     Rect bounds,
@@ -851,7 +849,12 @@ class _FloorPlan extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const hitRadius = 20.0;
+    const hitSize = 40.0;
+    final canvasSize = _FloorPlanPainter.canvasSize;
+    final horizontalMargin =
+        (viewport.width / _minMapScale - canvasSize.width) / 2;
+    final verticalMargin =
+        (viewport.height / _minMapScale - canvasSize.height) / 2;
     final doors = [
       for (final object in objects)
         if (object.type == 'door')
@@ -859,21 +862,30 @@ class _FloorPlan extends StatelessWidget {
     ];
     return ValueListenableBuilder<Matrix4>(
       valueListenable: transformationController,
-      child: InteractiveViewer(
-        constrained: false,
-        transformationController: transformationController,
-        minScale: .2,
-        maxScale: 4,
-        boundaryMargin: const EdgeInsets.all(400),
-        child: SizedBox.fromSize(
-          size: _FloorPlanPainter.canvasSize,
-          child: RepaintBoundary(
-            child: CustomPaint(
-              painter: _FloorPlanPainter(
-                floor: floor,
-                objects: objects,
-                pending: pending,
-                selectedRoom: selectedRoom,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.all(_viewportRadius),
+        child: ColoredBox(
+          color: const Color(0xFFF4F7FB),
+          child: InteractiveViewer(
+            constrained: false,
+            transformationController: transformationController,
+            minScale: _minMapScale,
+            maxScale: _maxMapScale,
+            boundaryMargin: EdgeInsets.symmetric(
+              horizontal: math.max(400.0, horizontalMargin),
+              vertical: math.max(400.0, verticalMargin),
+            ),
+            child: SizedBox.fromSize(
+              size: canvasSize,
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: _FloorPlanPainter(
+                    floor: floor,
+                    objects: objects,
+                    pending: pending,
+                    selectedRoom: selectedRoom,
+                  ),
+                ),
               ),
             ),
           ),
@@ -893,10 +905,14 @@ class _FloorPlan extends StatelessWidget {
           for (final (room, center) in targets)
             (
               room,
-              _semanticsBounds(
+              _doorHitBounds(
                 center,
                 targets,
-                Rect.fromCircle(center: center, radius: hitRadius),
+                Rect.fromCenter(
+                  center: center,
+                  width: hitSize,
+                  height: hitSize,
+                ),
               ).intersect(viewport.outerRect),
             ),
         ];
@@ -904,16 +920,12 @@ class _FloorPlan extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           excludeFromSemantics: true,
           onTapUp: (details) {
-            String? nearestRoom;
-            var nearestDistance = hitRadius * hitRadius;
-            for (final (room, center) in targets) {
-              final distance = (details.localPosition - center).distanceSquared;
-              if (distance <= nearestDistance) {
-                nearestDistance = distance;
-                nearestRoom = room;
+            for (final (room, region) in regions.reversed) {
+              if (region.contains(details.localPosition)) {
+                onSelectRoom(room);
+                return;
               }
             }
-            if (nearestRoom != null) onSelectRoom(nearestRoom);
           },
           child: Stack(
             fit: StackFit.expand,
