@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -173,6 +174,7 @@ class _Harness {
       await tester.pump(const Duration(milliseconds: 16));
     }
     expect(roomAction, findsOneWidget);
+    await tester.pumpAndSettle();
   }
 
   Future<void> tapFloorPlanAr(WidgetTester tester) async {
@@ -201,7 +203,9 @@ void main() {
           await tester.pumpAndSettle();
           // Switching floors clears the selection; pick a door on this floor.
           final door = floor == 2 ? '218' : '301';
-          await tester.tap(find.byKey(ValueKey('door-$door')));
+          await tester.tapAt(
+            tester.getCenter(find.byKey(ValueKey('door-$door'))),
+          );
           await tester.pumpAndSettle();
         }
         await harness.tapFloorPlanAr(tester);
@@ -254,7 +258,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Pick a room'), findsOneWidget);
     expect(find.text('9 pinned · 0 directory-only'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('Select room 301'));
+    await tester.tapAt(
+      tester.getCenter(find.byKey(const ValueKey('door-301'))),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Door on scan'), findsOneWidget);
     expect(find.text('Verify with AR'), findsOneWidget);
@@ -281,6 +287,67 @@ void main() {
     expect(button.onPressed, isNull);
     expect(harness.requests, isEmpty);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  testWidgets('narrow map controls leave door taps and actions available', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await _Harness().pump(tester);
+
+    Finder door(String room) => find.byKey(ValueKey('door-$room'));
+
+    await tester.tapAt(tester.getCenter(door('128')));
+    await tester.pumpAndSettle();
+    expect(find.text('Room 128'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Full-screen map'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Zoom in'));
+    await tester.pumpAndSettle();
+    final target = tester.renderObject<RenderBox>(door('120'));
+    await tester.tapAt(
+      target.localToGlobal(target.size.center(const Offset(9, 0))),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSemantics(door('120')),
+      containsSemantics(isSelected: true),
+    );
+
+    final accessibilityDoor = tester.getSemantics(door('119'));
+    accessibilityDoor.owner!.performAction(
+      accessibilityDoor.id,
+      SemanticsAction.tap,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Exit full-screen map'));
+    await tester.pumpAndSettle();
+    expect(find.text('Room 119'), findsOneWidget);
+  });
+
+  testWidgets('map and room-list headings fit large text on a narrow phone', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 844);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _Harness().pump(tester);
+
+    final list = find.byType(Scrollable).first;
+    for (final heading in ['Door position verified', 'Not placed on the map']) {
+      await tester.scrollUntilVisible(
+        find.text(heading),
+        160,
+        scrollable: list,
+      );
+    }
+  });
 
   final unsafeLookups = <String, List<CampusPlace>>{
     'no matching record': const [],
@@ -347,7 +414,9 @@ void main() {
         );
         await tester.tap(chip);
       } else {
-        await tester.tap(find.bySemanticsLabel('Select room 120'));
+        await tester.tapAt(
+          tester.getCenter(find.byKey(const ValueKey('door-120'))),
+        );
       }
       await tester.pump();
       expect(find.text('Room 119'), findsNothing);
@@ -481,8 +550,16 @@ void main() {
         ),
       ];
       await harness.pump(tester);
-      harness.router.push('/ar?destination=vec-room-without-pose');
+      await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('door-120'))),
+      );
       await tester.pumpAndSettle();
+      expect(find.text('Room 120'), findsOneWidget);
+      expect(
+        find.text('This door position is verified in the building scan.'),
+        findsOneWidget,
+      );
+      await harness.tapFloorPlanAr(tester);
       final request = harness.requests.single;
       expect(request['mode'], IndoorArRequest.localizeMode);
       expect(request['room'], '120');

@@ -394,90 +394,62 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 ),
               ],
             ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                child: Row(
-                  children: [
-                    Text(
-                      'Floor $_floor',
-                      style: const TextStyle(
-                        color: _ink,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${pinned.length} pinned · ${directory.length} directory-only',
-                      style: const TextStyle(
-                        color: _slate,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (_expanded)
-                Expanded(child: viewport)
-              else
-                SizedBox(height: 300, child: viewport),
-              if (pinned.isEmpty)
-                Container(
-                  margin: const EdgeInsets.fromLTRB(8, 8, 8, 2),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceWarm,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFC9A23A)),
-                  ),
-                  child: const Text(
-                    'Corridors are traced from the building scan. Door pin points for this floor are still coming, so rooms are listed below instead of placed.',
-                    style: TextStyle(
-                      color: _doorStroke,
-                      fontSize: 12,
-                      height: 1.45,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          Positioned(
-            right: 10,
-            top: 54,
-            child: Column(
-              children: [
-                _MapButton(
-                  tooltip: 'Zoom in',
-                  icon: Icons.add,
-                  onPressed: () => _zoomMap(1.25),
-                ),
-                const SizedBox(height: 6),
-                _MapButton(
-                  tooltip: 'Zoom out',
-                  icon: Icons.remove,
-                  onPressed: () => _zoomMap(.8),
-                ),
-                const SizedBox(height: 6),
-                _MapButton(
-                  tooltip: _expanded
-                      ? 'Exit full-screen map'
-                      : 'Full-screen map',
-                  icon: _expanded ? Icons.fullscreen_exit : Icons.fullscreen,
-                  onPressed: () => _setExpanded(!_expanded),
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+            child: _SectionTitle(
+              'Floor $_floor',
+              '${pinned.length} pinned · ${directory.length} directory-only',
             ),
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _MapButton(
+                tooltip: 'Zoom in',
+                icon: Icons.add,
+                onPressed: () => _zoomMap(1.25),
+              ),
+              const SizedBox(width: 6),
+              _MapButton(
+                tooltip: 'Zoom out',
+                icon: Icons.remove,
+                onPressed: () => _zoomMap(.8),
+              ),
+              const SizedBox(width: 6),
+              _MapButton(
+                tooltip: _expanded ? 'Exit full-screen map' : 'Full-screen map',
+                icon: _expanded ? Icons.fullscreen_exit : Icons.fullscreen,
+                onPressed: () => _setExpanded(!_expanded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (_expanded)
+            Expanded(child: viewport)
+          else
+            SizedBox(height: 300, child: viewport),
+          if (pinned.isEmpty)
+            Container(
+              margin: const EdgeInsets.fromLTRB(8, 8, 8, 2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceWarm,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFC9A23A)),
+              ),
+              child: const Text(
+                'Corridors are traced from the building scan. Door pin points for this floor are still coming, so rooms are listed below instead of placed.',
+                style: TextStyle(
+                  color: _doorStroke,
+                  fontSize: 12,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -491,7 +463,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     final (String badge, String note) = canVerify
         ? (
             'Door on scan',
-            'This door is tagged in the building scan. AR guides you to it and confirms you have arrived.',
+            'This door position is verified in the building scan.',
           )
         : ar
         ? (
@@ -583,12 +555,14 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                       ],
                     ),
                   ),
-                  _Pill(
-                    label: badge,
-                    background: canVerify
-                        ? const Color(0xFFE3F4EC)
-                        : AppColors.accentSoft,
-                    foreground: canVerify ? _verifiedGreen : _doorStroke,
+                  Flexible(
+                    child: _Pill(
+                      label: badge,
+                      background: canVerify
+                          ? const Color(0xFFE3F4EC)
+                          : AppColors.accentSoft,
+                      foreground: canVerify ? _verifiedGreen : _doorStroke,
+                    ),
                   ),
                 ],
               ),
@@ -809,43 +783,55 @@ class _FloorPlan extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 40 px keeps neighbouring hit boxes (119/120, 128/132) off each other's pins.
-    const hit = 40.0;
+    const hitRadius = 20.0;
+    final doors = [
+      for (final object in objects)
+        if (object.type == 'door')
+          (object, _FloorPlanPainter._objectCenter(object)),
+    ];
     return SizedBox.fromSize(
       size: _FloorPlanPainter.canvasSize,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: RepaintBoundary(
-              child: CustomPaint(
-                painter: _FloorPlanPainter(
-                  floor: floor,
-                  objects: objects,
-                  selectedRoom: selectedRoom,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTapUp: (details) {
+          String? nearestRoom;
+          var nearestDistance = hitRadius * hitRadius;
+          for (final (door, center) in doors) {
+            final distance = (details.localPosition - center).distanceSquared;
+            if (distance <= nearestDistance) {
+              nearestDistance = distance;
+              nearestRoom = door.room;
+            }
+          }
+          if (nearestRoom != null) onSelectRoom(nearestRoom);
+        },
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: _FloorPlanPainter(
+                    floor: floor,
+                    objects: objects,
+                    selectedRoom: selectedRoom,
+                  ),
                 ),
               ),
             ),
-          ),
-          for (final door in objects.where((o) => o.type == 'door'))
-            Positioned(
-              left: _FloorPlanPainter.toCanvas(door.x, -door.z).dx - hit / 2,
-              top: _FloorPlanPainter.toCanvas(door.x, -door.z).dy - hit / 2,
-              width: hit,
-              height: hit,
-              child: Semantics(
-                button: true,
-                selected: door.room == selectedRoom,
-                label: 'Select room ${door.room}',
-                onTap: () => onSelectRoom(door.room),
-                child: GestureDetector(
+            for (final (door, center) in doors)
+              Positioned.fromRect(
+                rect: Rect.fromCircle(center: center, radius: hitRadius),
+                child: Semantics(
                   key: ValueKey('door-${door.room}'),
-                  behavior: HitTestBehavior.opaque,
-                  excludeFromSemantics: true,
+                  button: true,
+                  selected: door.room == selectedRoom,
+                  label: 'Select room ${door.room}',
                   onTap: () => onSelectRoom(door.room),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -871,6 +857,9 @@ class _FloorPlanPainter extends CustomPainter {
 
   static Offset toCanvas(double x, double y) =>
       Offset((x - _world.left) * _pxPerMetre, (y - _world.top) * _pxPerMetre);
+
+  static Offset _objectCenter(_IndoorObject object) =>
+      toCanvas(object.x, -object.z);
 
   static Rect _rect(Rect r) =>
       Rect.fromPoints(toCanvas(r.left, r.top), toCanvas(r.right, r.bottom));
@@ -930,7 +919,7 @@ class _FloorPlanPainter extends CustomPainter {
       (o) => o.type == 'door' && o.room == selectedRoom,
     );
     for (final door in selected) {
-      final c = toCanvas(door.x, -door.z);
+      final c = _objectCenter(door);
       canvas.drawCircle(c, 1.7 * m, Paint()..color = const Color(0x61FDCC00));
       canvas.drawCircle(
         c,
@@ -950,7 +939,7 @@ class _FloorPlanPainter extends CustomPainter {
         'bathroom' => (_restroomColor, 'WC'),
         _ => (const Color(0xFF8D98A8), '?'),
       };
-      final c = toCanvas(feature.x, -feature.z);
+      final c = _objectCenter(feature);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(center: c, width: 1.5 * m, height: 1.5 * m),
@@ -962,7 +951,7 @@ class _FloorPlanPainter extends CustomPainter {
     }
 
     for (final door in objects.where((o) => o.type == 'door')) {
-      final c = toCanvas(door.x, -door.z);
+      final c = _objectCenter(door);
       canvas.drawCircle(c, .62 * m, Paint()..color = _doorFill);
       canvas.drawCircle(
         c,
@@ -1252,9 +1241,11 @@ class _SectionTitle extends StatelessWidget {
   final String caption;
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.baseline,
-    textBaseline: TextBaseline.alphabetic,
+  Widget build(BuildContext context) => Wrap(
+    alignment: WrapAlignment.spaceBetween,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    spacing: 8,
+    runSpacing: 4,
     children: [
       Text(
         title,
@@ -1264,7 +1255,6 @@ class _SectionTitle extends StatelessWidget {
           fontWeight: FontWeight.w800,
         ),
       ),
-      const Spacer(),
       Text(
         caption,
         style: const TextStyle(

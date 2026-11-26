@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -7,6 +9,7 @@ import 'package:navipet/data/floor_pressure.dart';
 import 'package:navipet/data/indoor_particle_filter.dart';
 import 'package:navipet/data/indoor_positioning_engine.dart';
 import 'package:navipet/data/indoor_wifi_fingerprints.dart';
+import 'package:navipet/screens/indoor_positioning_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +33,45 @@ void main() {
   const points = [floorOnePoint, floorTwoPoint];
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets('survey lists floors 1–2 and restores a saved floor 3 belief', (
+    tester,
+  ) async {
+    final filter = IndoorParticleFilter();
+    await filter.restore(points);
+    filter.seedFloor('3');
+    await filter.persist();
+    const export = 'assets/indoor/vec_floors123.json';
+    rootBundle.evict(export);
+    const sensorMethods = MethodChannel(
+      'dev.fluttercommunity.plus/sensors/method',
+    );
+    const barometerEvents = MethodChannel(
+      'dev.fluttercommunity.plus/sensors/barometer',
+    );
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(sensorMethods, (_) async => null);
+    messenger.setMockMethodCallHandler(barometerEvents, (_) async => null);
+
+    await tester.pumpWidget(const MaterialApp(home: IndoorPositioningScreen()));
+    final landpointPicker = find.byType(DropdownButton<IndoorLandpoint>);
+    for (
+      var attempt = 0;
+      attempt < 50 && !tester.any(landpointPicker);
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final picker = tester.widget<DropdownButton<IndoorLandpoint>>(
+      landpointPicker,
+    );
+    expect(picker.items!.map((item) => item.value!.floor).toSet(), {'1', '2'});
+    await tester.scrollUntilVisible(find.text('Estimated floor 3 · 100%'), 160);
+    expect(find.text('Estimated floor 3 · 100%'), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   test('Wi-Fi matcher chooses the closest surveyed landpoint', () {
     final live = WifiScanSnapshot(

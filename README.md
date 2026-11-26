@@ -615,11 +615,10 @@ For barometer floor references, start a recording on floor 1, enter floor
 numbers consistently, and confirm each floor as you arrive. In the positioning
 screen confirm the current starting floor to anchor
 relative pressure for that outing. The floor belief can persist without Wi-Fi;
-Wi-Fi scans refresh the likely landmark when available. The current bundled
-Unity scan provides landmark coordinates for floors 1–3 only. Floors 4–5
-can have a floor belief from pressure calibration, but do not yet have surveyed
-Wi-Fi landpoints or coordinates in this build. These estimates are a prototype
-and need on-device VEC survey/validation before being used as navigation truth.
+Wi-Fi scans refresh the likely landmark when available. The Wi-Fi survey uses
+the bundled Unity landmarks on floors 1 and 2. Floors 3–5 can have a floor
+belief from pressure calibration. These estimates are a prototype and need
+on-device VEC survey/validation before being used as navigation truth.
 
 ## Verification
 
