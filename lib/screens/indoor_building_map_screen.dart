@@ -902,6 +902,7 @@ class _FloorPlan extends StatelessWidget {
     Offset center,
     List<(String, Offset)> targets,
     Rect bounds,
+    double visibleMarkerRadius,
   ) {
     var Rect(:left, :top, :right, :bottom) = bounds;
     for (final (_, neighbor) in targets) {
@@ -914,9 +915,18 @@ class _FloorPlan extends StatelessWidget {
       final bisector = delta.distanceSquared / 2;
       if (dx * xExtent + dy * yExtent <= bisector) continue;
 
-      final xBudget = dx >= dy
+      final preferredXBudget = dx >= dy
           ? bisector - math.min(dy * yExtent, bisector / 5)
           : math.min(dx * xExtent, bisector / 5);
+      final reservedRadius = math.min(
+        visibleMarkerRadius,
+        bisector / (dx + dy),
+      );
+      final minXBudget = dx * reservedRadius;
+      final xBudget = preferredXBudget.clamp(
+        minXBudget,
+        math.max(minXBudget, bisector - dy * reservedRadius),
+      );
       if (delta.dx > 0) {
         right = math.min(right, center.dx + xBudget / dx);
       } else if (delta.dx < 0) {
@@ -978,18 +988,15 @@ class _FloorPlan extends StatelessWidget {
                 case final projected when visiblePinCenters.contains(projected))
               (room, projected),
         ];
-        final visibleCenters = [
-          for (final target in targets)
-            if (viewport.contains(target.$2)) target,
-        ];
         final regions = [
-          for (final (room, center) in visibleCenters)
+          for (final (room, center) in targets)
             (
               room,
               _doorHitBounds(
                 center,
-                visibleCenters,
+                targets,
                 Rect.fromCircle(center: center, radius: hitRadius),
+                viewport.contains(center) ? 0 : markerRadius,
               ).intersect(viewport.outerRect),
             ),
         ];

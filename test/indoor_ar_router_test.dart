@@ -667,6 +667,52 @@ void main() {
     expect(tester.getSemantics(door), containsSemantics(isSelected: true));
   });
 
+  testWidgets('partially visible doors keep their own accessibility action', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await _Harness().pump(tester);
+    await tester.tap(find.byTooltip('Full-screen map'));
+    await tester.pumpAndSettle();
+
+    final viewer = find.byType(InteractiveViewer);
+    final viewport = tester.getRect(viewer);
+    final controller = tester
+        .widget<InteractiveViewer>(viewer)
+        .transformationController!;
+    for (final (room, neighbor, pin, offscreen, inset) in [
+      ('120', '119', const Offset(251.87, 137.68), 2.0, 1.0),
+      ('132', '128', const Offset(552.36, 136.43), 3.6, .1),
+    ]) {
+      final transform = controller.value.clone();
+      final delta =
+          Offset(-offscreen, viewport.height / 2) -
+          MatrixUtils.transformPoint(transform, pin);
+      transform.setEntry(0, 3, transform.entry(0, 3) + delta.dx);
+      transform.setEntry(1, 3, transform.entry(1, 3) + delta.dy);
+      controller.value = transform;
+      await tester.pumpAndSettle();
+
+      final door = find.byKey(ValueKey('door-$room'));
+      final neighborDoor = find.byKey(ValueKey('door-$neighbor'));
+      final node = tester.getSemantics(door);
+      final box = tester.renderObject<RenderBox>(door);
+      final visiblePaint = Offset(viewport.left + inset, viewport.center.dy);
+      expect(node.rect.contains(box.globalToLocal(visiblePaint)), isTrue);
+      expect(
+        tester.getRect(door).overlaps(tester.getRect(neighborDoor)),
+        isFalse,
+      );
+
+      node.owner!.performAction(node.id, SemanticsAction.tap);
+      await tester.pumpAndSettle();
+      expect(tester.getSemantics(door), containsSemantics(isSelected: true));
+    }
+  });
+
   testWidgets('pending notice scrolls without collapsing the full-screen map', (
     tester,
   ) async {
