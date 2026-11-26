@@ -258,6 +258,10 @@ void main() {
     await tester.tap(find.text('Floor 3'));
     await tester.pumpAndSettle();
     expect(find.text('Pick a room'), findsOneWidget);
+    expect(
+      find.text('Tap a door on the map or pick a room from the list.'),
+      findsOneWidget,
+    );
     expect(find.text('9 pinned · 0 directory-only'), findsOneWidget);
     await tester.tapAt(
       tester.getCenter(find.byKey(const ValueKey('door-301'))),
@@ -275,10 +279,7 @@ void main() {
       expect(find.bySemanticsLabel(RegExp('^Select room')), findsNothing);
       expect(find.text('0 pinned · 7 directory-only'), findsOneWidget);
       expect(pending, findsOneWidget);
-      expect(
-        find.text('Pick a room from the directory below.'),
-        findsOneWidget,
-      );
+      expect(find.text('Pick a room from the directory.'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Full-screen map'));
       await tester.pumpAndSettle();
@@ -328,16 +329,25 @@ void main() {
     const pin119 = Offset(279.44, 138.28);
     const pin120 = Offset(251.87, 137.68);
     const pin128 = Offset(571.55, 107.73);
+    const pin132 = Offset(552.36, 136.43);
     const pin136 = Offset(456.46, 135.82);
     final exposedDoors = find.bySemanticsLabel(RegExp(r'^Select room \d+$'));
-    for (final (room, pin) in [('119', pin119), ('120', pin120)]) {
+    final above132 = pinAt(pin132) - const Offset(0, 8);
+    for (final (room, point) in [
+      ('119', pinAt(pin119)),
+      ('120', pinAt(pin120)),
+      ('132', above132),
+    ]) {
       final explored = exposedDoors.evaluate().where((element) {
         final box = element.renderObject! as RenderBox;
         final node = tester.getSemantics(find.byWidget(element.widget));
-        return node.rect.contains(box.globalToLocal(pinAt(pin)));
+        return node.rect.contains(box.globalToLocal(point));
       });
       expect(explored.single.widget.key, ValueKey('door-$room'));
     }
+    await tester.tapAt(above132);
+    await tester.pumpAndSettle();
+    expect(find.text('Room 132'), findsOneWidget);
 
     await tester.tapAt(pinAt(pin128));
     await tester.pumpAndSettle();
@@ -385,6 +395,29 @@ void main() {
     await tester.tap(find.byTooltip('Exit full-screen map'));
     await tester.pumpAndSettle();
     expect(find.text('Room 119'), findsOneWidget);
+  });
+
+  testWidgets('short body leaves the map controls reachable at large text', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(844, 320);
+    tester.view.padding = const FakeViewPadding(bottom: 21);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _Harness().pump(tester);
+
+    final expand = find.byTooltip('Full-screen map');
+    final roomList = find.byType(Scrollable).first;
+    expect(tester.getSize(roomList).height, greaterThan(0));
+    await tester.scrollUntilVisible(expand, 35, scrollable: roomList);
+    await tester.pumpAndSettle();
+    await tester.tap(expand);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Exit full-screen map'), findsOneWidget);
   });
 
   testWidgets('map and room-list headings fit large text on a narrow phone', (

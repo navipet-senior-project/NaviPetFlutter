@@ -201,11 +201,13 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             final pending = pinned.isEmpty;
             final mapSection = _mapSection(objects, pinned.length, pending);
             if (_expanded) return mapSection;
-            return Column(
-              children: [
-                Expanded(child: _roomList(mapSection, pinned, pending)),
-                _selectionSheet(pinned, pending),
-              ],
+            return LayoutBuilder(
+              builder: (context, constraints) => Column(
+                children: [
+                  Expanded(child: _roomList(mapSection, pinned, pending)),
+                  _selectionSheet(pinned, pending, constraints.maxHeight / 2),
+                ],
+              ),
             );
           },
         ),
@@ -499,7 +501,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     );
   }
 
-  Widget _selectionSheet(List<String> pinned, bool pending) {
+  Widget _selectionSheet(List<String> pinned, bool pending, double maxHeight) {
     final room = _selectedRoom;
     final ar = indoorScanCovered('VEC', '$_floor');
     final canVerify = room != null && pinned.contains(room) && ar;
@@ -532,9 +534,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
         ],
       ),
       // Large text on a short phone must scroll, not overflow.
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .5,
-      ),
+      constraints: BoxConstraints(maxHeight: maxHeight),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -563,8 +563,8 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
               const SizedBox(height: 4),
               Text(
                 pending
-                    ? 'Pick a room from the directory below.'
-                    : 'Tap a door on the map or a room below.',
+                    ? 'Pick a room from the directory.'
+                    : 'Tap a door on the map or pick a room from the list.',
                 style: const TextStyle(
                   color: AppColors.labelInk,
                   fontSize: 13,
@@ -824,17 +824,26 @@ class _FloorPlan extends StatelessWidget {
     for (final (_, neighbor) in targets) {
       if (neighbor == center) continue;
       final delta = neighbor - center;
-      final midpoint = (center + neighbor) / 2;
-      if (delta.dx.abs() >= delta.dy.abs()) {
-        if (delta.dx > 0) {
-          right = math.min(right, midpoint.dx);
-        } else {
-          left = math.max(left, midpoint.dx);
-        }
-      } else if (delta.dy > 0) {
-        bottom = math.min(bottom, midpoint.dy);
-      } else {
-        top = math.max(top, midpoint.dy);
+      final dx = delta.dx.abs();
+      final dy = delta.dy.abs();
+      final xExtent = delta.dx > 0 ? right - center.dx : center.dx - left;
+      final yExtent = delta.dy > 0 ? bottom - center.dy : center.dy - top;
+      final bisector = delta.distanceSquared / 2;
+      if (dx * xExtent + dy * yExtent <= bisector) continue;
+
+      final xBudget = dx >= dy
+          ? bisector - math.min(dy * yExtent, bisector / 5)
+          : math.min(dx * xExtent, bisector / 5);
+      if (delta.dx > 0) {
+        right = math.min(right, center.dx + xBudget / dx);
+      } else if (delta.dx < 0) {
+        left = math.max(left, center.dx - xBudget / dx);
+      }
+      final yBudget = bisector - xBudget;
+      if (delta.dy > 0) {
+        bottom = math.min(bottom, center.dy + yBudget / dy);
+      } else if (delta.dy < 0) {
+        top = math.max(top, center.dy - yBudget / dy);
       }
     }
     return Rect.fromLTRB(left, top, right, bottom);
@@ -887,11 +896,8 @@ class _FloorPlan extends StatelessWidget {
               _semanticsBounds(
                 center,
                 targets,
-                Rect.fromCircle(
-                  center: center,
-                  radius: hitRadius,
-                ).intersect(viewport.outerRect),
-              ),
+                Rect.fromCircle(center: center, radius: hitRadius),
+              ).intersect(viewport.outerRect),
             ),
         ];
         return GestureDetector(
@@ -1072,7 +1078,7 @@ class _FloorPlanPainter extends CustomPainter {
       );
       // Unity door headings: 0 faces north, 180 south, 90 sideways.
       final heading = door.rotationY.round() % 360;
-      if (heading == 90 || heading == 270) {
+      if (heading == 90) {
         _text(
           canvas,
           door.room,
