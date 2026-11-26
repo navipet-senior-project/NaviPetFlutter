@@ -78,6 +78,7 @@ List<CampusPlace> _vecRooms() => [
     185.36,
   ),
   _vecRoom('218', '2', const IndoorArVector3(1.25, -1.5, 9.5), 90),
+  _vecRoom('301', '3', const IndoorArVector3(-12.4, 6.5, 26.9), 0),
 ];
 
 class _FailingSearch extends flow.FakeSearchGateway {
@@ -117,7 +118,7 @@ class _Harness {
   Future<void> pump(WidgetTester tester) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     // Keep cached asset futures inside each test's async zone.
-    rootBundle.evict('assets/indoor/vec_floors1and2.json');
+    rootBundle.evict('assets/indoor/vec_floors123.json');
     final appState = _SignedInState();
     final controller = flow.build(search: search);
     router = createAppRouter(
@@ -160,7 +161,7 @@ class _Harness {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    final roomAction = find.textContaining('Verify location near room ');
+    final roomAction = find.text('Verify with AR');
     for (
       var attempt = 0;
       attempt < 50 && roomAction.evaluate().isEmpty;
@@ -175,14 +176,7 @@ class _Harness {
   }
 
   Future<void> tapFloorPlanAr(WidgetTester tester) async {
-    final button = find.textContaining('Verify location near room ');
-    await tester.scrollUntilVisible(
-      button,
-      -100,
-      scrollable: find.byType(Scrollable).first,
-      maxScrolls: 10,
-    );
-    await tester.tap(button);
+    await tester.tap(find.text('Verify with AR'));
     await tester.pumpAndSettle();
   }
 }
@@ -196,15 +190,18 @@ void main() {
     messenger.setMockMethodCallHandler(_indoorAr, null);
   });
 
-  for (final floor in [1, 2]) {
+  for (final floor in [1, 2, 3]) {
     testWidgets(
       'floor $floor room reaches Unity through the production router',
       (tester) async {
         final harness = _Harness();
         await harness.pump(tester);
-        if (floor == 2) {
-          await tester.ensureVisible(find.text('Floor 2'));
-          await tester.tap(find.text('Floor 2'));
+        if (floor != 1) {
+          await tester.tap(find.text('Floor $floor'));
+          await tester.pumpAndSettle();
+          // Switching floors clears the selection; pick a door on this floor.
+          final door = floor == 2 ? '218' : '301';
+          await tester.tap(find.byKey(ValueKey('door-$door')));
           await tester.pumpAndSettle();
         }
         await harness.tapFloorPlanAr(tester);
@@ -246,6 +243,43 @@ void main() {
     // Coordinates are the backend's, not the bundled scan's.
     expect(fromMap['position'], {'x': -5.7651, 'y': -1.8186, 'z': 22.6689});
     expect(fromMap['headingDeg'], 185.36);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  testWidgets('floor 3 shows pinned doors; floor 4 stays pending', (
+    tester,
+  ) async {
+    final harness = _Harness();
+    await harness.pump(tester);
+    await tester.tap(find.text('Floor 3'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pick a room'), findsOneWidget);
+    expect(find.text('9 pinned · 0 directory-only'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Select room 301'));
+    await tester.pumpAndSettle();
+    expect(find.text('Door on scan'), findsOneWidget);
+    expect(find.text('Verify with AR'), findsOneWidget);
+
+    await tester.tap(find.text('Floor 4'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel(RegExp('^Select room')), findsNothing);
+    expect(find.text('0 pinned · 7 directory-only'), findsOneWidget);
+    expect(find.textContaining('Door pin points for this floor'), findsOne);
+    final chip = find.text('417');
+    await tester.scrollUntilVisible(
+      chip,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    final button = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('AR unavailable here'),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      ),
+    );
+    expect(button.onPressed, isNull);
+    expect(harness.requests, isEmpty);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
   final unsafeLookups = <String, List<CampusPlace>>{
@@ -298,13 +332,14 @@ void main() {
       final search = _DelayedSearch()..results = _vecRooms();
       final harness = _Harness(search: search);
       await harness.pump(tester);
-      await tester.tap(find.textContaining('Verify location near room '));
+      await tester.tap(find.text('Verify with AR'));
       await tester.pump();
+      expect(find.text('Opening AR for VEC 119…'), findsOneWidget);
 
       if (selection == 'floor') {
         await tester.tap(find.text('Floor 2'));
       } else if (selection == 'room chip') {
-        final chip = find.widgetWithText(ActionChip, '120');
+        final chip = find.text('120');
         await tester.scrollUntilVisible(
           chip,
           200,
@@ -312,29 +347,19 @@ void main() {
         );
         await tester.tap(chip);
       } else {
-        final map = find
-            .descendant(
-              of: find.byType(InteractiveViewer),
-              matching: find.byType(CustomPaint),
-            )
-            .first;
-        await tester.ensureVisible(find.byType(InteractiveViewer));
-        final render = tester.renderObject<RenderBox>(map);
-        await tester.tapAt(
-          render.localToGlobal(
-            Offset(render.size.width * .19, render.size.height * .18),
-          ),
-        );
+        await tester.tap(find.bySemanticsLabel('Select room 120'));
       }
       await tester.pump();
-      await tester.scrollUntilVisible(
-        find.textContaining('Verify location near room '),
-        -200,
-        scrollable: find.byType(Scrollable).first,
-      );
+      expect(find.text('Room 119'), findsNothing);
+      expect(find.text('Opening AR for VEC 119…'), findsNothing);
       expect(
-        find.textContaining('Verify location near room 119'),
-        findsNothing,
+        find.text(selection == 'floor' ? 'Pick a room' : 'Room 120'),
+        findsOneWidget,
+      );
+      // The stale lookup must not keep the new room's button busy.
+      expect(
+        find.text('Verify with AR'),
+        selection == 'floor' ? findsNothing : findsOneWidget,
       );
       search.pending.complete(_vecRooms());
       await tester.pumpAndSettle();

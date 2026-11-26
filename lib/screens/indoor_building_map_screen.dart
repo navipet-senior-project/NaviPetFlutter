@@ -9,10 +9,22 @@ import 'package:provider/provider.dart';
 
 import '../data/campus_place.dart';
 import '../data/indoor_building_catalog.dart';
+import '../data/indoor_floor_coverage.dart';
 import '../data/navigation_flow_controller.dart';
 import '../theme/app_theme.dart';
 
-/// Shows the VEC Unity scan for floors 1–2 and directory plans for floors 3–5.
+const _ink = Color(0xFF00244E);
+const _slate = Color(0xFF5D6B82);
+const _doorFill = Color(0xFFF2E7B9);
+const _doorStroke = Color(0xFF6B4B00);
+const _entranceColor = Color(0xFF5B9CB0);
+const _stairsColor = Color(0xFFBD6C76);
+const _elevatorColor = Color(0xFF55958C);
+const _restroomColor = Color(0xFF8D83AA);
+const _verifiedGreen = Color(0xFF0B6B3A);
+
+/// VEC room picker: corridor plans traced from the MultiSet scans as the Unity
+/// building scene places them, with door pins from the Unity export.
 class IndoorBuildingMapScreen extends StatefulWidget {
   const IndoorBuildingMapScreen({super.key});
 
@@ -24,13 +36,12 @@ class IndoorBuildingMapScreen extends StatefulWidget {
 class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   late final Future<_VecIndoorMap> _map = _loadMap();
   final TransformationController _mapTransform = TransformationController();
-  bool _mapTransformInitialized = false;
   Size _mapViewportSize = Size.zero;
   Size _lastViewportSize = Size.zero;
-  Size? _lastMapSize;
   int _floor = 1;
-  String _selectedRoom = '119';
+  String? _selectedRoom = '119';
   bool _resolvingRoom = false;
+  bool _expanded = false;
   int _selectionVersion = 0;
 
   void _selectRoom(String room) {
@@ -38,8 +49,26 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     setState(() {
       _selectedRoom = room;
       _selectionVersion++;
+      // A stale lookup is discarded by its version, so it must not disable this room.
+      _resolvingRoom = false;
     });
   }
+
+  void _selectFloor(int floor) {
+    if (_floor == floor) return;
+    setState(() {
+      _floor = floor;
+      _selectedRoom = null;
+      _selectionVersion++;
+      _resolvingRoom = false;
+      _lastViewportSize = Size.zero;
+    });
+  }
+
+  void _setExpanded(bool expanded) => setState(() {
+    _expanded = expanded;
+    _lastViewportSize = Size.zero;
+  });
 
   @override
   void dispose() {
@@ -48,9 +77,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   }
 
   Future<_VecIndoorMap> _loadMap() async {
-    final raw = await rootBundle.loadString(
-      'assets/indoor/vec_floors1and2.json',
-    );
+    final raw = await rootBundle.loadString('assets/indoor/vec_floors123.json');
     final map = _VecIndoorMap.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     if (map.buildingId != IndoorBuildingCatalog.vecBuildingCode) {
       throw const FormatException('Indoor map building ID does not match VEC.');
@@ -73,13 +100,13 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
       ..scaleByDouble(nextScale, nextScale, nextScale, 1);
   }
 
-  void _fitMap(Size viewport, Size mapSize) {
-    if (viewport.isEmpty || mapSize.isEmpty) return;
-    final containScale = math.min(
-      viewport.width / mapSize.width,
-      viewport.height / mapSize.height,
-    );
-    final scale = (containScale * .94).clamp(.2, 4.0).toDouble();
+  void _fitMap(Size viewport) {
+    if (viewport.isEmpty) return;
+    final mapSize = _FloorPlanPainter.canvasSize;
+    final scale = math
+        .min(viewport.width / mapSize.width, viewport.height / mapSize.height)
+        .clamp(.2, 4.0)
+        .toDouble();
     _mapTransform.value = Matrix4.identity()
       ..translateByDouble(
         (viewport.width - mapSize.width * scale) / 2,
@@ -96,6 +123,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   /// asset is for drawing only and never supplies AR coordinates.
   Future<void> _verifyWithAr() async {
     final room = _selectedRoom;
+    if (room == null) return;
     final floor = '$_floor';
     final selectionVersion = _selectionVersion;
     final gateway = context.read<NavigationFlowController>().searchGateway;
@@ -131,9 +159,8 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     } catch (_) {
       message = "Couldn't look up room $room. Try again.";
     }
-    if (!mounted) return;
+    if (!mounted || selectionVersion != _selectionVersion) return;
     setState(() => _resolvingRoom = false);
-    if (selectionVersion != _selectionVersion) return;
     if (placeId == null) {
       messenger.showSnackBar(SnackBar(content: Text(message!)));
       return;
@@ -144,352 +171,478 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF4F6FA),
-    appBar: AppBar(
-      backgroundColor: Colors.white,
-      foregroundColor: AppColors.navy,
-      title: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            IndoorBuildingCatalog.vecDisplayName,
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-          ),
-          Text(
-            'VEC · Unity indoor map',
-            style: TextStyle(fontSize: 12, color: AppColors.muted),
-          ),
-        ],
-      ),
-      actions: [
-        if (kDebugMode)
-          IconButton(
-            tooltip: 'VEC positioning survey',
-            onPressed: () => context.push('/dev/vec-positioning'),
-            icon: const Icon(Icons.wifi_tethering),
-          ),
-      ],
-    ),
-    body: SafeArea(
-      child: FutureBuilder<_VecIndoorMap>(
-        future: _map,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(
-              child: Text('The VEC indoor map could not load.'),
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_expanded,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop && _expanded) _setExpanded(false);
+    },
+    child: Scaffold(
+      backgroundColor: const Color(0xFFF9F9F9),
+      appBar: _expanded ? null : _header(),
+      body: SafeArea(
+        child: FutureBuilder<_VecIndoorMap>(
+          future: _map,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const Center(
+                child: Text('The VEC indoor map could not load.'),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final map = snapshot.data!;
+            if (_expanded) return _mapSection(map);
+            return Column(
+              children: [
+                Expanded(child: _roomList(map)),
+                _selectionSheet(map),
+              ],
             );
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final map = snapshot.data!;
-          final objects = map.objectsForFloor(_floor);
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-            children: [
-              _notice(
-                _floor <= 2
-                    ? 'Tap a room marker or room number to select it. Pin positions come from the Unity scan; the scan does not include a walkable route or a complete building outline.'
-                    : 'Tap a room marker or room number to select it. Room outlines and numbering follow the directory diagrams.',
-                const Color(0xFFEAF4FA),
-                const Color(0xFF28536A),
-              ),
-              const SizedBox(height: 12),
-              _notice(
-                'The directory photo also shows floors 3–5. Floor 3 works with search and AR but has no map here. Floors 4–5 are not part of the current Unity scan.',
-                const Color(0xFFFFF4D6),
-                const Color(0xFF684B12),
-              ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: _resolvingRoom ? null : _verifyWithAr,
-                icon: const Icon(Icons.camera_alt_outlined),
-                label: Text('Verify location near room $_selectedRoom with AR'),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  for (final floor in const [1, 2, 3, 4, 5])
-                    ChoiceChip(
-                      label: Text('Floor $floor'),
-                      selected: _floor == floor,
-                      selectedColor: AppColors.navy,
-                      labelStyle: TextStyle(
-                        color: _floor == floor ? Colors.white : AppColors.navy,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      onSelected: (_) => setState(() {
-                        if (_floor != floor) {
-                          _selectionVersion++;
-                          _mapTransform.value = Matrix4.identity();
-                          _mapTransformInitialized = false;
-                        }
-                        _floor = floor;
-                        final rooms = map.roomNumbersForFloor(floor);
-                        if (!rooms.contains(_selectedRoom) &&
-                            rooms.isNotEmpty) {
-                          _selectedRoom = rooms.first;
-                        }
-                      }),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF26344F),
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x220B1830),
-                      blurRadius: 18,
-                      offset: Offset(0, 8),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          _floor <= 2 ? 'UNITY LEVEL $_floor' : 'FLOOR $_floor',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          _floor <= 2
-                              ? '${objects.length} Unity scan points'
-                              : 'Directory plan · not scanned',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    AspectRatio(
-                      aspectRatio: 1.2,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3E7ED),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final viewport = Size(
-                                constraints.maxWidth,
-                                constraints.maxHeight,
-                              );
-                              _mapViewportSize = viewport;
-                              final mapSize = Size(
-                                viewport.width * 1.5,
-                                _floor <= 2
-                                    ? viewport.height * 1.35
-                                    : viewport.width * 1.5 / 2.15,
-                              );
-                              if (!_mapTransformInitialized ||
-                                  _lastMapSize != mapSize ||
-                                  _lastViewportSize != viewport) {
-                                _mapTransformInitialized = true;
-                                _lastMapSize = mapSize;
-                                _lastViewportSize = viewport;
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  if (!mounted) return;
-                                  if (_lastMapSize != mapSize ||
-                                      _lastViewportSize != viewport) {
-                                    return;
-                                  }
-                                  _fitMap(viewport, mapSize);
-                                });
-                              }
-                              return InteractiveViewer(
-                                constrained: false,
-                                transformationController: _mapTransform,
-                                minScale: .2,
-                                maxScale: 4,
-                                boundaryMargin: const EdgeInsets.all(500),
-                                child: SizedBox(
-                                  width: mapSize.width,
-                                  height: mapSize.height,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTapDown: (details) {
-                                      final room = _FloorMapPainter.hitTestRoom(
-                                        objects,
-                                        details.localPosition,
-                                        mapSize,
-                                        floor: _floor,
-                                      );
-                                      if (room != null) {
-                                        _selectRoom(room);
-                                      }
-                                    },
-                                    child: CustomPaint(
-                                      size: mapSize,
-                                      painter: _FloorMapPainter(
-                                        objects,
-                                        selectedRoom: _selectedRoom,
-                                        floor: _floor,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Zoom',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Fit entire floor plan',
-                            onPressed: () => _fitMap(
-                              _mapViewportSize,
-                              _lastMapSize ?? Size.zero,
-                            ),
-                            color: Colors.white,
-                            icon: const Icon(Icons.fit_screen),
-                          ),
-                          IconButton(
-                            tooltip: 'Zoom out',
-                            onPressed: () => _zoomMap(.8),
-                            color: Colors.white,
-                            icon: const Icon(Icons.remove_circle_outline),
-                          ),
-                          IconButton(
-                            tooltip: 'Zoom in',
-                            onPressed: () => _zoomMap(1.25),
-                            color: Colors.white,
-                            icon: const Icon(Icons.add_circle_outline),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Wrap(
-                      spacing: 12,
-                      runSpacing: 8,
-                      children: [
-                        _Legend(color: Color(0xFFF2E7B9), label: 'Room door'),
-                        _Legend(color: Color(0xFF5B9CB0), label: 'Entrance'),
-                        _Legend(color: Color(0xFFBD6C76), label: 'Stairs'),
-                        _Legend(color: Color(0xFF55958C), label: 'Elevator'),
-                        _Legend(color: Color(0xFF8D83AA), label: 'Restroom'),
-                      ],
-                    ),
-                    if (_floor <= 2) ...[
-                      const SizedBox(height: 9),
-                      const Text(
-                        'Filled rooms have Unity scan points. Outlined rooms come from the directory reference.',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Pinch to zoom, drag to pan. Use + or - on either floor.',
-                      style: TextStyle(color: Colors.white60, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _floor <= 2 ? 'Room doors in this scan' : 'Rooms on this floor',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
-                children: [
-                  for (final room in map.roomNumbersForFloor(_floor))
-                    ActionChip(
-                      label: Text(room),
-                      visualDensity: VisualDensity.compact,
-                      backgroundColor: _selectedRoom == room
-                          ? const Color(0xFFFFF0C2)
-                          : Colors.white,
-                      onPressed: () => _selectRoom(room),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Directory-only floors',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Wrap(
-                spacing: 7,
-                children: [
-                  Chip(label: Text('3rd floor · AR only, no map')),
-                  Chip(label: Text('4th floor · not scanned')),
-                  Chip(label: Text('5th floor · not scanned')),
-                ],
-              ),
-            ],
-          );
-        },
+          },
+        ),
       ),
     ),
   );
 
-  Widget _notice(String text, Color background, Color foreground) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: background,
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
+  PreferredSizeWidget _header() => AppBar(
+    backgroundColor: AppColors.navy,
+    foregroundColor: Colors.white,
+    titleSpacing: 0,
+    title: const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.info_outline, color: foreground, size: 20),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(color: foreground, fontSize: 12, height: 1.4),
-          ),
+        Text(
+          'Choose a room',
+          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+        ),
+        Text(
+          '${IndoorBuildingCatalog.vecDisplayName} · VEC',
+          style: TextStyle(fontSize: 13, color: Color(0xFFC9D6E8)),
         ),
       ],
     ),
+    actions: [
+      if (kDebugMode)
+        IconButton(
+          tooltip: 'VEC positioning survey',
+          onPressed: () => context.push('/dev/vec-positioning'),
+          icon: const Icon(Icons.wifi_tethering),
+        ),
+    ],
+    bottom: PreferredSize(
+      preferredSize: const Size.fromHeight(74),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+        // Tabs are a fixed 56 px; past 1.3x the caption would overflow.
+        child: MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 1.3,
+          child: Row(
+            children: [
+              for (final floor in _floors)
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(left: floor == 1 ? 0 : 6),
+                    child: _FloorTab(
+                      floor: floor,
+                      selected: floor == _floor,
+                      onTap: () => _selectFloor(floor),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
   );
+
+  Widget _roomList(_VecIndoorMap map) {
+    final pinned = map.pinnedRooms(_floor);
+    final directory = _directoryOnlyRooms[_floor] ?? const <String>[];
+    final ar = indoorScanCovered('VEC', '$_floor');
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _Pill(
+            label: ar ? 'AR ready' : 'AR not covered',
+            background: ar ? const Color(0xFFE3F4EC) : const Color(0xFFEEF1F5),
+            foreground: ar ? _verifiedGreen : AppColors.labelInk,
+          ),
+        ),
+        const SizedBox(height: 14),
+        _mapSection(map),
+        const SizedBox(height: 14),
+        const Wrap(
+          spacing: 14,
+          runSpacing: 8,
+          children: [
+            _Legend(color: _doorFill, label: 'Room door', door: true),
+            _Legend(color: _entranceColor, label: 'Entrance'),
+            _Legend(color: _stairsColor, label: 'Stairs'),
+            _Legend(color: _elevatorColor, label: 'Elevator'),
+            _Legend(color: _restroomColor, label: 'Restroom'),
+          ],
+        ),
+        const SizedBox(height: 14),
+        const _SectionTitle('Pinned on the scan', 'Door position verified'),
+        const SizedBox(height: 10),
+        if (pinned.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E2E2)),
+            ),
+            child: Text(
+              'None yet on Floor $_floor. Pin points for this floor are on the way; rooms move here once they land.',
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                color: AppColors.labelInk,
+              ),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final room in pinned)
+                _RoomChip(
+                  room: room,
+                  pinned: true,
+                  selected: room == _selectedRoom,
+                  onTap: () => _selectRoom(room),
+                ),
+            ],
+          ),
+        if (directory.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const _SectionTitle('Directory only', 'Not placed on the map'),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final room in directory)
+                _RoomChip(
+                  room: room,
+                  pinned: false,
+                  selected: room == _selectedRoom,
+                  onTap: () => _selectRoom(room),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _mapSection(_VecIndoorMap map) {
+    final pinned = map.pinnedRooms(_floor);
+    final directory = _directoryOnlyRooms[_floor] ?? const <String>[];
+    final viewport = ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: ColoredBox(
+        color: const Color(0xFFF4F7FB),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = Size(constraints.maxWidth, constraints.maxHeight);
+            _mapViewportSize = size;
+            if (_lastViewportSize != size) {
+              _lastViewportSize = size;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && _lastViewportSize == size) _fitMap(size);
+              });
+            }
+            return InteractiveViewer(
+              constrained: false,
+              transformationController: _mapTransform,
+              minScale: .2,
+              maxScale: 4,
+              boundaryMargin: const EdgeInsets.all(400),
+              child: _FloorPlan(
+                floor: _floor,
+                objects: map.objectsForFloor(_floor),
+                selectedRoom: _selectedRoom,
+                onSelectRoom: _selectRoom,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    return Container(
+      padding: _expanded
+          ? const EdgeInsets.fromLTRB(8, 12, 8, 8)
+          : const EdgeInsets.all(8),
+      decoration: _expanded
+          ? const BoxDecoration(color: Colors.white)
+          : BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x14101828),
+                  blurRadius: 30,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      'Floor $_floor',
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${pinned.length} pinned · ${directory.length} directory-only',
+                      style: const TextStyle(
+                        color: _slate,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_expanded)
+                Expanded(child: viewport)
+              else
+                SizedBox(height: 300, child: viewport),
+              if (pinned.isEmpty)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(8, 8, 8, 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceWarm,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFC9A23A)),
+                  ),
+                  child: const Text(
+                    'Corridors are traced from the building scan. Door pin points for this floor are still coming, so rooms are listed below instead of placed.',
+                    style: TextStyle(
+                      color: _doorStroke,
+                      fontSize: 12,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Positioned(
+            right: 10,
+            top: 54,
+            child: Column(
+              children: [
+                _MapButton(
+                  tooltip: 'Zoom in',
+                  icon: Icons.add,
+                  onPressed: () => _zoomMap(1.25),
+                ),
+                const SizedBox(height: 6),
+                _MapButton(
+                  tooltip: 'Zoom out',
+                  icon: Icons.remove,
+                  onPressed: () => _zoomMap(.8),
+                ),
+                const SizedBox(height: 6),
+                _MapButton(
+                  tooltip: _expanded
+                      ? 'Exit full-screen map'
+                      : 'Full-screen map',
+                  icon: _expanded ? Icons.fullscreen_exit : Icons.fullscreen,
+                  onPressed: () => _setExpanded(!_expanded),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _selectionSheet(_VecIndoorMap map) {
+    final room = _selectedRoom;
+    final ar = indoorScanCovered('VEC', '$_floor');
+    final pinned = room != null && map.pinnedRooms(_floor).contains(room);
+    final canVerify = pinned && ar;
+    final (String badge, String note) = canVerify
+        ? (
+            'Door on scan',
+            'This door is tagged in the building scan. AR guides you to it and confirms you have arrived.',
+          )
+        : ar
+        ? (
+            'Directory only',
+            "Floor $_floor has AR, but this room has no door in the scan yet, so AR can't confirm it.",
+          )
+        : (
+            'Directory only',
+            "The building scan covers this floor's corridors. Floor $_floor pin points are still coming, so this room isn't placed and AR isn't available yet.",
+          );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x24101828),
+            blurRadius: 32,
+            offset: Offset(0, -12),
+          ),
+        ],
+      ),
+      // Large text on a short phone must scroll, not overflow.
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .5,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD0D5DD),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (room == null) ...[
+              const Text(
+                'Pick a room',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Tap a door on the map or a room below.',
+                style: TextStyle(
+                  color: AppColors.labelInk,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ] else ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Room $room',
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'VEC $room · Floor $_floor',
+                          style: const TextStyle(
+                            color: _slate,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _Pill(
+                    label: badge,
+                    background: canVerify
+                        ? const Color(0xFFE3F4EC)
+                        : AppColors.accentSoft,
+                    foreground: canVerify ? _verifiedGreen : _doorStroke,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                note,
+                style: const TextStyle(
+                  color: AppColors.labelInk,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.navy,
+                  disabledBackgroundColor: const Color(0xFFEEF1F5),
+                  disabledForegroundColor: AppColors.muted,
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                onPressed: canVerify && !_resolvingRoom ? _verifyWithAr : null,
+                icon: const Icon(Icons.view_in_ar),
+                label: Text(
+                  !canVerify
+                      ? 'AR unavailable here'
+                      : _resolvingRoom
+                      ? 'Opening AR for VEC $room…'
+                      : 'Verify with AR',
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+const _floors = [1, 2, 3, 4, 5];
+
+/// Rooms the app's directory lists without a tagged door in the Unity export.
+/// They are listed, never placed: floors 4–5 pin points have not landed yet.
+const _directoryOnlyRooms = <int, List<String>>{
+  1: ['104', '118', '129', '130', '133', '135'],
+  4: ['402', '417', '418', '419', '420', '424', '425'],
+  5: ['510', '514', '515', '516', '518', '519', '523'],
+};
 
 class _VecIndoorMap {
   const _VecIndoorMap({required this.buildingId, required this.objects});
@@ -510,13 +663,12 @@ class _VecIndoorMap {
   List<_IndoorObject> objectsForFloor(int floor) =>
       objects.where((object) => object.floor == floor).toList(growable: false);
 
-  List<String> roomNumbersForFloor(int floor) {
-    if (floor > 2) return _FloorMapPainter.directoryRooms[floor] ?? const [];
-    return objectsForFloor(floor)
-        .where((object) => object.type == 'door')
-        .map((object) => object.id.substring(3))
-        .toList(growable: false);
-  }
+  List<String> pinnedRooms(int floor) =>
+      objectsForFloor(floor)
+          .where((object) => object.type == 'door')
+          .map((object) => object.room)
+          .toList()
+        ..sort();
 }
 
 class _IndoorObject {
@@ -526,19 +678,18 @@ class _IndoorObject {
     required this.floor,
     required this.x,
     required this.z,
-    required this.y,
     required this.rotationY,
   });
 
   factory _IndoorObject.fromJson(Map<String, dynamic> json) {
     final position = json['position'] as Map<String, dynamic>;
+    final floorId = json['floorId'] as String;
     return _IndoorObject(
       id: json['id'] as String,
       type: json['type'] as String,
-      floor: (json['floorId'] as String).endsWith('1') ? 1 : 2,
+      floor: int.parse(floorId.substring(floorId.lastIndexOf('_') + 1)),
       x: (position['x'] as num).toDouble(),
       z: (position['z'] as num).toDouble(),
-      y: (position['y'] as num).toDouble(),
       rotationY: (json['rotationY'] as num?)?.toDouble() ?? 0,
     );
   }
@@ -548,668 +699,610 @@ class _IndoorObject {
   final int floor;
   final double x;
   final double z;
-  final double y;
   final double rotationY;
+
+  String get room => id.substring(3);
 }
 
-class _FloorMapPainter extends CustomPainter {
-  const _FloorMapPainter(
-    this.objects, {
-    required this.selectedRoom,
-    required this.floor,
+/// Corridor outlines traced from 1.2 m-thick slices of the MultiSet scan
+/// meshes as placed in the Unity `VEC_Building` scene. Rects are Unity metres
+/// with y = -z, so north is up.
+class _FloorGeometry {
+  const _FloorGeometry({
+    required this.halls,
+    this.core,
+    required this.labels,
+    this.pending = false,
   });
 
-  final List<_IndoorObject> objects;
-  final String selectedRoom;
+  final List<Rect> halls;
+  final Rect? core;
+  final List<(String, Offset, double)> labels;
+  final bool pending;
+}
+
+const _geometry = <int, _FloorGeometry>{
+  1: _FloorGeometry(
+    halls: [
+      Rect.fromLTWH(-34.8, -24.2, 64.8, 3),
+      Rect.fromLTWH(-5, -33.6, 2.4, 9.4),
+      Rect.fromLTWH(-2.6, -21.2, 4.8, 21.2),
+      Rect.fromLTWH(-30.4, -24.4, 1.4, 9.6),
+      Rect.fromLTWH(24, -24.2, 5, 6.6),
+    ],
+    labels: [
+      ('Main corridor', Offset(-16, -22.7), 0),
+      ('Entrance lobby', Offset(-0.2, -8), -math.pi / 2),
+    ],
+  ),
+  2: _FloorGeometry(
+    halls: [
+      Rect.fromLTWH(-30.8, -24.4, 54.6, 3),
+      Rect.fromLTWH(-12.8, -29.6, 17.8, 5.2),
+      Rect.fromLTWH(-2, -21.4, 3.2, 5.8),
+      Rect.fromLTWH(-30.4, -21.4, 3.2, 9.6),
+    ],
+    core: Rect.fromLTWH(-11, -27.8, 14.2, 3.4),
+    labels: [
+      ('Core', Offset(-3.9, -26.1), 0),
+      ('Main corridor', Offset(-16, -22.9), 0),
+    ],
+  ),
+  3: _FloorGeometry(
+    halls: [
+      Rect.fromLTWH(-31.2, -24.4, 54.9, 3),
+      Rect.fromLTWH(23.4, -24.4, 3, 4.2),
+      Rect.fromLTWH(-13, -29.4, 17.8, 5),
+      Rect.fromLTWH(-2, -21.4, 3.2, 5.8),
+      Rect.fromLTWH(-30.8, -21.4, 3.4, 8),
+    ],
+    core: Rect.fromLTWH(-11.2, -27.6, 14.2, 3.2),
+    labels: [
+      ('Core', Offset(-4.1, -26), 0),
+      ('Main corridor', Offset(-12, -22.9), 0),
+    ],
+  ),
+  4: _FloorGeometry(
+    halls: [
+      Rect.fromLTWH(-31, -23.8, 58.6, 2.8),
+      Rect.fromLTWH(-12.8, -29, 18, 5.2),
+      Rect.fromLTWH(-2, -21, 3.2, 6),
+      Rect.fromLTWH(-30.8, -21, 2.4, 4.8),
+    ],
+    core: Rect.fromLTWH(-11, -27.2, 14.4, 3.4),
+    labels: [
+      ('Core', Offset(-3.8, -25.5), 0),
+      ('Main corridor', Offset(-16, -22.4), 0),
+      ('Pin points pending', Offset(12, -22.4), 0),
+    ],
+    pending: true,
+  ),
+  5: _FloorGeometry(
+    halls: [
+      Rect.fromLTWH(-31, -24, 57.2, 3),
+      Rect.fromLTWH(-13.2, -29.4, 18.4, 5.4),
+      Rect.fromLTWH(-2, -21, 3.2, 5.4),
+      Rect.fromLTWH(-30.8, -21, 3.4, 8.6),
+    ],
+    core: Rect.fromLTWH(-11.2, -27.6, 14.2, 3.6),
+    labels: [
+      ('Core', Offset(-4.1, -25.8), 0),
+      ('Main corridor', Offset(-16, -22.5), 0),
+      ('Pin points pending', Offset(12, -22.5), 0),
+    ],
+    pending: true,
+  ),
+};
+
+class _FloorPlan extends StatelessWidget {
+  const _FloorPlan({
+    required this.floor,
+    required this.objects,
+    required this.selectedRoom,
+    required this.onSelectRoom,
+  });
+
   final int floor;
+  final List<_IndoorObject> objects;
+  final String? selectedRoom;
+  final ValueChanged<String> onSelectRoom;
 
-  static const Map<int, List<String>> directoryRooms = {
-    3: ['301', '302', '304', '321', '322', '325', '326', '330', '331'],
-    4: ['402', '417', '418', '419', '420', '424', '425'],
-    5: ['510', '514', '515', '516', '518', '519', '523'],
-  };
+  @override
+  Widget build(BuildContext context) {
+    // 40 px keeps neighbouring hit boxes (119/120, 128/132) off each other's pins.
+    const hit = 40.0;
+    return SizedBox.fromSize(
+      size: _FloorPlanPainter.canvasSize,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _FloorPlanPainter(
+                  floor: floor,
+                  objects: objects,
+                  selectedRoom: selectedRoom,
+                ),
+              ),
+            ),
+          ),
+          for (final door in objects.where((o) => o.type == 'door'))
+            Positioned(
+              left: _FloorPlanPainter.toCanvas(door.x, -door.z).dx - hit / 2,
+              top: _FloorPlanPainter.toCanvas(door.x, -door.z).dy - hit / 2,
+              width: hit,
+              height: hit,
+              child: Semantics(
+                button: true,
+                selected: door.room == selectedRoom,
+                label: 'Select room ${door.room}',
+                onTap: () => onSelectRoom(door.room),
+                child: GestureDetector(
+                  key: ValueKey('door-${door.room}'),
+                  behavior: HitTestBehavior.opaque,
+                  excludeFromSemantics: true,
+                  onTap: () => onSelectRoom(door.room),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
-  static const _minX = -34.0;
-  static const _maxX = 34.0;
-  static const _minZ = -5.0;
-  static const _maxZ = 35.0;
-  // First-floor diagram layout follows the user's sketch. These are display
-  // coordinates only; AR continues to use the original Unity export values.
-  static const Map<String, Rect> _floorOneRooms = {
-    '124': Rect.fromLTWH(.10, .09, .19, .19),
-    '127': Rect.fromLTWH(.60, .10, .13, .18),
-    '128': Rect.fromLTWH(.74, .10, .14, .22),
-    '129': Rect.fromLTWH(.90, .10, .055, .10),
-    '130': Rect.fromLTWH(.90, .21, .055, .12),
-    '121': Rect.fromLTWH(.15, .59, .14, .16),
-    '120': Rect.fromLTWH(.29, .59, .08, .16),
-    '119': Rect.fromLTWH(.375, .59, .065, .16),
-    '118': Rect.fromLTWH(.445, .59, .055, .16),
-    '104': Rect.fromLTWH(.39, .82, .09, .11),
-    '136': Rect.fromLTWH(.695, .58, .07, .18),
-    '134': Rect.fromLTWH(.765, .62, .06, .25),
-    '132': Rect.fromLTWH(.825, .58, .07, .18),
-    '135': Rect.fromLTWH(.695, .78, .07, .14),
-    '133': Rect.fromLTWH(.825, .78, .07, .14),
-  };
-  static const List<Rect> _floorOneUnlabeledRooms = [
-    Rect.fromLTWH(.29, .09, .30, .19),
-    Rect.fromLTWH(.16, .76, .22, .17),
-  ];
-  static const Map<String, Rect> _floorTwoRooms = {
-    '201': Rect.fromLTWH(.05, .08, .13, .25),
-    '202': Rect.fromLTWH(.18, .08, .22, .25),
-    '215': Rect.fromLTWH(.75, .08, .06, .25),
-    '217': Rect.fromLTWH(.815, .08, .075, .25),
-    '218': Rect.fromLTWH(.895, .08, .06, .25),
-    '220': Rect.fromLTWH(.35, .57, .09, .37),
-    '224': Rect.fromLTWH(.68, .57, .16, .37),
-    '227': Rect.fromLTWH(.855, .57, .10, .37),
-  };
-  static const List<Rect> _floorTwoUnlabeledRooms = [
-    Rect.fromLTWH(.40, .08, .35, .10),
-    Rect.fromLTWH(.48, .20, .10, .14),
-    Rect.fromLTWH(.58, .20, .10, .14),
-    Rect.fromLTWH(.05, .57, .29, .37),
-  ];
-  // These layouts follow the newly labeled directory sketches. Rectangles
-  // without room numbers preserve the unlabelled spaces for later mapping.
-  static const Map<String, Rect> _floorThreeRooms = {
-    '301': Rect.fromLTWH(.02, .03, .16, .40),
-    '302': Rect.fromLTWH(.18, .03, .15, .40),
-    '304': Rect.fromLTWH(.33, .30, .18, .13),
-    '321': Rect.fromLTWH(.76, .03, .13, .40),
-    '322': Rect.fromLTWH(.89, .03, .10, .40),
-    '325': Rect.fromLTWH(.09, .63, .19, .34),
-    '326': Rect.fromLTWH(.28, .63, .13, .34),
-    '330': Rect.fromLTWH(.62, .63, .20, .34),
-    '331': Rect.fromLTWH(.82, .63, .17, .34),
-  };
-  static const List<Rect> _floorThreeUnlabeledRooms = [
-    Rect.fromLTWH(.33, .03, .18, .27),
-    Rect.fromLTWH(.51, .03, .25, .14),
-  ];
-  static const Map<String, Rect> _floorFourRooms = {
-    '402': Rect.fromLTWH(.18, .03, .15, .40),
-    '417': Rect.fromLTWH(.76, .03, .13, .40),
-    '418': Rect.fromLTWH(.89, .03, .10, .40),
-    '419': Rect.fromLTWH(.09, .63, .19, .34),
-    '420': Rect.fromLTWH(.28, .63, .13, .34),
-    '424': Rect.fromLTWH(.62, .63, .12, .34),
-    '425': Rect.fromLTWH(.78, .63, .21, .34),
-  };
-  static const List<Rect> _floorFourUnlabeledRooms = [
-    Rect.fromLTWH(.02, .03, .16, .40),
-    Rect.fromLTWH(.33, .03, .32, .14),
-    Rect.fromLTWH(.65, .03, .05, .40),
-    Rect.fromLTWH(.70, .03, .06, .40),
-    Rect.fromLTWH(.74, .63, .04, .34),
-  ];
-  static const Map<String, Rect> _floorFiveRooms = {
-    '510': Rect.fromLTWH(.02, .10, .31, .33),
-    '514': Rect.fromLTWH(.66, .03, .06, .40),
-    '515': Rect.fromLTWH(.72, .03, .06, .40),
-    '516': Rect.fromLTWH(.78, .03, .21, .40),
-    '518': Rect.fromLTWH(.09, .63, .16, .34),
-    '519': Rect.fromLTWH(.25, .63, .16, .34),
-    '523': Rect.fromLTWH(.59, .63, .19, .34),
-  };
-  static const List<Rect> _floorFiveUnlabeledRooms = [
-    Rect.fromLTWH(.33, .10, .31, .14),
-    Rect.fromLTWH(.33, .24, .31, .15),
-    Rect.fromLTWH(.39, .25, .21, .14),
-    Rect.fromLTWH(.78, .63, .12, .34),
-    Rect.fromLTWH(.90, .63, .09, .20),
-  ];
-  static const Map<String, Offset> _floorOneFeatures = {
-    'VECentr1B': Offset(.06, .45),
-    'VECentr1A': Offset(.94, .45),
-    'VECentr1C': Offset(.60, .945),
-    'VECstairsF1B': Offset(.125, .66),
-    'VECstairsF1A': Offset(.965, .66),
-    'VECelev1A': Offset(.54, .64),
-    'VECelev1B': Offset(.54, .76),
-    'VECbathF1': Offset(.65, .64),
-    'VECbathM1': Offset(.65, .76),
-  };
-  static const Map<String, Offset> _floorTwoFeatures = {
-    'VECstairsF2B': Offset(.06, .45),
-    'VECstairsF2A': Offset(.94, .45),
-    'VECbathM2': Offset(.53, .27),
-    'VECbathF2': Offset(.63, .27),
-    'VECelev2A': Offset(.47, .65),
-    'VECelev2B': Offset(.47, .85),
-  };
+class _FloorPlanPainter extends CustomPainter {
+  const _FloorPlanPainter({
+    required this.floor,
+    required this.objects,
+    required this.selectedRoom,
+  });
+
+  final int floor;
+  final List<_IndoorObject> objects;
+  final String? selectedRoom;
+
+  static const _world = Rect.fromLTWH(-36, -35, 67, 36);
+  static const _pxPerMetre = 10.0;
+  static final canvasSize = Size(
+    _world.width * _pxPerMetre,
+    _world.height * _pxPerMetre,
+  );
+
+  static Offset toCanvas(double x, double y) =>
+      Offset((x - _world.left) * _pxPerMetre, (y - _world.top) * _pxPerMetre);
+
+  static Rect _rect(Rect r) =>
+      Rect.fromPoints(toCanvas(r.left, r.top), toCanvas(r.right, r.bottom));
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawColor(const Color(0xFFF7F7F4), BlendMode.src);
-    if (floor == 1) {
-      _paintFloorOne(canvas, size);
-      return;
+    const m = _pxPerMetre;
+    final grid = Paint()
+      ..color = const Color(0xFFDCE3EC)
+      ..strokeWidth = .6;
+    for (var x = 0.0; x <= size.width; x += 5 * m) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
     }
-    if (floor == 2) {
-      _paintFloorTwo(canvas, size);
-      return;
-    }
-    if (floor >= 3 && floor <= 5) {
-      _paintDirectoryFloor(canvas, size);
-      return;
+    for (var y = 0.0; y <= size.height; y += 5 * m) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
     }
 
-    // Draw all pins before labels so a later scan point can't cover an earlier
-    // room number. Coordinates remain the exact x/z values exported by Unity.
-    for (final object in objects) {
-      final point = _point(object.x, object.z, size);
-      final color = switch (object.type) {
-        'door' => const Color(0xFFF2E7B9),
-        'entrance' => const Color(0xFF5B9CB0),
-        'stairs' => const Color(0xFFBD6C76),
-        'elevator' => const Color(0xFF55958C),
-        'bathroom' => const Color(0xFF8D83AA),
-        _ => const Color(0xFF8D98A8),
-      };
-      final roomNumber = object.type == 'door' ? object.id.substring(3) : null;
-      final labelOffset = _labelOffset(roomNumber, object.type);
-      final labelPoint = point + labelOffset;
-      final markerRect = Rect.fromCenter(
-        center: labelPoint,
-        width: object.type == 'door' ? 38 : 30,
-        height: 25,
-      );
-      if (labelOffset.distance > 0) {
-        canvas.drawLine(
-          point,
-          labelPoint,
-          Paint()
-            ..color = const Color(0xFF8792A1)
-            ..strokeWidth = 1.2,
-        );
-        canvas.drawCircle(point, 3, Paint()..color = const Color(0xFF26344F));
-      }
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(markerRect, const Radius.circular(5)),
-        Paint()..color = color,
-      );
-      if (object.type == 'door' && object.id == 'VEC$selectedRoom') {
-        canvas.drawCircle(
-          labelPoint,
-          22,
-          Paint()
-            ..color = const Color(0xFFF2B544)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.5,
-        );
-      }
-    }
-
-    // Labels are a separate pass so every number stays on top of nearby pins.
-    for (final object in objects) {
-      final point = _point(object.x, object.z, size);
-      final labelPoint =
-          point +
-          _labelOffset(
-            object.type == 'door' ? object.id.substring(3) : null,
-            object.type,
-          );
-      final label = object.type == 'door'
-          ? object.id.substring(3)
-          : switch (object.type) {
-              'entrance' => 'E',
-              'stairs' => 'S',
-              'elevator' => 'L',
-              'bathroom' => 'R',
-              _ => '?',
-            };
-      _drawText(
-        canvas,
-        label,
-        labelPoint,
-        10,
-        const Color(0xFF26344F),
-        bold: true,
+    final geometry = _geometry[floor]!;
+    final outline = Paint()
+      ..color = const Color(0xFF8FA2BC)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .7 * m;
+    for (final hall in geometry.halls) {
+      final path = Path()..addRect(_rect(hall));
+      canvas.drawPath(
+        geometry.pending ? _dashed(path, 1 * m, .5 * m) : path,
+        outline,
       );
     }
-  }
-
-  void _paintFloorOne(Canvas canvas, Size size) {
-    _paintFloorPlan(
-      canvas,
-      size,
-      _floorOneRooms,
-      _floorOneFeatures,
-      _floorOneUnlabeledRooms,
-      horizontalShift: .015,
-      lowerEntranceCorridor: true,
-    );
-  }
-
-  void _paintFloorTwo(Canvas canvas, Size size) {
-    _paintFloorPlan(
-      canvas,
-      size,
-      _floorTwoRooms,
-      _floorTwoFeatures,
-      _floorTwoUnlabeledRooms,
-    );
-  }
-
-  void _paintDirectoryFloor(Canvas canvas, Size size) {
-    final rooms = switch (floor) {
-      3 => _floorThreeRooms,
-      4 => _floorFourRooms,
-      _ => _floorFiveRooms,
-    };
-    final blankRooms = switch (floor) {
-      3 => _floorThreeUnlabeledRooms,
-      4 => _floorFourUnlabeledRooms,
-      _ => _floorFiveUnlabeledRooms,
-    };
-    _paintFloorPlan(
-      canvas,
-      size,
-      rooms,
-      const {},
-      blankRooms,
-      corridorTop: .42,
-      corridorHeight: .20,
-    );
-
-    final features = switch (floor) {
-      3 => <(Offset, String, Color)>[
-        (Offset(.04, .52), 'E', const Color(0xFF5B9CB0)),
-        (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
-        (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
-        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
-        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
-        (Offset(.58, .355), 'R', const Color(0xFF8D83AA)),
-        (Offset(.685, .355), 'R', const Color(0xFF8D83AA)),
-      ],
-      4 => <(Offset, String, Color)>[
-        (Offset(.04, .52), 'E', const Color(0xFF5B9CB0)),
-        (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
-        (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
-        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
-        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
-        (Offset(.465, .355), 'R', const Color(0xFF8D83AA)),
-        (Offset(.57, .355), 'R', const Color(0xFF8D83AA)),
-      ],
-      _ => <(Offset, String, Color)>[
-        (Offset(.965, .52), 'S', const Color(0xFFBD6C76)),
-        (Offset(.045, .80), 'S', const Color(0xFFBD6C76)),
-        (Offset(.4475, .72), 'L', const Color(0xFF55958C)),
-        (Offset(.4475, .88), 'L', const Color(0xFF55958C)),
-        (Offset(.43, .32), 'R', const Color(0xFF8D83AA)),
-        (Offset(.535, .32), 'R', const Color(0xFF8D83AA)),
-      ],
-    };
-    for (final (position, label, color) in features) {
-      final center = Offset(
-        position.dx * size.width,
-        position.dy * size.height,
-      );
-      final marker = Rect.fromCenter(
-        center: center,
-        width: size.width * (label == 'R' ? .09 : .075),
-        height:
-            size.height *
-            (label == 'L'
-                ? .16
-                : label == 'R'
-                ? .11
-                : .065),
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(marker, Radius.circular(size.width * .008)),
-        Paint()..color = color,
-      );
-      _drawText(
-        canvas,
-        label,
-        center,
-        size.width * .027,
-        Colors.white,
-        bold: true,
-      );
+    final fill = Paint()..color = Colors.white;
+    for (final hall in geometry.halls) {
+      canvas.drawRect(_rect(hall), fill);
     }
-  }
-
-  void _paintFloorPlan(
-    Canvas canvas,
-    Size size,
-    Map<String, Rect> roomLayout,
-    Map<String, Offset> featureLayout,
-    List<Rect> unlabeledRooms, {
-    double horizontalShift = 0,
-    bool lowerEntranceCorridor = false,
-    double corridorTop = .34,
-    double corridorHeight = .21,
-  }) {
-    final scannedRooms = objects
-        .where((object) => object.type == 'door')
-        .map((object) => object.id.substring(3))
-        .toSet();
-    final outer = Rect.fromLTWH(
-      size.width * .025,
-      size.height * .025,
-      size.width * .95,
-      size.height * .95,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(outer, Radius.circular(size.width * .025)),
-      Paint()..color = const Color(0xFFE2E6EC),
-    );
-    final building = outer.deflate(size.width * .018);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(building, Radius.circular(size.width * .022)),
-      Paint()..color = const Color(0xFFF7F7F4),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(building, Radius.circular(size.width * .022)),
-      Paint()
-        ..color = const Color(0xFF33445E)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = size.width * .004,
-    );
-
-    final corridor = Rect.fromLTWH(
-      building.left + size.width * .012,
-      size.height * corridorTop,
-      building.width - size.width * .024,
-      size.height * corridorHeight,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(corridor, Radius.circular(size.width * .018)),
-      Paint()..color = const Color(0xFFD5DAE3),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(corridor, Radius.circular(size.width * .018)),
-      Paint()
-        ..color = const Color(0xFFBCC5D0)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = size.width * .002,
-    );
-    _drawText(
-      canvas,
-      'MAIN CORRIDOR',
-      Offset(
-        size.width * .50,
-        size.height * (corridorTop + corridorHeight / 2),
-      ),
-      size.width * .022,
-      const Color(0xFF566171),
-      bold: true,
-    );
-
-    canvas.save();
-    canvas.translate(-size.width * horizontalShift, 0);
-    if (lowerEntranceCorridor) {
-      final left = size.width * .575;
-      final right = size.width * .625;
-      final bottom = size.height * .925;
+    if (geometry.core case final core?) {
+      canvas.drawRect(_rect(core), Paint()..color = const Color(0xFFE3E9F1));
       canvas.drawRect(
-        Rect.fromLTRB(left, corridor.bottom - 2, right, bottom),
-        Paint()..color = const Color(0xFFD5DAE3),
-      );
-      final walls = Paint()
-        ..color = const Color(0xFFBCC5D0)
-        ..strokeWidth = size.width * .002;
-      canvas.drawLine(
-        Offset(left, corridor.bottom),
-        Offset(left, bottom),
-        walls,
-      );
-      canvas.drawLine(
-        Offset(right, corridor.bottom),
-        Offset(right, bottom),
-        walls,
-      );
-      canvas.drawLine(Offset(left, bottom), Offset(right, bottom), walls);
-    }
-
-    for (final normalizedRect in unlabeledRooms) {
-      final rect = Rect.fromLTWH(
-        normalizedRect.left * size.width,
-        normalizedRect.top * size.height,
-        normalizedRect.width * size.width,
-        normalizedRect.height * size.height,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(size.width * .006)),
-        Paint()..color = const Color(0xFFFAFAF7),
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(size.width * .006)),
+        _rect(core),
         Paint()
-          ..color = const Color(0xFF8793A2)
+          ..color = const Color(0xFF9FB0C6)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = size.width * .0025,
+          ..strokeWidth = .22 * m,
       );
     }
-
-    for (final entry in roomLayout.entries) {
-      final normalizedRect = entry.value;
-      final rect = Rect.fromLTWH(
-        normalizedRect.left * size.width,
-        normalizedRect.top * size.height,
-        normalizedRect.width * size.width,
-        normalizedRect.height * size.height,
-      );
-      final isScanned = scannedRooms.contains(entry.key);
-      final isSelected = entry.key == selectedRoom;
-      final radius = Radius.circular(size.width * .008);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, radius),
-        Paint()
-          ..color = isSelected
-              ? const Color(0xFFFFE8A8)
-              : isScanned
-              ? const Color(0xFFF2E7B9)
-              : const Color(0xFFFAFAF7),
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, radius),
-        Paint()
-          ..color = isSelected
-              ? const Color(0xFFB98212)
-              : isScanned
-              ? const Color(0xFF9A895C)
-              : const Color(0xFF9AA4B1)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = isSelected ? size.width * .005 : size.width * .0025,
-      );
-      _drawText(
+    for (final (text, at, angle) in geometry.labels) {
+      _text(
         canvas,
-        entry.key,
-        rect.center,
-        math.max(size.width * .024, math.min(rect.width, rect.height) * .23),
-        const Color(0xFF26344F),
-        bold: true,
+        text,
+        toCanvas(at.dx, at.dy),
+        .9 * m,
+        _slate,
+        FontWeight.w600,
+        angle: angle,
       );
     }
 
-    for (final object in objects.where((item) => item.type != 'door')) {
-      final position = featureLayout[object.id];
-      if (position == null) continue;
-      final center = Offset(
-        position.dx * size.width,
-        position.dy * size.height,
+    final selected = objects.where(
+      (o) => o.type == 'door' && o.room == selectedRoom,
+    );
+    for (final door in selected) {
+      final c = toCanvas(door.x, -door.z);
+      canvas.drawCircle(c, 1.7 * m, Paint()..color = const Color(0x61FDCC00));
+      canvas.drawCircle(
+        c,
+        1.7 * m,
+        Paint()
+          ..color = const Color(0xFFE0A800)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .3 * m,
       );
-      // The left floor-two access marker is an entrance in the user's plan,
-      // although the exported Unity marker is typed as stairs.
-      final displayType = object.floor == 2 && object.id == 'VECstairsF2B'
-          ? 'entrance'
-          : object.type;
-      final color = switch (displayType) {
-        'entrance' => const Color(0xFF5B9CB0),
-        'stairs' => const Color(0xFFBD6C76),
-        'elevator' => const Color(0xFF55958C),
-        'bathroom' => const Color(0xFF8D83AA),
-        _ => const Color(0xFF8D98A8),
+    }
+
+    for (final feature in objects.where((o) => o.type != 'door')) {
+      final (color, label) = switch (feature.type) {
+        'entrance' => (_entranceColor, 'IN'),
+        'stairs' => (_stairsColor, 'ST'),
+        'elevator' => (_elevatorColor, 'EL'),
+        'bathroom' => (_restroomColor, 'WC'),
+        _ => (const Color(0xFF8D98A8), '?'),
       };
-      final rect = Rect.fromCenter(
-        center: center,
-        width: size.width * .05,
-        height: size.height * .065,
-      );
+      final c = toCanvas(feature.x, -feature.z);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(size.width * .008)),
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: c, width: 1.5 * m, height: 1.5 * m),
+          const Radius.circular(.35 * m),
+        ),
         Paint()..color = color,
       );
-      final label = switch (displayType) {
-        'entrance' => 'E',
-        'stairs' => 'S',
-        'elevator' => 'L',
-        'bathroom' => 'R',
-        _ => '?',
-      };
-      _drawText(
-        canvas,
-        label,
-        center,
-        size.width * .027,
-        Colors.white,
-        bold: true,
+      _text(canvas, label, c, .6 * m, Colors.white, FontWeight.w800);
+    }
+
+    for (final door in objects.where((o) => o.type == 'door')) {
+      final c = toCanvas(door.x, -door.z);
+      canvas.drawCircle(c, .62 * m, Paint()..color = _doorFill);
+      canvas.drawCircle(
+        c,
+        .62 * m,
+        Paint()
+          ..color = _doorStroke
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .16 * m,
       );
-    }
-
-    canvas.restore();
-  }
-
-  static Offset _labelOffset(String? roomNumber, String type) {
-    if (type == 'door') {
-      return switch (roomNumber) {
-        '120' => const Offset(0, -18),
-        '119' => const Offset(0, 18),
-        '201' || '202' => const Offset(0, 17),
-        _ => Offset.zero,
-      };
-    }
-    return Offset.zero;
-  }
-
-  static String? hitTestRoom(
-    List<_IndoorObject> objects,
-    Offset position,
-    Size size, {
-    required int floor,
-  }) {
-    if (floor <= 5) {
-      final roomLayout = switch (floor) {
-        1 => _floorOneRooms,
-        2 => _floorTwoRooms,
-        3 => _floorThreeRooms,
-        4 => _floorFourRooms,
-        _ => _floorFiveRooms,
-      };
-      if (floor > 2) {
-        for (final entry in roomLayout.entries) {
-          final rect = Rect.fromLTWH(
-            entry.value.left * size.width,
-            entry.value.top * size.height,
-            entry.value.width * size.width,
-            entry.value.height * size.height,
-          );
-          if (rect.inflate(12).contains(position)) return entry.key;
-        }
-        return null;
-      }
-      for (final object in objects.where((item) => item.type == 'door')) {
-        final room = object.id.substring(3);
-        final normalizedRect = roomLayout[room];
-        if (normalizedRect == null) continue;
-        final rect = Rect.fromLTWH(
-          normalizedRect.left * size.width,
-          normalizedRect.top * size.height,
-          normalizedRect.width * size.width,
-          normalizedRect.height * size.height,
+      // Unity door headings: 0 faces north, 180 south, 90 sideways.
+      final heading = door.rotationY.round() % 360;
+      if (heading == 90 || heading == 270) {
+        _text(
+          canvas,
+          door.room,
+          c + const Offset(1 * m, 0),
+          1.15 * m,
+          _ink,
+          FontWeight.w800,
+          alignStart: true,
         );
-        if (rect.inflate(12).contains(position)) return room;
-      }
-      return null;
-    }
-    _IndoorObject? nearest;
-    var nearestDistance = 30.0;
-    for (final object in objects.where((item) => item.type == 'door')) {
-      final point = Offset(
-        size.width * (.09 + ((object.x - _minX) / (_maxX - _minX)) * .82),
-        size.height * (.09 + ((_maxZ - object.z) / (_maxZ - _minZ)) * .80),
-      );
-      final labelPoint =
-          point + _labelOffset(object.id.substring(3), object.type);
-      final distance =
-          (position - point).distance < (position - labelPoint).distance
-          ? (position - point).distance
-          : (position - labelPoint).distance;
-      if (distance < nearestDistance) {
-        nearest = object;
-        nearestDistance = distance;
+      } else {
+        _text(
+          canvas,
+          door.room,
+          c + Offset(0, (heading == 0 ? -1.6 : 1.6) * m),
+          1.15 * m,
+          _ink,
+          FontWeight.w800,
+        );
       }
     }
-    return nearest?.id.substring(3);
+
+    final bar = Paint()
+      ..color = _slate
+      ..strokeWidth = .18 * m
+      ..style = PaintingStyle.stroke;
+    final start = toCanvas(-34, -1.2);
+    final end = toCanvas(-24, -1.2);
+    canvas.drawLine(start, end, bar);
+    canvas.drawLine(
+      start.translate(0, -.4 * m),
+      start.translate(0, .4 * m),
+      bar,
+    );
+    canvas.drawLine(end.translate(0, -.4 * m), end.translate(0, .4 * m), bar);
+    _text(canvas, '10 m', toCanvas(-29, -2.2), .9 * m, _slate, FontWeight.w600);
   }
 
-  Offset _point(double x, double z, Size size) => Offset(
-    size.width * (.09 + ((x - _minX) / (_maxX - _minX)) * .82),
-    size.height * (.09 + ((_maxZ - z) / (_maxZ - _minZ)) * .80),
-  );
+  static Path _dashed(Path source, double dash, double gap) {
+    final out = Path();
+    for (final metric in source.computeMetrics()) {
+      for (var d = 0.0; d < metric.length; d += dash + gap) {
+        out.addPath(metric.extractPath(d, d + dash), Offset.zero);
+      }
+    }
+    return out;
+  }
 
-  void _drawText(
+  static void _text(
     Canvas canvas,
     String text,
-    Offset center,
+    Offset at,
     double fontSize,
-    Color color, {
-    bool bold = false,
+    Color color,
+    FontWeight weight, {
+    double angle = 0,
+    bool alignStart = false,
   }) {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: fontSize,
-          fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-        ),
+        style: TextStyle(color: color, fontSize: fontSize, fontWeight: weight),
       ),
       textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
     )..layout();
+    canvas.save();
+    canvas.translate(at.dx, at.dy);
+    if (angle != 0) canvas.rotate(angle);
     painter.paint(
       canvas,
-      center - Offset(painter.width / 2, painter.height / 2),
+      Offset(alignStart ? 0 : -painter.width / 2, -painter.height / 2),
     );
+    canvas.restore();
+    painter.dispose();
   }
 
   @override
-  bool shouldRepaint(covariant _FloorMapPainter oldDelegate) =>
-      oldDelegate.objects != objects ||
-      oldDelegate.selectedRoom != selectedRoom;
+  bool shouldRepaint(covariant _FloorPlanPainter oldDelegate) =>
+      // objects is derived from floor, so it needs no separate compare.
+      oldDelegate.floor != floor || oldDelegate.selectedRoom != selectedRoom;
+}
+
+class _FloorTab extends StatelessWidget {
+  const _FloorTab({
+    required this.floor,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int floor;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    child: Material(
+      color: selected ? const Color(0xFFFDCC00) : const Color(0x14FFFFFF),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? const Color(0xFFFDCC00) : const Color(0x38FFFFFF),
+          width: 1.5,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: SizedBox(
+          height: 56,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ExcludeSemantics(
+                child: Text(
+                  '$floor',
+                  style: TextStyle(
+                    color: selected ? _ink : Colors.white,
+                    fontSize: 20,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Floor $floor',
+                maxLines: 1,
+                style: TextStyle(
+                  color: selected ? _ink : const Color(0xFFC9D6E8),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _RoomChip extends StatelessWidget {
+  const _RoomChip({
+    required this.room,
+    required this.pinned,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String room;
+  final bool pinned;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final (Color background, Color foreground, Color border) = pinned
+        ? selected
+              ? (AppColors.navy, Colors.white, AppColors.navy)
+              : (Colors.white, _ink, const Color(0xFFD5DCE6))
+        : selected
+        ? (AppColors.accentSoft, _doorStroke, _doorStroke)
+        : (const Color(0xFFF9F9F9), AppColors.labelInk, AppColors.faint);
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: background,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: border, width: 1.5),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: pinned ? _doorFill : null,
+                      border: Border.all(color: _doorStroke, width: 1.5),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    room,
+                    style: TextStyle(
+                      color: foreground,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapButton extends StatelessWidget {
+  const _MapButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    icon: Icon(icon, size: 20),
+    style: IconButton.styleFrom(
+      fixedSize: const Size(44, 44),
+      backgroundColor: Colors.white,
+      foregroundColor: _ink,
+      elevation: 2,
+      shadowColor: const Color(0x1A101828),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+    ),
+  );
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.label,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: foreground,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title, this.caption);
+
+  final String title;
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.baseline,
+    textBaseline: TextBaseline.alphabetic,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(
+          color: _ink,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const Spacer(),
+      Text(
+        caption,
+        style: const TextStyle(
+          color: _slate,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ],
+  );
 }
 
 class _Legend extends StatelessWidget {
-  const _Legend({required this.color, required this.label});
+  const _Legend({required this.color, required this.label, this.door = false});
 
   final Color color;
   final String label;
+  final bool door;
 
   @override
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       Container(
-        width: 11,
-        height: 11,
+        width: 12,
+        height: 12,
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(door ? 6 : 4),
+          border: door ? Border.all(color: _doorStroke, width: 1.5) : null,
         ),
       ),
-      const SizedBox(width: 5),
+      const SizedBox(width: 6),
       Text(
         label,
         style: const TextStyle(
-          fontSize: 10,
-          color: Color(0xFFE4E8F0),
+          fontSize: 12,
+          color: AppColors.labelInk,
           fontWeight: FontWeight.w600,
         ),
       ),

@@ -94,10 +94,12 @@ phone unless a note says so.
      at most 10 s old within 2 m of that footprint.
    - Outdoor arrival at a room enters `FlowIndoorHandoff`. The handoff sheet
      offers **Scan AR** only for covered VEC floors, regardless of fix age.
-   - **Verify location** on the VEC building map opens AR after resolving the
+   - **Verify with AR** on the VEC building map opens AR after resolving the
      selected room and floor to exactly one backend place ID through search.
-     Floors 1–2 combine drawn floor plans with data from the bundled scan
-     (`assets/indoor/vec_floors1and2.json`). Floors 3–5 use directory plans.
+     All five floors draw corridors traced from the MultiSet scans as placed
+     in the Unity `VEC_Building` scene. Floors 1–3 place door pins from the
+     bundled Unity export (`assets/indoor/vec_floors123.json`); floors 4–5
+     list rooms without placing them until their pin points land.
      The AR door pose comes from the backend place record. If the room cannot
      be matched to exactly one place or the lookup fails, AR does not open;
      try search or retry the lookup.
@@ -614,7 +616,7 @@ numbers consistently, and confirm each floor as you arrive. In the positioning
 screen confirm the current starting floor to anchor
 relative pressure for that outing. The floor belief can persist without Wi-Fi;
 Wi-Fi scans refresh the likely landmark when available. The current bundled
-Unity scan provides landmark coordinates for floors 1 and 2 only. Floors 3–5
+Unity scan provides landmark coordinates for floors 1–3 only. Floors 4–5
 can have a floor belief from pressure calibration, but do not yet have surveyed
 Wi-Fi landpoints or coordinates in this build. These estimates are a prototype
 and need on-device VEC survey/validation before being used as navigation truth.
