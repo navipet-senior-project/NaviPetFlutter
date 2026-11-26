@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/rendering.dart' show MatrixUtils, RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -275,6 +275,10 @@ void main() {
       expect(find.bySemanticsLabel(RegExp('^Select room')), findsNothing);
       expect(find.text('0 pinned · 7 directory-only'), findsOneWidget);
       expect(pending, findsOneWidget);
+      expect(
+        find.text('Pick a room from the directory below.'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byTooltip('Full-screen map'));
       await tester.pumpAndSettle();
@@ -312,18 +316,34 @@ void main() {
     await _Harness().pump(tester);
 
     Finder door(String room) => find.byKey(ValueKey('door-$room'));
-    void expectTargetSize(String room) {
-      final size = tester.getSize(door(room));
-      expect(size.width, closeTo(40, .001));
-      expect(size.height, closeTo(40, .001));
+    final viewer = find.byType(InteractiveViewer);
+    Offset pinAt(Offset canvasPoint) {
+      final controller = tester
+          .widget<InteractiveViewer>(viewer)
+          .transformationController!;
+      return tester.getTopLeft(viewer) +
+          MatrixUtils.transformPoint(controller.value, canvasPoint);
     }
 
-    await tester.tapAt(tester.getCenter(door('128')));
+    const pin119 = Offset(279.44, 138.28);
+    const pin120 = Offset(251.87, 137.68);
+    const pin128 = Offset(571.55, 107.73);
+    const pin136 = Offset(456.46, 135.82);
+    final exposedDoors = find.bySemanticsLabel(RegExp(r'^Select room \d+$'));
+    for (final (room, pin) in [('119', pin119), ('120', pin120)]) {
+      final explored = exposedDoors.evaluate().where((element) {
+        final box = element.renderObject! as RenderBox;
+        final node = tester.getSemantics(find.byWidget(element.widget));
+        return node.rect.contains(box.globalToLocal(pinAt(pin)));
+      });
+      expect(explored.single.widget.key, ValueKey('door-$room'));
+    }
+
+    await tester.tapAt(pinAt(pin128));
     await tester.pumpAndSettle();
     expect(find.text('Room 128'), findsOneWidget);
 
-    expectTargetSize('136');
-    final center = tester.getCenter(door('136'));
+    final center = pinAt(pin136);
     await tester.tapAt(center + const Offset(0, 21));
     await tester.pumpAndSettle();
     expect(find.text('Room 128'), findsOneWidget);
@@ -331,16 +351,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Room 136'), findsOneWidget);
 
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byTooltip('Zoom in'));
+      await tester.pumpAndSettle();
+    }
+    final visible = tester.getRect(viewer);
+    expect(door('128'), findsNothing);
+    await tester.tapAt(Offset(visible.right - 1, pinAt(pin128).dy));
+    await tester.pumpAndSettle();
+    expect(find.text('Room 136'), findsOneWidget);
+
     await tester.tap(find.byTooltip('Full-screen map'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Zoom in'));
     await tester.pumpAndSettle();
-    final beforePan = tester.getCenter(door('120'));
-    await tester.drag(find.byType(InteractiveViewer), const Offset(30, 0));
+    final beforePan = pinAt(pin120);
+    await tester.drag(viewer, const Offset(30, 0));
     await tester.pumpAndSettle();
-    expect(tester.getCenter(door('120')).dx, greaterThan(beforePan.dx));
-    expectTargetSize('120');
-    await tester.tapAt(tester.getCenter(door('120')) + const Offset(5, 0));
+    expect(pinAt(pin120).dx, greaterThan(beforePan.dx));
+    await tester.tapAt(pinAt(pin120) + const Offset(5, 0));
     await tester.pumpAndSettle();
     expect(
       tester.getSemantics(door('120')),
@@ -372,6 +401,13 @@ void main() {
     final toolbar = tester.getRect(find.byType(NavigationToolbar));
     for (final text in ['Choose a room', 'Vivian Engineering Center · VEC']) {
       final paragraph = tester.renderObject<RenderParagraph>(find.text(text));
+      expect(paragraph.textScaler.scale(13), 26);
+      expect(
+        paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: text.length - 1, extentOffset: text.length),
+        ),
+        isNotEmpty,
+      );
       final lines = paragraph.getBoxesForSelection(
         TextSelection(baseOffset: 0, extentOffset: text.length),
       );

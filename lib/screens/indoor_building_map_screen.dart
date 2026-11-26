@@ -14,6 +14,7 @@ import '../data/indoor_floor_coverage.dart';
 import '../data/navigation_flow_controller.dart';
 import '../theme/app_theme.dart';
 
+const _viewportRadius = Radius.circular(18);
 const _ink = Color(0xFF00244E);
 const _slate = Color(0xFF5D6B82);
 const _doorFill = Color(0xFFF2E7B9);
@@ -192,12 +193,18 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final map = snapshot.data!;
-            if (_expanded) return _mapSection(map);
+            final objects = snapshot.data!.objectsForFloor(_floor);
+            final pinned = [
+              for (final object in objects)
+                if (object.type == 'door') object.room,
+            ]..sort();
+            final pending = pinned.isEmpty;
+            final mapSection = _mapSection(objects, pinned.length, pending);
+            if (_expanded) return mapSection;
             return Column(
               children: [
-                Expanded(child: _roomList(map)),
-                _selectionSheet(map),
+                Expanded(child: _roomList(mapSection, pinned, pending)),
+                _selectionSheet(pinned, pending),
               ],
             );
           },
@@ -227,12 +234,13 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     final titleStyle =
         AppBarTheme.of(context).titleTextStyle ??
         Theme.of(context).textTheme.titleLarge;
+    final textScaler = MediaQuery.textScalerOf(context);
     var titleHeight = 0.0;
     for (final (label, style) in titleLines) {
       final painter = TextPainter(
         text: TextSpan(text: label, style: titleStyle?.merge(style) ?? style),
         textDirection: Directionality.of(context),
-        textScaler: MediaQuery.textScalerOf(context),
+        textScaler: textScaler,
       )..layout(maxWidth: titleWidth);
       titleHeight += painter.height.ceilToDouble();
       painter.dispose();
@@ -247,7 +255,14 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final (label, style) in titleLines) Text(label, style: style),
+          for (final (label, style) in titleLines)
+            Text(
+              label,
+              style: style,
+              textScaler: textScaler,
+              softWrap: true,
+              overflow: TextOverflow.clip,
+            ),
         ],
       ),
       actions: [
@@ -289,8 +304,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     );
   }
 
-  Widget _roomList(_VecIndoorMap map) {
-    final pinned = map.pinnedRooms(_floor);
+  Widget _roomList(Widget mapSection, List<String> pinned, bool pending) {
     final directory = _directoryOnlyRooms[_floor] ?? const <String>[];
     final ar = indoorScanCovered('VEC', '$_floor');
     return ListView(
@@ -305,7 +319,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        _mapSection(map),
+        mapSection,
         const SizedBox(height: 14),
         const Wrap(
           spacing: 14,
@@ -321,7 +335,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
         const SizedBox(height: 14),
         const _SectionTitle('Pinned on the scan', 'Door position verified'),
         const SizedBox(height: 10),
-        if (pinned.isEmpty)
+        if (pending)
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -374,11 +388,10 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     );
   }
 
-  Widget _mapSection(_VecIndoorMap map) {
-    final pinned = map.pinnedRooms(_floor);
+  Widget _mapSection(List<_IndoorObject> objects, int pinCount, bool pending) {
     final directory = _directoryOnlyRooms[_floor] ?? const <String>[];
     final viewport = ClipRRect(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: const BorderRadius.all(_viewportRadius),
       child: ColoredBox(
         color: const Color(0xFFF4F7FB),
         child: LayoutBuilder(
@@ -394,7 +407,12 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             return _FloorPlan(
               transformationController: _mapTransform,
               floor: _floor,
-              objects: map.objectsForFloor(_floor),
+              objects: objects,
+              pending: pending,
+              viewport: RRect.fromRectAndRadius(
+                Offset.zero & size,
+                _viewportRadius,
+              ),
               selectedRoom: _selectedRoom,
               onSelectRoom: _selectRoom,
             );
@@ -427,7 +445,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
             child: _SectionTitle(
               'Floor $_floor',
-              '${pinned.length} pinned · ${directory.length} directory-only',
+              '$pinCount pinned · ${directory.length} directory-only',
             ),
           ),
           Row(
@@ -457,7 +475,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             Expanded(child: viewport)
           else
             SizedBox(height: 300, child: viewport),
-          if (pinned.isEmpty)
+          if (pending)
             Container(
               margin: const EdgeInsets.fromLTRB(8, 8, 8, 2),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -481,11 +499,10 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     );
   }
 
-  Widget _selectionSheet(_VecIndoorMap map) {
+  Widget _selectionSheet(List<String> pinned, bool pending) {
     final room = _selectedRoom;
     final ar = indoorScanCovered('VEC', '$_floor');
-    final pinned = room != null && map.pinnedRooms(_floor).contains(room);
-    final canVerify = pinned && ar;
+    final canVerify = room != null && pinned.contains(room) && ar;
     final (String badge, String note) = canVerify
         ? (
             'Door on scan',
@@ -544,9 +561,11 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Tap a door on the map or a room below.',
-                style: TextStyle(
+              Text(
+                pending
+                    ? 'Pick a room from the directory below.'
+                    : 'Tap a door on the map or a room below.',
+                style: const TextStyle(
                   color: AppColors.labelInk,
                   fontSize: 13,
                   height: 1.5,
@@ -662,13 +681,6 @@ class _VecIndoorMap {
 
   List<_IndoorObject> objectsForFloor(int floor) =>
       objects.where((object) => object.floor == floor).toList(growable: false);
-
-  List<String> pinnedRooms(int floor) =>
-      objectsForFloor(floor)
-          .where((object) => object.type == 'door')
-          .map((object) => object.room)
-          .toList()
-        ..sort();
 }
 
 class _IndoorObject {
@@ -708,17 +720,11 @@ class _IndoorObject {
 /// meshes as placed in the Unity `VEC_Building` scene. Rects are Unity metres
 /// with y = -z, so north is up.
 class _FloorGeometry {
-  const _FloorGeometry({
-    required this.halls,
-    this.core,
-    required this.labels,
-    this.pending = false,
-  });
+  const _FloorGeometry({required this.halls, this.core, required this.labels});
 
   final List<Rect> halls;
   final Rect? core;
   final List<(String, Offset, double)> labels;
-  final bool pending;
 }
 
 const _geometry = <int, _FloorGeometry>{
@@ -773,9 +779,7 @@ const _geometry = <int, _FloorGeometry>{
     labels: [
       ('Core', Offset(-3.8, -25.5), 0),
       ('Main corridor', Offset(-16, -22.4), 0),
-      ('Pin points pending', Offset(12, -22.4), 0),
     ],
-    pending: true,
   ),
   5: _FloorGeometry(
     halls: [
@@ -788,9 +792,7 @@ const _geometry = <int, _FloorGeometry>{
     labels: [
       ('Core', Offset(-4.1, -25.8), 0),
       ('Main corridor', Offset(-16, -22.5), 0),
-      ('Pin points pending', Offset(12, -22.5), 0),
     ],
-    pending: true,
   ),
 };
 
@@ -799,6 +801,8 @@ class _FloorPlan extends StatelessWidget {
     required this.transformationController,
     required this.floor,
     required this.objects,
+    required this.pending,
+    required this.viewport,
     required this.selectedRoom,
     required this.onSelectRoom,
   });
@@ -806,8 +810,35 @@ class _FloorPlan extends StatelessWidget {
   final TransformationController transformationController;
   final int floor;
   final List<_IndoorObject> objects;
+  final bool pending;
+  final RRect viewport;
   final String? selectedRoom;
   final ValueChanged<String> onSelectRoom;
+
+  static Rect _semanticsBounds(
+    Offset center,
+    List<(String, Offset)> targets,
+    Rect bounds,
+  ) {
+    var Rect(:left, :top, :right, :bottom) = bounds;
+    for (final (_, neighbor) in targets) {
+      if (neighbor == center) continue;
+      final delta = neighbor - center;
+      final midpoint = (center + neighbor) / 2;
+      if (delta.dx.abs() >= delta.dy.abs()) {
+        if (delta.dx > 0) {
+          right = math.min(right, midpoint.dx);
+        } else {
+          left = math.max(left, midpoint.dx);
+        }
+      } else if (delta.dy > 0) {
+        bottom = math.min(bottom, midpoint.dy);
+      } else {
+        top = math.max(top, midpoint.dy);
+      }
+    }
+    return Rect.fromLTRB(left, top, right, bottom);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -832,6 +863,7 @@ class _FloorPlan extends StatelessWidget {
               painter: _FloorPlanPainter(
                 floor: floor,
                 objects: objects,
+                pending: pending,
                 selectedRoom: selectedRoom,
               ),
             ),
@@ -839,9 +871,28 @@ class _FloorPlan extends StatelessWidget {
         ),
       ),
       builder: (context, transform, viewer) {
+        final visiblePinCenters = viewport.inflate(
+          _FloorPlanPainter._doorOuterRadius * transform.getMaxScaleOnAxis(),
+        );
         final targets = [
           for (final (room, center) in doors)
-            (room, MatrixUtils.transformPoint(transform, center)),
+            if (MatrixUtils.transformPoint(transform, center)
+                case final projected when visiblePinCenters.contains(projected))
+              (room, projected),
+        ];
+        final regions = [
+          for (final (room, center) in targets)
+            (
+              room,
+              _semanticsBounds(
+                center,
+                targets,
+                Rect.fromCircle(
+                  center: center,
+                  radius: hitRadius,
+                ).intersect(viewport.outerRect),
+              ),
+            ),
         ];
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -862,17 +913,18 @@ class _FloorPlan extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               viewer!,
-              for (final (room, center) in targets)
-                Positioned.fromRect(
-                  rect: Rect.fromCircle(center: center, radius: hitRadius),
-                  child: Semantics(
-                    key: ValueKey('door-$room'),
-                    button: true,
-                    selected: room == selectedRoom,
-                    label: 'Select room $room',
-                    onTap: () => onSelectRoom(room),
+              for (final (room, region) in regions)
+                if (!region.isEmpty)
+                  Positioned.fromRect(
+                    rect: region,
+                    child: Semantics(
+                      key: ValueKey('door-$room'),
+                      button: true,
+                      selected: room == selectedRoom,
+                      label: 'Select room $room',
+                      onTap: () => onSelectRoom(room),
+                    ),
                   ),
-                ),
             ],
           ),
         );
@@ -885,15 +937,20 @@ class _FloorPlanPainter extends CustomPainter {
   const _FloorPlanPainter({
     required this.floor,
     required this.objects,
+    required this.pending,
     required this.selectedRoom,
   });
 
   final int floor;
   final List<_IndoorObject> objects;
+  final bool pending;
   final String? selectedRoom;
 
   static const _world = Rect.fromLTWH(-36, -35, 67, 36);
   static const _pxPerMetre = 10.0;
+  static const _doorRadius = .62 * _pxPerMetre;
+  static const _doorStrokeWidth = .16 * _pxPerMetre;
+  static const _doorOuterRadius = _doorRadius + _doorStrokeWidth / 2;
   static final canvasSize = Size(
     _world.width * _pxPerMetre,
     _world.height * _pxPerMetre,
@@ -928,10 +985,7 @@ class _FloorPlanPainter extends CustomPainter {
       ..strokeWidth = .7 * m;
     for (final hall in geometry.halls) {
       final path = Path()..addRect(_rect(hall));
-      canvas.drawPath(
-        geometry.pending ? _dashed(path, 1 * m, .5 * m) : path,
-        outline,
-      );
+      canvas.drawPath(pending ? _dashed(path, 1 * m, .5 * m) : path, outline);
     }
     final fill = Paint()..color = Colors.white;
     for (final hall in geometry.halls) {
@@ -956,6 +1010,17 @@ class _FloorPlanPainter extends CustomPainter {
         _slate,
         FontWeight.w600,
         angle: angle,
+      );
+    }
+
+    if (pending) {
+      _text(
+        canvas,
+        'Pin points pending',
+        toCanvas(12, -22.5),
+        .9 * m,
+        _slate,
+        FontWeight.w600,
       );
     }
 
@@ -996,14 +1061,14 @@ class _FloorPlanPainter extends CustomPainter {
 
     for (final door in objects.where((o) => o.type == 'door')) {
       final c = _objectCenter(door);
-      canvas.drawCircle(c, .62 * m, Paint()..color = _doorFill);
+      canvas.drawCircle(c, _doorRadius, Paint()..color = _doorFill);
       canvas.drawCircle(
         c,
-        .62 * m,
+        _doorRadius,
         Paint()
           ..color = _doorStroke
           ..style = PaintingStyle.stroke
-          ..strokeWidth = .16 * m,
+          ..strokeWidth = _doorStrokeWidth,
       );
       // Unity door headings: 0 faces north, 180 south, 90 sideways.
       final heading = door.rotationY.round() % 360;
@@ -1086,7 +1151,9 @@ class _FloorPlanPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _FloorPlanPainter oldDelegate) =>
       // objects is derived from floor, so it needs no separate compare.
-      oldDelegate.floor != floor || oldDelegate.selectedRoom != selectedRoom;
+      oldDelegate.floor != floor ||
+      oldDelegate.pending != pending ||
+      oldDelegate.selectedRoom != selectedRoom;
 }
 
 class _FloorTab extends StatelessWidget {
