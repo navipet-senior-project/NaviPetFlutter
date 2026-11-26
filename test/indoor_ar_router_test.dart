@@ -500,6 +500,93 @@ void main() {
     }
   });
 
+  testWidgets('full-screen pan and zoom keep part of the canvas visible', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await _Harness().pump(tester);
+    await tester.tap(find.byTooltip('Full-screen map'));
+    await tester.pumpAndSettle();
+
+    final viewer = find.byType(InteractiveViewer);
+    final plan = find.descendant(
+      of: viewer,
+      matching: find.byType(CustomPaint),
+    );
+    final viewport = tester.getRect(viewer);
+    Rect visiblePlan() {
+      final box = tester.renderObject<RenderBox>(plan);
+      return MatrixUtils.transformRect(
+        box.getTransformTo(null),
+        Offset.zero & box.size,
+      ).intersect(viewport);
+    }
+
+    final start = Offset(viewport.center.dx, viewport.top + 80);
+    final beforePan = visiblePlan();
+    await tester.dragFrom(start, const Offset(0, 550));
+    await tester.pumpAndSettle();
+    expect(visiblePlan().top, greaterThan(beforePan.top));
+    expect(visiblePlan().height, greaterThan(0));
+
+    for (final control in ['Zoom in', 'Zoom out']) {
+      await tester.tap(find.byTooltip(control));
+      await tester.pumpAndSettle();
+      expect(visiblePlan().isEmpty, isFalse);
+    }
+  });
+
+  testWidgets('rounded corners exclude pointer and accessibility hits', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await _Harness().pump(tester);
+    await tester.tap(find.byTooltip('Full-screen map'));
+    await tester.pumpAndSettle();
+
+    final viewer = find.byType(InteractiveViewer);
+    final door = find.byKey(const ValueKey('door-120'));
+    final viewport = tester.getRect(viewer);
+    final controller = tester
+        .widget<InteractiveViewer>(viewer)
+        .transformationController!;
+    const pin = Offset(251.87, 137.68);
+    for (final (corner, inward) in [
+      (viewport.topLeft, const Offset(1, 1)),
+      (viewport.topRight, const Offset(-1, 1)),
+      (viewport.bottomLeft, const Offset(1, -1)),
+      (viewport.bottomRight, const Offset(-1, -1)),
+    ]) {
+      final at = corner + inward * 12;
+      final transform = controller.value.clone();
+      final delta =
+          at - viewport.topLeft - MatrixUtils.transformPoint(transform, pin);
+      transform.setEntry(0, 3, transform.entry(0, 3) + delta.dx);
+      transform.setEntry(1, 3, transform.entry(1, 3) + delta.dy);
+      controller.value = transform;
+      await tester.pumpAndSettle();
+
+      final node = tester.getSemantics(door);
+      final box = tester.renderObject<RenderBox>(door);
+      final outside = corner + inward * 2;
+      expect(node.rect.contains(box.globalToLocal(outside)), isFalse);
+      expect(node.rect.contains(box.globalToLocal(at)), isTrue);
+      await tester.tapAt(outside);
+      await tester.pumpAndSettle();
+      expect(tester.getSemantics(door), containsSemantics(isSelected: false));
+    }
+
+    await tester.tapAt(viewport.bottomRight - const Offset(12, 12));
+    await tester.pumpAndSettle();
+    expect(tester.getSemantics(door), containsSemantics(isSelected: true));
+  });
+
   testWidgets('short body leaves the map controls reachable at large text', (
     tester,
   ) async {

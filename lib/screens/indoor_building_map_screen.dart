@@ -37,10 +37,39 @@ class IndoorBuildingMapScreen extends StatefulWidget {
       _IndoorBuildingMapScreenState();
 }
 
+class _MapTransformationController extends TransformationController {
+  Size viewportSize = Size.zero;
+
+  @override
+  set value(Matrix4 transform) {
+    if (viewportSize.isEmpty) {
+      super.value = transform;
+      return;
+    }
+    final canvas = _FloorPlanPainter.canvasSize * transform.getMaxScaleOnAxis();
+    final visibleWidth = math.min(40.0, viewportSize.width);
+    final visibleHeight = math.min(40.0, viewportSize.height);
+    final x = transform.entry(0, 3);
+    final y = transform.entry(1, 3);
+    final boundedX = x.clamp(
+      visibleWidth - canvas.width,
+      viewportSize.width - visibleWidth,
+    );
+    final boundedY = y.clamp(
+      visibleHeight - canvas.height,
+      viewportSize.height - visibleHeight,
+    );
+    super.value = x == boundedX && y == boundedY
+        ? transform
+        : (transform.clone()
+            ..setEntry(0, 3, boundedX.toDouble())
+            ..setEntry(1, 3, boundedY.toDouble()));
+  }
+}
+
 class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   late final Future<_VecIndoorMap> _map = _loadMap();
-  final TransformationController _mapTransform = TransformationController();
-  Size _mapViewportSize = Size.zero;
+  final _mapTransform = _MapTransformationController();
   Size _lastViewportSize = Size.zero;
   int _floor = 1;
   String? _selectedRoom = '119';
@@ -92,13 +121,14 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   void _zoomMap(double factor) {
     final current = _mapTransform.value;
     final currentScale = current.getMaxScaleOnAxis();
-    if (currentScale <= 0 || _mapViewportSize.isEmpty) return;
+    final viewport = _mapTransform.viewportSize;
+    if (currentScale <= 0 || viewport.isEmpty) return;
     final nextScale = (currentScale * factor)
         .clamp(_minMapScale, _maxMapScale)
         .toDouble();
     final ratio = nextScale / currentScale;
-    final centerX = _mapViewportSize.width / 2;
-    final centerY = _mapViewportSize.height / 2;
+    final centerX = viewport.width / 2;
+    final centerY = viewport.height / 2;
     final translateX = centerX + (current.entry(0, 3) - centerX) * ratio;
     final translateY = centerY + (current.entry(1, 3) - centerY) * ratio;
     _mapTransform.value = Matrix4.identity()
@@ -399,7 +429,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     final viewport = LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        _mapViewportSize = size;
+        _mapTransform.viewportSize = size;
         if (_lastViewportSize != size) {
           _lastViewportSize = size;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -414,7 +444,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
           viewport: RRect.fromRectAndRadius(
             Offset.zero & size,
             _viewportRadius,
-          ),
+          ).scaleRadii(),
           selectedRoom: _selectedRoom,
           onSelectRoom: _selectRoom,
         );
@@ -847,14 +877,22 @@ class _FloorPlan extends StatelessWidget {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
+  Rect _clipHitRegion(Rect bounds) {
+    final region = bounds.intersect(viewport.outerRect);
+    final nearSide =
+        region.left < viewport.left + viewport.tlRadiusX ||
+        region.right > viewport.right - viewport.trRadiusX;
+    final nearEnd =
+        region.top < viewport.top + viewport.tlRadiusY ||
+        region.bottom > viewport.bottom - viewport.blRadiusY;
+    return nearSide && nearEnd
+        ? region.intersect(viewport.safeInnerRect)
+        : region;
+  }
+
   @override
   Widget build(BuildContext context) {
     const hitSize = 40.0;
-    final canvasSize = _FloorPlanPainter.canvasSize;
-    final horizontalMargin =
-        (viewport.width / _minMapScale - canvasSize.width) / 2;
-    final verticalMargin =
-        (viewport.height / _minMapScale - canvasSize.height) / 2;
     final doors = [
       for (final object in objects)
         if (object.type == 'door')
@@ -871,12 +909,9 @@ class _FloorPlan extends StatelessWidget {
             transformationController: transformationController,
             minScale: _minMapScale,
             maxScale: _maxMapScale,
-            boundaryMargin: EdgeInsets.symmetric(
-              horizontal: math.max(400.0, horizontalMargin),
-              vertical: math.max(400.0, verticalMargin),
-            ),
+            boundaryMargin: const EdgeInsets.all(double.infinity),
             child: SizedBox.fromSize(
-              size: canvasSize,
+              size: _FloorPlanPainter.canvasSize,
               child: RepaintBoundary(
                 child: CustomPaint(
                   painter: _FloorPlanPainter(
@@ -905,15 +940,17 @@ class _FloorPlan extends StatelessWidget {
           for (final (room, center) in targets)
             (
               room,
-              _doorHitBounds(
-                center,
-                targets,
-                Rect.fromCenter(
-                  center: center,
-                  width: hitSize,
-                  height: hitSize,
+              _clipHitRegion(
+                _doorHitBounds(
+                  center,
+                  targets,
+                  Rect.fromCenter(
+                    center: center,
+                    width: hitSize,
+                    height: hitSize,
+                  ),
                 ),
-              ).intersect(viewport.outerRect),
+              ),
             ),
         ];
         return GestureDetector(
