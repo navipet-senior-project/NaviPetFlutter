@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show MatrixUtils;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -205,57 +206,88 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     ),
   );
 
-  PreferredSizeWidget _header() => AppBar(
-    backgroundColor: AppColors.navy,
-    foregroundColor: Colors.white,
-    titleSpacing: 0,
-    title: const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Choose a room',
-          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-        ),
-        Text(
-          '${IndoorBuildingCatalog.vecDisplayName} · VEC',
-          style: TextStyle(fontSize: 13, color: Color(0xFFC9D6E8)),
-        ),
+  PreferredSizeWidget _header() {
+    const titleLines = [
+      ('Choose a room', TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+      (
+        '${IndoorBuildingCatalog.vecDisplayName} · VEC',
+        TextStyle(fontSize: 13, color: Color(0xFFC9D6E8)),
+      ),
+    ];
+    const leadingWidth = 56.0;
+    const actionWidth = 48.0;
+    final padding = MediaQuery.paddingOf(context);
+    final titleWidth = math.max(
+      1.0,
+      MediaQuery.sizeOf(context).width -
+          padding.horizontal -
+          leadingWidth -
+          (kDebugMode ? actionWidth : 0),
+    );
+    final titleStyle =
+        AppBarTheme.of(context).titleTextStyle ??
+        Theme.of(context).textTheme.titleLarge;
+    var titleHeight = 0.0;
+    for (final (label, style) in titleLines) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: titleStyle?.merge(style) ?? style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: titleWidth);
+      titleHeight += painter.height.ceilToDouble();
+      painter.dispose();
+    }
+    return AppBar(
+      backgroundColor: AppColors.navy,
+      foregroundColor: Colors.white,
+      leadingWidth: leadingWidth,
+      toolbarHeight: math.max(kToolbarHeight, titleHeight + 8),
+      titleSpacing: 0,
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (label, style) in titleLines) Text(label, style: style),
+        ],
+      ),
+      actions: [
+        if (kDebugMode)
+          SizedBox(
+            width: actionWidth,
+            child: IconButton(
+              tooltip: 'VEC positioning survey',
+              onPressed: () => context.push('/dev/vec-positioning'),
+              icon: const Icon(Icons.wifi_tethering),
+            ),
+          ),
       ],
-    ),
-    actions: [
-      if (kDebugMode)
-        IconButton(
-          tooltip: 'VEC positioning survey',
-          onPressed: () => context.push('/dev/vec-positioning'),
-          icon: const Icon(Icons.wifi_tethering),
-        ),
-    ],
-    bottom: PreferredSize(
-      preferredSize: const Size.fromHeight(74),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-        // Tabs are a fixed 56 px; past 1.3x the caption would overflow.
-        child: MediaQuery.withClampedTextScaling(
-          maxScaleFactor: 1.3,
-          child: Row(
-            children: [
-              for (final floor in _floors)
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(left: floor == 1 ? 0 : 6),
-                    child: _FloorTab(
-                      floor: floor,
-                      selected: floor == _floor,
-                      onTap: () => _selectFloor(floor),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(74),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+          // Tabs are a fixed 56 px; past 1.3x the caption would overflow.
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.3,
+            child: Row(
+              children: [
+                for (final floor in _floors)
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(left: floor == 1 ? 0 : 6),
+                      child: _FloorTab(
+                        floor: floor,
+                        selected: floor == _floor,
+                        onTap: () => _selectFloor(floor),
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _roomList(_VecIndoorMap map) {
     final pinned = map.pinnedRooms(_floor);
@@ -359,18 +391,12 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 if (mounted && _lastViewportSize == size) _fitMap(size);
               });
             }
-            return InteractiveViewer(
-              constrained: false,
+            return _FloorPlan(
               transformationController: _mapTransform,
-              minScale: .2,
-              maxScale: 4,
-              boundaryMargin: const EdgeInsets.all(400),
-              child: _FloorPlan(
-                floor: _floor,
-                objects: map.objectsForFloor(_floor),
-                selectedRoom: _selectedRoom,
-                onSelectRoom: _selectRoom,
-              ),
+              floor: _floor,
+              objects: map.objectsForFloor(_floor),
+              selectedRoom: _selectedRoom,
+              onSelectRoom: _selectRoom,
             );
           },
         ),
@@ -441,7 +467,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 border: Border.all(color: const Color(0xFFC9A23A)),
               ),
               child: const Text(
-                'Corridors are traced from the building scan. Door pin points for this floor are still coming, so rooms are listed below instead of placed.',
+                'Corridors are traced from the building scan. Door pin points for this floor are still coming.',
                 style: TextStyle(
                   color: _doorStroke,
                   fontSize: 12,
@@ -770,12 +796,14 @@ const _geometry = <int, _FloorGeometry>{
 
 class _FloorPlan extends StatelessWidget {
   const _FloorPlan({
+    required this.transformationController,
     required this.floor,
     required this.objects,
     required this.selectedRoom,
     required this.onSelectRoom,
   });
 
+  final TransformationController transformationController;
   final int floor;
   final List<_IndoorObject> objects;
   final String? selectedRoom;
@@ -787,52 +815,68 @@ class _FloorPlan extends StatelessWidget {
     final doors = [
       for (final object in objects)
         if (object.type == 'door')
-          (object, _FloorPlanPainter._objectCenter(object)),
+          (object.room, _FloorPlanPainter._objectCenter(object)),
     ];
-    return SizedBox.fromSize(
-      size: _FloorPlanPainter.canvasSize,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        excludeFromSemantics: true,
-        onTapUp: (details) {
-          String? nearestRoom;
-          var nearestDistance = hitRadius * hitRadius;
-          for (final (door, center) in doors) {
-            final distance = (details.localPosition - center).distanceSquared;
-            if (distance <= nearestDistance) {
-              nearestDistance = distance;
-              nearestRoom = door.room;
-            }
-          }
-          if (nearestRoom != null) onSelectRoom(nearestRoom);
-        },
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: RepaintBoundary(
-                child: CustomPaint(
-                  painter: _FloorPlanPainter(
-                    floor: floor,
-                    objects: objects,
-                    selectedRoom: selectedRoom,
-                  ),
-                ),
+    return ValueListenableBuilder<Matrix4>(
+      valueListenable: transformationController,
+      child: InteractiveViewer(
+        constrained: false,
+        transformationController: transformationController,
+        minScale: .2,
+        maxScale: 4,
+        boundaryMargin: const EdgeInsets.all(400),
+        child: SizedBox.fromSize(
+          size: _FloorPlanPainter.canvasSize,
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _FloorPlanPainter(
+                floor: floor,
+                objects: objects,
+                selectedRoom: selectedRoom,
               ),
             ),
-            for (final (door, center) in doors)
-              Positioned.fromRect(
-                rect: Rect.fromCircle(center: center, radius: hitRadius),
-                child: Semantics(
-                  key: ValueKey('door-${door.room}'),
-                  button: true,
-                  selected: door.room == selectedRoom,
-                  label: 'Select room ${door.room}',
-                  onTap: () => onSelectRoom(door.room),
-                ),
-              ),
-          ],
+          ),
         ),
       ),
+      builder: (context, transform, viewer) {
+        final targets = [
+          for (final (room, center) in doors)
+            (room, MatrixUtils.transformPoint(transform, center)),
+        ];
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          onTapUp: (details) {
+            String? nearestRoom;
+            var nearestDistance = hitRadius * hitRadius;
+            for (final (room, center) in targets) {
+              final distance = (details.localPosition - center).distanceSquared;
+              if (distance <= nearestDistance) {
+                nearestDistance = distance;
+                nearestRoom = room;
+              }
+            }
+            if (nearestRoom != null) onSelectRoom(nearestRoom);
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              viewer!,
+              for (final (room, center) in targets)
+                Positioned.fromRect(
+                  rect: Rect.fromCircle(center: center, radius: hitRadius),
+                  child: Semantics(
+                    key: ValueKey('door-$room'),
+                    button: true,
+                    selected: room == selectedRoom,
+                    label: 'Select room $room',
+                    onTap: () => onSelectRoom(room),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

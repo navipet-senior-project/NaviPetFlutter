@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -249,7 +250,7 @@ void main() {
     expect(fromMap['headingDeg'], 185.36);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
-  testWidgets('floor 3 shows pinned doors; floor 4 stays pending', (
+  testWidgets('floor 3 shows doors and floors 4–5 stay pending', (
     tester,
   ) async {
     final harness = _Harness();
@@ -265,17 +266,30 @@ void main() {
     expect(find.text('Door on scan'), findsOneWidget);
     expect(find.text('Verify with AR'), findsOneWidget);
 
-    await tester.tap(find.text('Floor 4'));
-    await tester.pumpAndSettle();
-    expect(find.bySemanticsLabel(RegExp('^Select room')), findsNothing);
-    expect(find.text('0 pinned · 7 directory-only'), findsOneWidget);
-    expect(find.textContaining('Door pin points for this floor'), findsOne);
+    final pending = find.text(
+      'Corridors are traced from the building scan. Door pin points for this floor are still coming.',
+    );
+    for (final floor in [5, 4]) {
+      await tester.tap(find.text('Floor $floor'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel(RegExp('^Select room')), findsNothing);
+      expect(find.text('0 pinned · 7 directory-only'), findsOneWidget);
+      expect(pending, findsOneWidget);
+
+      await tester.tap(find.byTooltip('Full-screen map'));
+      await tester.pumpAndSettle();
+      expect(pending, findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('^Select room')), findsNothing);
+      await tester.tap(find.byTooltip('Exit full-screen map'));
+      await tester.pumpAndSettle();
+    }
     final chip = find.text('417');
     await tester.scrollUntilVisible(
       chip,
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
     await tester.tap(chip);
     await tester.pumpAndSettle();
     final button = tester.widget<ButtonStyleButton>(
@@ -298,19 +312,35 @@ void main() {
     await _Harness().pump(tester);
 
     Finder door(String room) => find.byKey(ValueKey('door-$room'));
+    void expectTargetSize(String room) {
+      final size = tester.getSize(door(room));
+      expect(size.width, closeTo(40, .001));
+      expect(size.height, closeTo(40, .001));
+    }
 
     await tester.tapAt(tester.getCenter(door('128')));
     await tester.pumpAndSettle();
     expect(find.text('Room 128'), findsOneWidget);
 
+    expectTargetSize('136');
+    final center = tester.getCenter(door('136'));
+    await tester.tapAt(center + const Offset(0, 21));
+    await tester.pumpAndSettle();
+    expect(find.text('Room 128'), findsOneWidget);
+    await tester.tapAt(center + const Offset(0, 12));
+    await tester.pumpAndSettle();
+    expect(find.text('Room 136'), findsOneWidget);
+
     await tester.tap(find.byTooltip('Full-screen map'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Zoom in'));
     await tester.pumpAndSettle();
-    final target = tester.renderObject<RenderBox>(door('120'));
-    await tester.tapAt(
-      target.localToGlobal(target.size.center(const Offset(9, 0))),
-    );
+    final beforePan = tester.getCenter(door('120'));
+    await tester.drag(find.byType(InteractiveViewer), const Offset(30, 0));
+    await tester.pumpAndSettle();
+    expect(tester.getCenter(door('120')).dx, greaterThan(beforePan.dx));
+    expectTargetSize('120');
+    await tester.tapAt(tester.getCenter(door('120')) + const Offset(5, 0));
     await tester.pumpAndSettle();
     expect(
       tester.getSemantics(door('120')),
@@ -338,6 +368,25 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await _Harness().pump(tester);
+
+    final toolbar = tester.getRect(find.byType(NavigationToolbar));
+    for (final text in ['Choose a room', 'Vivian Engineering Center · VEC']) {
+      final paragraph = tester.renderObject<RenderParagraph>(find.text(text));
+      final lines = paragraph.getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: text.length),
+      );
+      expect(lines, isNotEmpty);
+      for (final line in lines) {
+        expect(
+          paragraph.localToGlobal(line.toRect().topLeft).dy,
+          greaterThanOrEqualTo(toolbar.top),
+        );
+        expect(
+          paragraph.localToGlobal(line.toRect().bottomRight).dy,
+          lessThanOrEqualTo(toolbar.bottom),
+        );
+      }
+    }
 
     final list = find.byType(Scrollable).first;
     for (final heading in ['Door position verified', 'Not placed on the map']) {

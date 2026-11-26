@@ -68,6 +68,7 @@ void main() {
     final picker = tester.widget<DropdownButton<IndoorLandpoint>>(
       landpointPicker,
     );
+    expect(picker.value?.id, 'VECelev2A');
     expect(picker.items!.map((item) => item.value!.floor).toSet(), {'1', '2'});
     await tester.scrollUntilVisible(find.text('Estimated floor 3 · 100%'), 160);
     expect(find.text('Estimated floor 3 · 100%'), findsOneWidget);
