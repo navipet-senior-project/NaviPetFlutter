@@ -250,6 +250,46 @@ void main() {
     expect(fromMap['headingDeg'], 185.36);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
+  testWidgets('floor 2 paints the west access with a neutral marker', (
+    tester,
+  ) async {
+    await _Harness().pump(tester);
+    await tester.tap(find.text('Floor 2'));
+    await tester.pumpAndSettle();
+
+    final plan = find.descendant(
+      of: find.byType(InteractiveViewer),
+      matching: find.byType(CustomPaint),
+    );
+    final marker = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(
+          (-29.62105941772461 + 36) * 10,
+          (35 - 21.350000381469727) * 10,
+        ),
+        width: 15,
+        height: 15,
+      ),
+      const Radius.circular(3.5),
+    );
+    final canvas = TestRecordingCanvas();
+    tester
+        .widget<CustomPaint>(plan)
+        .painter!
+        .paint(canvas, tester.getSize(plan));
+    final westMarker = canvas.invocations
+        .map((call) => call.invocation)
+        .singleWhere(
+          (call) =>
+              call.memberName == #drawRRect &&
+              call.positionalArguments.first == marker,
+        );
+    expect(
+      (westMarker.positionalArguments[1] as Paint).color.toARGB32(),
+      0xFF5D6B82,
+    );
+  });
+
   testWidgets('floor 3 shows doors and floors 4–5 stay pending', (
     tester,
   ) async {

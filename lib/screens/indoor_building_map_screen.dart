@@ -1047,13 +1047,16 @@ class _FloorPlanPainter extends CustomPainter {
     }
 
     for (final feature in objects.where((o) => o.type != 'door')) {
-      final (color, label) = switch (feature.type) {
-        'entrance' => (_entranceColor, 'IN'),
-        'stairs' => (_stairsColor, 'ST'),
-        'elevator' => (_elevatorColor, 'EL'),
-        'bathroom' => (_restroomColor, 'WC'),
-        _ => (const Color(0xFF8D98A8), '?'),
-      };
+      final westAccess = feature.floor == 2 && feature.id == 'VECstairsF2B';
+      final (color, label) = westAccess
+          ? (_slate, 'West access')
+          : switch (feature.type) {
+              'entrance' => (_entranceColor, 'IN'),
+              'stairs' => (_stairsColor, 'ST'),
+              'elevator' => (_elevatorColor, 'EL'),
+              'bathroom' => (_restroomColor, 'WC'),
+              _ => (const Color(0xFF8D98A8), '?'),
+            };
       final c = _objectCenter(feature);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
@@ -1062,7 +1065,15 @@ class _FloorPlanPainter extends CustomPainter {
         ),
         Paint()..color = color,
       );
-      _text(canvas, label, c, .6 * m, Colors.white, FontWeight.w800);
+      _text(
+        canvas,
+        label,
+        westAccess ? c + const Offset(1.15 * _pxPerMetre, 0) : c,
+        (westAccess ? .9 : .6) * m,
+        westAccess ? _slate : Colors.white,
+        FontWeight.w800,
+        alignStart: westAccess,
+      );
     }
 
     for (final door in objects.where((o) => o.type == 'door')) {
@@ -1077,7 +1088,7 @@ class _FloorPlanPainter extends CustomPainter {
           ..strokeWidth = _doorStrokeWidth,
       );
       // Unity door headings: 0 faces north, 180 south, 90 sideways.
-      final heading = door.rotationY.round() % 360;
+      final heading = door.rotationY;
       if (heading == 90) {
         _text(
           canvas,
@@ -1088,7 +1099,7 @@ class _FloorPlanPainter extends CustomPainter {
           FontWeight.w800,
           alignStart: true,
         );
-      } else {
+      } else if (heading == 0 || heading == 180) {
         _text(
           canvas,
           door.room,
