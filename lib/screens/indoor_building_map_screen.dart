@@ -38,32 +38,51 @@ class IndoorBuildingMapScreen extends StatefulWidget {
 }
 
 class _MapTransformationController extends TransformationController {
-  Size viewportSize = Size.zero;
+  RRect viewport = RRect.zero;
+  List<Rect> floorContent = const [];
 
   @override
   set value(Matrix4 transform) {
-    if (viewportSize.isEmpty) {
-      super.value = transform;
-      return;
+    final scale = transform.getMaxScaleOnAxis();
+    final translation = Offset(transform.entry(0, 3), transform.entry(1, 3));
+    var bounded = translation;
+    var nearestDistance = double.infinity;
+    final visibleArea = viewport.safeInnerRect;
+    for (final content in floorContent) {
+      final visibleWidth = math.min(
+        40.0,
+        math.min(visibleArea.width, content.width * scale) / 2,
+      );
+      final visibleHeight = math.min(
+        40.0,
+        math.min(visibleArea.height, content.height * scale) / 2,
+      );
+      final candidate = Offset(
+        translation.dx
+            .clamp(
+              visibleArea.left + visibleWidth - content.right * scale,
+              visibleArea.right - visibleWidth - content.left * scale,
+            )
+            .toDouble(),
+        translation.dy
+            .clamp(
+              visibleArea.top + visibleHeight - content.bottom * scale,
+              visibleArea.bottom - visibleHeight - content.top * scale,
+            )
+            .toDouble(),
+      );
+      final distance = (candidate - translation).distanceSquared;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        bounded = candidate;
+      }
+      if (distance == 0) break;
     }
-    final canvas = _FloorPlanPainter.canvasSize * transform.getMaxScaleOnAxis();
-    final visibleWidth = math.min(40.0, viewportSize.width);
-    final visibleHeight = math.min(40.0, viewportSize.height);
-    final x = transform.entry(0, 3);
-    final y = transform.entry(1, 3);
-    final boundedX = x.clamp(
-      visibleWidth - canvas.width,
-      viewportSize.width - visibleWidth,
-    );
-    final boundedY = y.clamp(
-      visibleHeight - canvas.height,
-      viewportSize.height - visibleHeight,
-    );
-    super.value = x == boundedX && y == boundedY
+    super.value = bounded == translation
         ? transform
         : (transform.clone()
-            ..setEntry(0, 3, boundedX.toDouble())
-            ..setEntry(1, 3, boundedY.toDouble()));
+            ..setEntry(0, 3, bounded.dx)
+            ..setEntry(1, 3, bounded.dy));
   }
 }
 
@@ -121,7 +140,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   void _zoomMap(double factor) {
     final current = _mapTransform.value;
     final currentScale = current.getMaxScaleOnAxis();
-    final viewport = _mapTransform.viewportSize;
+    final viewport = _mapTransform.viewport.outerRect.size;
     if (currentScale <= 0 || viewport.isEmpty) return;
     final nextScale = (currentScale * factor)
         .clamp(_minMapScale, _maxMapScale)
@@ -429,7 +448,13 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     final viewport = LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        _mapTransform.viewportSize = size;
+        final clip = RRect.fromRectAndRadius(
+          Offset.zero & size,
+          _viewportRadius,
+        ).scaleRadii();
+        _mapTransform
+          ..viewport = clip
+          ..floorContent = _FloorPlanPainter._contentBounds(_floor, objects);
         if (_lastViewportSize != size) {
           _lastViewportSize = size;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -441,10 +466,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
           floor: _floor,
           objects: objects,
           pending: pending,
-          viewport: RRect.fromRectAndRadius(
-            Offset.zero & size,
-            _viewportRadius,
-          ).scaleRadii(),
+          viewport: clip,
           selectedRoom: _selectedRoom,
           onSelectRoom: _selectRoom,
         );
@@ -877,22 +899,51 @@ class _FloorPlan extends StatelessWidget {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  Rect _clipHitRegion(Rect bounds) {
-    final region = bounds.intersect(viewport.outerRect);
-    final nearSide =
-        region.left < viewport.left + viewport.tlRadiusX ||
-        region.right > viewport.right - viewport.trRadiusX;
-    final nearEnd =
-        region.top < viewport.top + viewport.tlRadiusY ||
-        region.bottom > viewport.bottom - viewport.blRadiusY;
-    return nearSide && nearEnd
-        ? region.intersect(viewport.safeInnerRect)
-        : region;
+  Rect _clipHitRegion(Rect bounds, Offset center) {
+    var region = bounds.intersect(viewport.outerRect);
+    final radius = viewport.tlRadiusX;
+    final radiusSquared = radius * radius;
+    final preferredInset = viewport.safeInnerRect.left - viewport.left;
+    final anchor = viewport.contains(center)
+        ? center
+        : viewport.outerRect.center;
+
+    double curveInset(double depth) {
+      final remaining = radius - depth.clamp(0.0, radius);
+      return radius - math.sqrt(radiusSquared - remaining * remaining);
+    }
+
+    for (final (corner, xSign, ySign) in [
+      (viewport.outerRect.topLeft, 1, 1),
+      (viewport.outerRect.topRight, -1, 1),
+      (viewport.outerRect.bottomLeft, 1, -1),
+      (viewport.outerRect.bottomRight, -1, -1),
+    ]) {
+      final x = ((xSign > 0 ? region.left : region.right) - corner.dx) * xSign;
+      final y = ((ySign > 0 ? region.top : region.bottom) - corner.dy) * ySign;
+      if (region.isEmpty || x >= radius || y >= radius || x >= curveInset(y)) {
+        continue;
+      }
+
+      final minX = curveInset((anchor.dy - corner.dy) * ySign);
+      final maxX = math.min(radius, (anchor.dx - corner.dx) * xSign);
+      final insetX = preferredInset > minX && preferredInset < maxX
+          ? preferredInset
+          : (minX + maxX) / 2;
+      final clipX = corner.dx + xSign * insetX;
+      final clipY = corner.dy + ySign * curveInset(insetX);
+      region = Rect.fromLTRB(
+        xSign > 0 ? math.max(region.left, clipX) : region.left,
+        ySign > 0 ? math.max(region.top, clipY) : region.top,
+        xSign < 0 ? math.min(region.right, clipX) : region.right,
+        ySign < 0 ? math.min(region.bottom, clipY) : region.bottom,
+      );
+    }
+    return region;
   }
 
   @override
   Widget build(BuildContext context) {
-    const hitSize = 40.0;
     final doors = [
       for (final object in objects)
         if (object.type == 'door')
@@ -927,9 +978,10 @@ class _FloorPlan extends StatelessWidget {
         ),
       ),
       builder: (context, transform, viewer) {
-        final visiblePinCenters = viewport.inflate(
-          _FloorPlanPainter._doorOuterRadius * transform.getMaxScaleOnAxis(),
-        );
+        final markerRadius =
+            _FloorPlanPainter._doorOuterRadius * transform.getMaxScaleOnAxis();
+        final hitSize = math.max(40.0, markerRadius * 2);
+        final visiblePinCenters = viewport.inflate(markerRadius);
         final targets = [
           for (final (room, center) in doors)
             if (MatrixUtils.transformPoint(transform, center)
@@ -950,6 +1002,7 @@ class _FloorPlan extends StatelessWidget {
                     height: hitSize,
                   ),
                 ),
+                center,
               ),
             ),
         ];
@@ -1003,6 +1056,7 @@ class _FloorPlanPainter extends CustomPainter {
 
   static const _world = Rect.fromLTWH(-36, -35, 67, 36);
   static const _pxPerMetre = 10.0;
+  static const _featureSize = 1.5 * _pxPerMetre;
   static const _doorRadius = .62 * _pxPerMetre;
   static const _doorStrokeWidth = .16 * _pxPerMetre;
   static const _doorOuterRadius = _doorRadius + _doorStrokeWidth / 2;
@@ -1019,6 +1073,19 @@ class _FloorPlanPainter extends CustomPainter {
 
   static Rect _rect(Rect r) =>
       Rect.fromPoints(toCanvas(r.left, r.top), toCanvas(r.right, r.bottom));
+
+  static List<Rect> _contentBounds(int floor, List<_IndoorObject> objects) {
+    final geometry = _geometry[floor]!;
+    return [
+      for (final hall in geometry.halls) _rect(hall),
+      if (geometry.core case final core?) _rect(core),
+      for (final object in objects)
+        Rect.fromCircle(
+          center: _objectCenter(object),
+          radius: object.type == 'door' ? _doorOuterRadius : _featureSize / 2,
+        ),
+    ];
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1109,7 +1176,7 @@ class _FloorPlanPainter extends CustomPainter {
       final c = _objectCenter(feature);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromCenter(center: c, width: 1.5 * m, height: 1.5 * m),
+          Rect.fromCenter(center: c, width: _featureSize, height: _featureSize),
           const Radius.circular(.35 * m),
         ),
         Paint()..color = color,

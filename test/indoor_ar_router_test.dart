@@ -454,9 +454,34 @@ void main() {
       SemanticsAction.tap,
     );
     await tester.pumpAndSettle();
+    expect(
+      tester.getSemantics(door('119')),
+      containsSemantics(isSelected: true),
+    );
+    final controller = tester
+        .widget<InteractiveViewer>(viewer)
+        .transformationController!;
+    final focalPoint = tester.getSize(viewer).center(Offset.zero);
+    controller.value = Matrix4.identity()
+      ..translateByDouble(
+        focalPoint.dx - pin120.dx * 4,
+        focalPoint.dy - pin120.dy * 4,
+        0,
+        1,
+      )
+      ..scaleByDouble(4, 4, 4, 1);
+    await tester.pumpAndSettle();
+    final insideZoomedPin = pinAt(pin120) + const Offset(0, 24);
+    expect(exploredDoorAt(insideZoomedPin), const ValueKey('door-120'));
+    await tester.tapAt(insideZoomedPin);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSemantics(door('120')),
+      containsSemantics(isSelected: true),
+    );
     await tester.tap(find.byTooltip('Exit full-screen map'));
     await tester.pumpAndSettle();
-    expect(find.text('Room 119'), findsOneWidget);
+    expect(find.text('Room 120'), findsOneWidget);
   });
 
   testWidgets('pinch zooms out after the button in both map layouts', (
@@ -500,7 +525,7 @@ void main() {
     }
   });
 
-  testWidgets('full-screen pan and zoom keep part of the canvas visible', (
+  testWidgets('full-screen pan and zoom keep a floor 3 corridor visible', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -508,6 +533,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     await _Harness().pump(tester);
+    await tester.tap(find.text('Floor 3'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Full-screen map'));
     await tester.pumpAndSettle();
 
@@ -517,25 +544,38 @@ void main() {
       matching: find.byType(CustomPaint),
     );
     final viewport = tester.getRect(viewer);
-    Rect visiblePlan() {
+    final canvas = TestRecordingCanvas();
+    tester
+        .widget<CustomPaint>(plan)
+        .painter!
+        .paint(canvas, tester.getSize(plan));
+    final corridors = [
+      for (final record in canvas.invocations)
+        if (record.invocation case final call
+            when call.memberName == #drawRect &&
+                (call.positionalArguments[1] as Paint).color.toARGB32() ==
+                    0xFFFFFFFF)
+          call.positionalArguments[0] as Rect,
+    ];
+    bool corridorsVisible() {
       final box = tester.renderObject<RenderBox>(plan);
-      return MatrixUtils.transformRect(
-        box.getTransformTo(null),
-        Offset.zero & box.size,
-      ).intersect(viewport);
+      final transform = box.getTransformTo(null);
+      return corridors.any(
+        (rect) => MatrixUtils.transformRect(transform, rect).overlaps(viewport),
+      );
     }
 
-    final start = Offset(viewport.center.dx, viewport.top + 80);
-    final beforePan = visiblePlan();
-    await tester.dragFrom(start, const Offset(0, 550));
+    final start = Offset(viewport.center.dx, viewport.bottom - 80);
+    final beforePan = tester.getTopLeft(plan).dy;
+    await tester.dragFrom(start, const Offset(0, -650));
     await tester.pumpAndSettle();
-    expect(visiblePlan().top, greaterThan(beforePan.top));
-    expect(visiblePlan().height, greaterThan(0));
+    expect(tester.getTopLeft(plan).dy, lessThan(beforePan));
+    expect(corridorsVisible(), isTrue);
 
     for (final control in ['Zoom in', 'Zoom out']) {
       await tester.tap(find.byTooltip(control));
       await tester.pumpAndSettle();
-      expect(visiblePlan().isEmpty, isFalse);
+      expect(corridorsVisible(), isTrue);
     }
   });
 
@@ -557,13 +597,14 @@ void main() {
         .widget<InteractiveViewer>(viewer)
         .transformationController!;
     const pin = Offset(251.87, 137.68);
-    for (final (corner, inward) in [
-      (viewport.topLeft, const Offset(1, 1)),
-      (viewport.topRight, const Offset(-1, 1)),
-      (viewport.bottomLeft, const Offset(1, -1)),
-      (viewport.bottomRight, const Offset(-1, -1)),
+    for (final (corner, inward, pinOffset) in [
+      (viewport.topLeft, const Offset(1, 1), const Offset(12, 12)),
+      (viewport.topRight, const Offset(-1, 1), const Offset(-2, 30)),
+      (viewport.bottomLeft, const Offset(1, -1), const Offset(30, -2)),
+      (viewport.bottomRight, const Offset(-1, -1), const Offset(-12, -12)),
+      (viewport.topLeft, const Offset(1, 1), const Offset(2, 30)),
     ]) {
-      final at = corner + inward * 12;
+      final at = corner + pinOffset;
       final transform = controller.value.clone();
       final delta =
           at - viewport.topLeft - MatrixUtils.transformPoint(transform, pin);
@@ -582,7 +623,7 @@ void main() {
       expect(tester.getSemantics(door), containsSemantics(isSelected: false));
     }
 
-    await tester.tapAt(viewport.bottomRight - const Offset(12, 12));
+    await tester.tapAt(viewport.topLeft + const Offset(2, 30));
     await tester.pumpAndSettle();
     expect(tester.getSemantics(door), containsSemantics(isSelected: true));
   });
