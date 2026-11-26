@@ -381,6 +381,38 @@ void main() {
       return hits.isEmpty ? null : hits.single.widget.key;
     }
 
+    final asset =
+        jsonDecode(
+              await rootBundle.loadString('assets/indoor/vec_floors123.json'),
+            )
+            as Map<String, dynamic>;
+    final floorDoors = (asset['objects'] as List)
+        .cast<Map<String, dynamic>>()
+        .where(
+          (entry) => entry['type'] == 'door' && entry['floorId'] == 'floor_1',
+        );
+    final centers = <Key, Offset>{
+      for (final item in floorDoors)
+        ValueKey('door-${(item['id'] as String).substring(3)}'): pinAt(
+          Offset(
+            ((item['position']['x'] as num).toDouble() + 36) * 10,
+            (35 - (item['position']['z'] as num).toDouble()) * 10,
+          ),
+        ),
+    };
+    expect(exposedDoors, findsNWidgets(centers.length));
+    final bounds = <Rect>[];
+    for (final entry in centers.entries) {
+      expect(exploredDoorAt(entry.value), entry.key);
+      final region = tester.getRect(find.byKey(entry.key));
+      expect(bounds.any(region.overlaps), isFalse);
+      bounds.add(region);
+    }
+
+    await tester.tapAt(Offset.lerp(pinAt(pin120), pinAt(pin119), .4)!);
+    await tester.pumpAndSettle();
+    expect(find.text('Room 120'), findsOneWidget);
+
     final above132 = pinAt(pin132) - const Offset(0, 8);
     for (final (room, point) in [
       ('119', pinAt(pin119)),
@@ -398,21 +430,19 @@ void main() {
     expect(find.text('Room 128'), findsOneWidget);
 
     final beside132 = pinAt(pin132) + const Offset(4, -1);
-    expect(exploredDoorAt(beside132), isNull);
     await tester.tapAt(beside132);
     await tester.pumpAndSettle();
-    expect(find.text('Room 128'), findsOneWidget);
+    expect(find.text('Room 132'), findsOneWidget);
 
     final center = pinAt(pin136);
     expect(exploredDoorAt(center + const Offset(0, 21)), isNull);
     await tester.tapAt(center + const Offset(0, 21));
     await tester.pumpAndSettle();
-    expect(find.text('Room 128'), findsOneWidget);
+    expect(find.text('Room 132'), findsOneWidget);
     final corner136 = center + const Offset(-18, -18);
-    expect(exploredDoorAt(corner136), const ValueKey('door-136'));
     await tester.tapAt(corner136);
     await tester.pumpAndSettle();
-    expect(find.text('Room 136'), findsOneWidget);
+    expect(find.text('Room 132'), findsOneWidget);
     expect(
       exploredDoorAt(center + const Offset(0, 12)),
       const ValueKey('door-136'),
@@ -471,6 +501,12 @@ void main() {
       )
       ..scaleByDouble(4, 4, 4, 1);
     await tester.pumpAndSettle();
+    await tester.tapAt(pinAt(pin120) + const Offset(24, 24));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSemantics(door('120')),
+      containsSemantics(isSelected: false),
+    );
     final insideZoomedPin = pinAt(pin120) + const Offset(0, 24);
     expect(exploredDoorAt(insideZoomedPin), const ValueKey('door-120'));
     await tester.tapAt(insideZoomedPin);
@@ -579,7 +615,7 @@ void main() {
     }
   });
 
-  testWidgets('rounded corners exclude pointer and accessibility hits', (
+  testWidgets('rounded corners reject outside taps and accept visible paint', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -616,16 +652,52 @@ void main() {
       final node = tester.getSemantics(door);
       final box = tester.renderObject<RenderBox>(door);
       final outside = corner + inward * 2;
-      expect(node.rect.contains(box.globalToLocal(outside)), isFalse);
       expect(node.rect.contains(box.globalToLocal(at)), isTrue);
       await tester.tapAt(outside);
       await tester.pumpAndSettle();
       expect(tester.getSemantics(door), containsSemantics(isSelected: false));
     }
 
-    await tester.tapAt(viewport.topLeft + const Offset(2, 30));
+    controller.value = Matrix4.identity()
+      ..translateByDouble(1 - pin.dx * 3.5, 13 - pin.dy * 3.5, 0, 1)
+      ..scaleByDouble(3.5, 3.5, 3.5, 1);
+    await tester.pumpAndSettle();
+    await tester.tapAt(viewport.topLeft + const Offset(6, 8));
     await tester.pumpAndSettle();
     expect(tester.getSemantics(door), containsSemantics(isSelected: true));
+  });
+
+  testWidgets('pending notice scrolls without collapsing the full-screen map', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _Harness().pump(tester);
+    await tester.tap(find.text('Floor 4'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Full-screen map'));
+    await tester.pumpAndSettle();
+
+    tester.view.physicalSize = const Size(320, 240);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    await tester.pumpAndSettle();
+
+    final viewer = find.byType(InteractiveViewer);
+    final notice = find.ancestor(
+      of: find.textContaining('Corridors are traced from the building scan.'),
+      matching: find.byType(Scrollable),
+    );
+    final viewportHeight = tester.getSize(viewer).height;
+    expect(viewportHeight, greaterThan(0));
+    expect(viewportHeight, greaterThanOrEqualTo(tester.getSize(notice).height));
+    final position = tester.state<ScrollableState>(notice).position;
+    await tester.drag(notice, const Offset(0, -60));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(0));
+    expect(tester.getSize(viewer).height, viewportHeight);
   });
 
   testWidgets('short body leaves the map controls reachable at large text', (

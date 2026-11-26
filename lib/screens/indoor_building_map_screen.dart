@@ -472,6 +472,33 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
         );
       },
     );
+    final notice = pending
+        ? Container(
+            margin: const EdgeInsets.fromLTRB(8, 8, 8, 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceWarm,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFC9A23A)),
+            ),
+            child: const Text(
+              'Corridors are traced from the building scan. Door pin points for this floor are still coming.',
+              style: TextStyle(
+                color: _doorStroke,
+                fontSize: 12,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          )
+        : null;
+    final heading = Padding(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+      child: _SectionTitle(
+        'Floor $_floor',
+        '$pinCount pinned · ${directory.length} directory-only',
+      ),
+    );
     return Container(
       padding: _expanded
           ? const EdgeInsets.fromLTRB(8, 12, 8, 8)
@@ -490,63 +517,69 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 ),
               ],
             ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-            child: _SectionTitle(
-              'Floor $_floor',
-              '$pinCount pinned · ${directory.length} directory-only',
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              _MapButton(
-                tooltip: 'Zoom in',
-                icon: Icons.add,
-                onPressed: () => _zoomMap(1.25),
-              ),
-              const SizedBox(width: 6),
-              _MapButton(
-                tooltip: 'Zoom out',
-                icon: Icons.remove,
-                onPressed: () => _zoomMap(.8),
-              ),
-              const SizedBox(width: 6),
-              _MapButton(
-                tooltip: _expanded ? 'Exit full-screen map' : 'Full-screen map',
-                icon: _expanded ? Icons.fullscreen_exit : Icons.fullscreen,
-                onPressed: () => _setExpanded(!_expanded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          if (_expanded)
-            Expanded(child: viewport)
-          else
-            SizedBox(height: 300, child: viewport),
-          if (pending)
-            Container(
-              margin: const EdgeInsets.fromLTRB(8, 8, 8, 2),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceWarm,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFC9A23A)),
-              ),
-              child: const Text(
-                'Corridors are traced from the building scan. Door pin points for this floor are still coming.',
-                style: TextStyle(
-                  color: _doorStroke,
-                  fontSize: 12,
-                  height: 1.45,
-                  fontWeight: FontWeight.w600,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_expanded)
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight / 4,
                 ),
-              ),
+                child: SingleChildScrollView(child: heading),
+              )
+            else
+              heading,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _MapButton(
+                  tooltip: 'Zoom in',
+                  icon: Icons.add,
+                  onPressed: () => _zoomMap(1.25),
+                ),
+                const SizedBox(width: 6),
+                _MapButton(
+                  tooltip: 'Zoom out',
+                  icon: Icons.remove,
+                  onPressed: () => _zoomMap(.8),
+                ),
+                const SizedBox(width: 6),
+                _MapButton(
+                  tooltip: _expanded
+                      ? 'Exit full-screen map'
+                      : 'Full-screen map',
+                  icon: _expanded ? Icons.fullscreen_exit : Icons.fullscreen,
+                  onPressed: () => _setExpanded(!_expanded),
+                ),
+              ],
             ),
-        ],
+            const SizedBox(height: 6),
+            if (_expanded)
+              Expanded(
+                child: notice == null
+                    ? viewport
+                    : LayoutBuilder(
+                        builder: (context, constraints) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: viewport),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxHeight: constraints.maxHeight / 2,
+                              ),
+                              child: SingleChildScrollView(child: notice),
+                            ),
+                          ],
+                        ),
+                      ),
+              )
+            else ...[
+              SizedBox(height: 300, child: viewport),
+              if (notice != null) notice,
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -899,49 +932,6 @@ class _FloorPlan extends StatelessWidget {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  Rect _clipHitRegion(Rect bounds, Offset center) {
-    var region = bounds.intersect(viewport.outerRect);
-    final radius = viewport.tlRadiusX;
-    final radiusSquared = radius * radius;
-    final preferredInset = viewport.safeInnerRect.left - viewport.left;
-    final anchor = viewport.contains(center)
-        ? center
-        : viewport.outerRect.center;
-
-    double curveInset(double depth) {
-      final remaining = radius - depth.clamp(0.0, radius);
-      return radius - math.sqrt(radiusSquared - remaining * remaining);
-    }
-
-    for (final (corner, xSign, ySign) in [
-      (viewport.outerRect.topLeft, 1, 1),
-      (viewport.outerRect.topRight, -1, 1),
-      (viewport.outerRect.bottomLeft, 1, -1),
-      (viewport.outerRect.bottomRight, -1, -1),
-    ]) {
-      final x = ((xSign > 0 ? region.left : region.right) - corner.dx) * xSign;
-      final y = ((ySign > 0 ? region.top : region.bottom) - corner.dy) * ySign;
-      if (region.isEmpty || x >= radius || y >= radius || x >= curveInset(y)) {
-        continue;
-      }
-
-      final minX = curveInset((anchor.dy - corner.dy) * ySign);
-      final maxX = math.min(radius, (anchor.dx - corner.dx) * xSign);
-      final insetX = preferredInset > minX && preferredInset < maxX
-          ? preferredInset
-          : (minX + maxX) / 2;
-      final clipX = corner.dx + xSign * insetX;
-      final clipY = corner.dy + ySign * curveInset(insetX);
-      region = Rect.fromLTRB(
-        xSign > 0 ? math.max(region.left, clipX) : region.left,
-        ySign > 0 ? math.max(region.top, clipY) : region.top,
-        xSign < 0 ? math.min(region.right, clipX) : region.right,
-        ySign < 0 ? math.min(region.bottom, clipY) : region.bottom,
-      );
-    }
-    return region;
-  }
-
   @override
   Widget build(BuildContext context) {
     final doors = [
@@ -980,7 +970,7 @@ class _FloorPlan extends StatelessWidget {
       builder: (context, transform, viewer) {
         final markerRadius =
             _FloorPlanPainter._doorOuterRadius * transform.getMaxScaleOnAxis();
-        final hitSize = math.max(40.0, markerRadius * 2);
+        final hitRadius = math.max(20.0, markerRadius);
         final visiblePinCenters = viewport.inflate(markerRadius);
         final targets = [
           for (final (room, center) in doors)
@@ -988,34 +978,37 @@ class _FloorPlan extends StatelessWidget {
                 case final projected when visiblePinCenters.contains(projected))
               (room, projected),
         ];
+        final visibleCenters = [
+          for (final target in targets)
+            if (viewport.contains(target.$2)) target,
+        ];
         final regions = [
-          for (final (room, center) in targets)
+          for (final (room, center) in visibleCenters)
             (
               room,
-              _clipHitRegion(
-                _doorHitBounds(
-                  center,
-                  targets,
-                  Rect.fromCenter(
-                    center: center,
-                    width: hitSize,
-                    height: hitSize,
-                  ),
-                ),
+              _doorHitBounds(
                 center,
-              ),
+                visibleCenters,
+                Rect.fromCircle(center: center, radius: hitRadius),
+              ).intersect(viewport.outerRect),
             ),
         ];
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           excludeFromSemantics: true,
           onTapUp: (details) {
-            for (final (room, region) in regions.reversed) {
-              if (region.contains(details.localPosition)) {
-                onSelectRoom(room);
-                return;
+            final point = details.localPosition;
+            if (!viewport.contains(point)) return;
+            String? nearestRoom;
+            var nearestDistance = hitRadius * hitRadius;
+            for (final (room, center) in targets) {
+              final distance = (point - center).distanceSquared;
+              if (distance <= nearestDistance) {
+                nearestRoom = room;
+                nearestDistance = distance;
               }
             }
+            if (nearestRoom != null) onSelectRoom(nearestRoom);
           },
           child: Stack(
             fit: StackFit.expand,
