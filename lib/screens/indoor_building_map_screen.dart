@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show MatrixUtils;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -173,9 +172,8 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   }
 
   /// The map only picks a room number. The destination is the same backend
-  /// record autocomplete selects, so the AR launch screen loads its door pose
-  /// from `place(id)` exactly as it does for a search result; the bundled scan
-  /// asset is for drawing only and never supplies AR coordinates.
+  /// record autocomplete selects. Pass its ID to the AR launch screen so it
+  /// fetches the door pose from `place(id)` without using 2D pin coordinates.
   Future<void> _verifyWithAr() async {
     final room = _selectedRoom;
     if (room == null) return;
@@ -576,7 +574,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
               )
             else ...[
               SizedBox(height: 300, child: viewport),
-              if (notice != null) notice,
+              ?notice,
             ],
           ],
         ),
