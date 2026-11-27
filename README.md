@@ -94,8 +94,8 @@ screen to switch floors or use the room list.
 Corridor outlines approximate the MultiSet scans as placed in Unity's
 `VEC_Building` scene. Door pins on floors 1–5 come from the bundled
 [Unity export](assets/indoor/vec_floors12345.json). Floor 1 rooms without a
-tagged door appear under **Directory only**. Floors 4–5 show their doors, but
-indoor AR covers only floors 1–3, so their rooms show **AR unavailable here**.
+tagged door appear under **Directory only**. Door pins on every floor use the
+same **Verify with AR** lookup.
 
 ### Launching indoor AR
 

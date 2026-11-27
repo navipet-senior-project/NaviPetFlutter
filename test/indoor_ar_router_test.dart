@@ -81,7 +81,24 @@ List<CampusPlace> _vecRooms() => [
   ),
   _vecRoom('218', '2', const IndoorArVector3(1.25, -1.5, 9.5), 90),
   _vecRoom('301', '3', const IndoorArVector3(-12.4, 6.5, 26.9), 0),
+  _vecRoom('417', '4', const IndoorArVector3(-20.5, 9.8, 18.2), 270),
+  _vecRoom('501', '5', const IndoorArVector3(-24.1, 13.1, -3.6), 90),
 ];
+
+/// Records each autocomplete query the floor plan sends.
+class _RecordingSearch extends flow.FakeSearchGateway {
+  final queries = <String>[];
+
+  @override
+  Future<List<CampusPlace>> autocomplete(
+    String query, {
+    NavigationCoordinate? proximity,
+    int limit = 10,
+  }) {
+    queries.add(query);
+    return super.autocomplete(query, proximity: proximity, limit: limit);
+  }
+}
 
 class _FailingSearch extends flow.FakeSearchGateway {
   @override
@@ -193,28 +210,37 @@ void main() {
     messenger.setMockMethodCallHandler(_indoorAr, null);
   });
 
-  for (final floor in [1, 2, 3]) {
+  for (final (floor, door) in [
+    (1, '119'),
+    (2, '218'),
+    (3, '301'),
+    (4, '417'),
+    (5, '501'),
+  ]) {
     testWidgets(
       'floor $floor room reaches Unity through the production router',
       (tester) async {
-        final harness = _Harness();
+        final search = _RecordingSearch()..results = _vecRooms();
+        final harness = _Harness(search: search);
         await harness.pump(tester);
         if (floor != 1) {
           await tester.tap(find.text('Floor $floor'));
           await tester.pumpAndSettle();
           // Switching floors clears the selection; pick a door on this floor.
-          final door = floor == 2 ? '218' : '301';
           await tester.tapAt(
             tester.getCenter(find.byKey(ValueKey('door-$door'))),
           );
           await tester.pumpAndSettle();
         }
         await harness.tapFloorPlanAr(tester);
+        // Same backend lookup as autocomplete: room search, then place(id).
+        expect(search.queries, ['VEC $door']);
         expect(harness.requests, hasLength(1));
         final request = harness.requests.single;
         final place = harness.search.results.singleWhere(
           (item) => item.floorNumber == '$floor',
         );
+        expect(place.roomNumber, door);
         final pose = place.indoor!;
         expect(request['schemaVersion'], IndoorArRequest.schemaVersion);
         expect(request['floor'], '$floor');
@@ -350,7 +376,7 @@ void main() {
     expect(find.byKey(const ValueKey('door-510')), findsNothing);
     expect(find.text('510'), findsNothing);
 
-    // Floors 4–5 have door pins but no indoor AR coverage yet.
+    // Floors 4–5 offer the same AR action as floors 1–3.
     for (final (floor, room) in [(4, '417'), (5, '501')]) {
       await tester.tap(find.text('Floor $floor'));
       await tester.pumpAndSettle();
@@ -359,19 +385,16 @@ void main() {
       expect(find.text('Room $room'), findsOneWidget);
       expect(find.text('Door on scan'), findsOneWidget);
       expect(
-        find.text(
-          'This door position is verified in the building scan, but '
-          "indoor AR doesn't cover Floor $floor yet.",
-        ),
+        find.text('This door position is verified in the building scan.'),
         findsOneWidget,
       );
       final button = tester.widget<ButtonStyleButton>(
         find.ancestor(
-          of: find.text('AR unavailable here'),
+          of: find.text('Verify with AR'),
           matching: find.bySubtype<ButtonStyleButton>(),
         ),
       );
-      expect(button.onPressed, isNull);
+      expect(button.onPressed, isNotNull);
     }
     expect(harness.requests, isEmpty);
 
@@ -853,6 +876,43 @@ void main() {
     }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
   }
 
+  for (final (floor, room) in [(4, '417'), (5, '501')]) {
+    testWidgets(
+      'floor $floor room missing from the backend does not launch AR',
+      (tester) async {
+        // Backend without the floor 4–5 migration: autocomplete has no match.
+        final search = _RecordingSearch()
+          ..results = _vecRooms()
+              .where((p) => p.floorNumber != '$floor')
+              .toList();
+        final harness = _Harness(search: search);
+        await harness.pump(tester);
+        await tester.tap(find.text('Floor $floor'));
+        await tester.pumpAndSettle();
+        await tester.tapAt(
+          tester.getCenter(find.byKey(ValueKey('door-$room'))),
+        );
+        await tester.pumpAndSettle();
+        await harness.tapFloorPlanAr(tester);
+        expect(search.queries, ['VEC $room']);
+        expect(
+          find.text(
+            "Couldn't match room $room on floor $floor to a campus record. "
+            'Search for it instead.',
+          ),
+          findsOneWidget,
+        );
+        expect(harness.tokens.calls, 0);
+        expect(harness.requests, isEmpty);
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          '/buildings/vec',
+        );
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
+  }
+
   testWidgets('map room button does not launch AR when lookup fails', (
     tester,
   ) async {
@@ -975,7 +1035,7 @@ void main() {
 
   for (final unsupported in [
     (
-      floor: '4',
+      floor: '6',
       mapCode: IndoorArRequest.buildMapCode,
       frame: IndoorArRequest.buildFrame,
     ),
