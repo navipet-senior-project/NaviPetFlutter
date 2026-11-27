@@ -128,7 +128,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   }
 
   Future<_VecIndoorMap> _loadMap() async {
-    final raw = await rootBundle.loadString('assets/indoor/vec_floors123.json');
+    final raw = await rootBundle.loadString('assets/indoor/vec_floors12345.json');
     final map = _VecIndoorMap.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     if (map.buildingId != IndoorBuildingCatalog.vecBuildingCode) {
       throw const FormatException('Indoor map building ID does not match VEC.');
@@ -249,14 +249,13 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
               for (final object in objects)
                 if (object.type == 'door') object.room,
             ]..sort();
-            final pending = pinned.isEmpty;
-            final mapSection = _mapSection(objects, pinned.length, pending);
+            final mapSection = _mapSection(objects, pinned.length);
             if (_expanded) return mapSection;
             return LayoutBuilder(
               builder: (context, constraints) => Column(
                 children: [
-                  Expanded(child: _roomList(mapSection, pinned, pending)),
-                  _selectionSheet(pinned, pending, constraints.maxHeight / 2),
+                  Expanded(child: _roomList(mapSection, pinned)),
+                  _selectionSheet(pinned, constraints.maxHeight / 2),
                 ],
               ),
             );
@@ -357,7 +356,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     );
   }
 
-  Widget _roomList(Widget mapSection, List<String> pinned, bool pending) {
+  Widget _roomList(Widget mapSection, List<String> pinned) {
     final directory = _directoryOnlyRooms[_floor] ?? const <String>[];
     final ar = indoorScanCovered('VEC', '$_floor');
     return ListView(
@@ -388,37 +387,19 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
         const SizedBox(height: 14),
         const _SectionTitle('Pinned on the scan', 'Door position verified'),
         const SizedBox(height: 10),
-        if (pending)
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E2E2)),
-            ),
-            child: Text(
-              'None yet on Floor $_floor. Pin points for this floor are on the way; rooms move here once they land.',
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.45,
-                color: AppColors.labelInk,
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final room in pinned)
+              _RoomChip(
+                room: room,
+                pinned: true,
+                selected: room == _selectedRoom,
+                onTap: () => _selectRoom(room),
               ),
-            ),
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final room in pinned)
-                _RoomChip(
-                  room: room,
-                  pinned: true,
-                  selected: room == _selectedRoom,
-                  onTap: () => _selectRoom(room),
-                ),
-            ],
-          ),
+          ],
+        ),
         if (directory.isNotEmpty) ...[
           const SizedBox(height: 14),
           const _SectionTitle('Directory only', 'Not placed on the map'),
@@ -441,7 +422,7 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
     );
   }
 
-  Widget _mapSection(List<_IndoorObject> objects, int pinCount, bool pending) {
+  Widget _mapSection(List<_IndoorObject> objects, int pinCount) {
     final directory = _directoryOnlyRooms[_floor] ?? const <String>[];
     final viewport = LayoutBuilder(
       builder: (context, constraints) {
@@ -463,33 +444,12 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
           transformationController: _mapTransform,
           floor: _floor,
           objects: objects,
-          pending: pending,
           viewport: clip,
           selectedRoom: _selectedRoom,
           onSelectRoom: _selectRoom,
         );
       },
     );
-    final notice = pending
-        ? Container(
-            margin: const EdgeInsets.fromLTRB(8, 8, 8, 2),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceWarm,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFC9A23A)),
-            ),
-            child: const Text(
-              'Corridors are traced from the building scan. Door pin points for this floor are still coming.',
-              style: TextStyle(
-                color: _doorStroke,
-                fontSize: 12,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          )
-        : null;
     final heading = Padding(
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
       child: _SectionTitle(
@@ -554,51 +514,33 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
             ),
             const SizedBox(height: 6),
             if (_expanded)
-              Expanded(
-                child: notice == null
-                    ? viewport
-                    : LayoutBuilder(
-                        builder: (context, constraints) => Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(child: viewport),
-                            ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxHeight: constraints.maxHeight / 2,
-                              ),
-                              child: SingleChildScrollView(child: notice),
-                            ),
-                          ],
-                        ),
-                      ),
-              )
-            else ...[
+              Expanded(child: viewport)
+            else
               SizedBox(height: 300, child: viewport),
-              ?notice,
-            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _selectionSheet(List<String> pinned, bool pending, double maxHeight) {
+  Widget _selectionSheet(List<String> pinned, double maxHeight) {
     final room = _selectedRoom;
     final ar = indoorScanCovered('VEC', '$_floor');
-    final canVerify = room != null && pinned.contains(room) && ar;
+    final onScan = room != null && pinned.contains(room);
+    final canVerify = onScan && ar;
     final (String badge, String note) = canVerify
         ? (
             'Door on scan',
             'This door position is verified in the building scan.',
           )
-        : ar
+        : onScan
         ? (
-            'Directory only',
-            "Floor $_floor has AR, but this room has no door in the scan yet, so AR can't confirm it.",
+            'Door on scan',
+            "This door position is verified in the building scan, but indoor AR doesn't cover Floor $_floor yet.",
           )
         : (
             'Directory only',
-            "The building scan covers this floor's corridors. Floor $_floor pin points are still coming, so this room isn't placed and AR isn't available yet.",
+            "This room has no door in the building scan yet, so AR can't confirm it.",
           );
     return Container(
       width: double.infinity,
@@ -642,11 +584,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                pending
-                    ? 'Pick a room from the directory.'
-                    : 'Tap a door on the map or pick a room from the list.',
-                style: const TextStyle(
+              const Text(
+                'Tap a door on the map or pick a room from the list.',
+                style: TextStyle(
                   color: AppColors.labelInk,
                   fontSize: 13,
                   height: 1.5,
@@ -684,10 +624,10 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
                   Flexible(
                     child: _Pill(
                       label: badge,
-                      background: canVerify
+                      background: onScan
                           ? const Color(0xFFE3F4EC)
                           : AppColors.accentSoft,
-                      foreground: canVerify ? _verifiedGreen : _doorStroke,
+                      foreground: onScan ? _verifiedGreen : _doorStroke,
                     ),
                   ),
                 ],
@@ -737,11 +677,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
 const _floors = [1, 2, 3, 4, 5];
 
 /// Rooms the app's directory lists without a tagged door in the Unity export.
-/// They are listed, never placed: floors 4–5 pin points have not landed yet.
+/// They are listed, never placed.
 const _directoryOnlyRooms = <int, List<String>>{
   1: ['104', '118', '129', '130', '133', '135'],
-  4: ['402', '417', '418', '419', '420', '424', '425'],
-  5: ['510', '514', '515', '516', '518', '519', '523'],
 };
 
 class _VecIndoorMap {
@@ -872,7 +810,7 @@ const _geometry = <int, _FloorGeometry>{
     core: Rect.fromLTWH(-11.2, -27.6, 14.2, 3.6),
     labels: [
       ('Core', Offset(-4.1, -25.8), 0),
-      ('Main corridor', Offset(-16, -22.5), 0),
+      ('Main corridor', Offset(-22, -22.5), 0),
     ],
   ),
 };
@@ -882,7 +820,6 @@ class _FloorPlan extends StatelessWidget {
     required this.transformationController,
     required this.floor,
     required this.objects,
-    required this.pending,
     required this.viewport,
     required this.selectedRoom,
     required this.onSelectRoom,
@@ -891,7 +828,6 @@ class _FloorPlan extends StatelessWidget {
   final TransformationController transformationController;
   final int floor;
   final List<_IndoorObject> objects;
-  final bool pending;
   final RRect viewport;
   final String? selectedRoom;
   final ValueChanged<String> onSelectRoom;
@@ -966,7 +902,6 @@ class _FloorPlan extends StatelessWidget {
                   painter: _FloorPlanPainter(
                     floor: floor,
                     objects: objects,
-                    pending: pending,
                     selectedRoom: selectedRoom,
                   ),
                 ),
@@ -1043,13 +978,11 @@ class _FloorPlanPainter extends CustomPainter {
   const _FloorPlanPainter({
     required this.floor,
     required this.objects,
-    required this.pending,
     required this.selectedRoom,
   });
 
   final int floor;
   final List<_IndoorObject> objects;
-  final bool pending;
   final String? selectedRoom;
 
   static const _world = Rect.fromLTWH(-36, -35, 67, 36);
@@ -1104,8 +1037,7 @@ class _FloorPlanPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = .7 * m;
     for (final hall in geometry.halls) {
-      final path = Path()..addRect(_rect(hall));
-      canvas.drawPath(pending ? _dashed(path, 1 * m, .5 * m) : path, outline);
+      canvas.drawRect(_rect(hall), outline);
     }
     final fill = Paint()..color = Colors.white;
     for (final hall in geometry.halls) {
@@ -1130,17 +1062,6 @@ class _FloorPlanPainter extends CustomPainter {
         _slate,
         FontWeight.w600,
         angle: angle,
-      );
-    }
-
-    if (pending) {
-      _text(
-        canvas,
-        'Pin points pending',
-        toCanvas(12, -22.5),
-        .9 * m,
-        _slate,
-        FontWeight.w600,
       );
     }
 
@@ -1241,16 +1162,6 @@ class _FloorPlanPainter extends CustomPainter {
     _text(canvas, '10 m', toCanvas(-29, -2.2), .9 * m, _slate, FontWeight.w600);
   }
 
-  static Path _dashed(Path source, double dash, double gap) {
-    final out = Path();
-    for (final metric in source.computeMetrics()) {
-      for (var d = 0.0; d < metric.length; d += dash + gap) {
-        out.addPath(metric.extractPath(d, d + dash), Offset.zero);
-      }
-    }
-    return out;
-  }
-
   static void _text(
     Canvas canvas,
     String text,
@@ -1283,7 +1194,6 @@ class _FloorPlanPainter extends CustomPainter {
   bool shouldRepaint(covariant _FloorPlanPainter oldDelegate) =>
       // objects is derived from floor, so it needs no separate compare.
       oldDelegate.floor != floor ||
-      oldDelegate.pending != pending ||
       oldDelegate.selectedRoom != selectedRoom;
 }
 

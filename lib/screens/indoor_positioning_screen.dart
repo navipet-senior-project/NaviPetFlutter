@@ -29,7 +29,7 @@ class _IndoorPositioningScreenState extends State<IndoorPositioningScreen> {
   Future<void> _load() async {
     final raw =
         jsonDecode(
-              await rootBundle.loadString('assets/indoor/vec_floors123.json'),
+              await rootBundle.loadString('assets/indoor/vec_floors12345.json'),
             )
             as Map<String, dynamic>;
     final objects = raw['objects'] as List<dynamic>;

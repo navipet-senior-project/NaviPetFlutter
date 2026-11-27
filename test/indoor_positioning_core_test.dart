@@ -41,7 +41,7 @@ void main() {
     await filter.restore(points);
     filter.seedFloor('3');
     await filter.persist();
-    const export = 'assets/indoor/vec_floors123.json';
+    const export = 'assets/indoor/vec_floors12345.json';
     rootBundle.evict(export);
     const sensorMethods = MethodChannel(
       'dev.fluttercommunity.plus/sensors/method',
@@ -68,7 +68,7 @@ void main() {
     final picker = tester.widget<DropdownButton<IndoorLandpoint>>(
       landpointPicker,
     );
-    expect(picker.value?.id, 'VECelev2A');
+    expect(picker.value, picker.items!.first.value);
     expect(picker.items!.map((item) => item.value!.floor).toSet(), {'1', '2'});
     await tester.scrollUntilVisible(find.text('Estimated floor 3 · 100%'), 160);
     expect(find.text('Estimated floor 3 · 100%'), findsOneWidget);

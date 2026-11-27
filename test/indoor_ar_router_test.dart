@@ -120,7 +120,7 @@ class _Harness {
   Future<void> pump(WidgetTester tester) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     // Keep cached asset futures inside each test's async zone.
-    rootBundle.evict('assets/indoor/vec_floors123.json');
+    rootBundle.evict('assets/indoor/vec_floors12345.json');
     final appState = _SignedInState();
     final controller = flow.build(search: search);
     router = createAppRouter(
@@ -290,7 +290,35 @@ void main() {
     );
   });
 
-  testWidgets('floor 3 shows doors and floors 4–5 stay pending', (
+  testWidgets('floors 4 and 5 each paint their own two elevators', (
+    tester,
+  ) async {
+    await _Harness().pump(tester);
+    for (final floor in [4, 5]) {
+      await tester.tap(find.text('Floor $floor'));
+      await tester.pumpAndSettle();
+      final plan = find.descendant(
+        of: find.byType(InteractiveViewer),
+        matching: find.byType(CustomPaint),
+      );
+      final canvas = TestRecordingCanvas();
+      tester
+          .widget<CustomPaint>(plan)
+          .painter!
+          .paint(canvas, tester.getSize(plan));
+      final elevators = canvas.invocations
+          .map((call) => call.invocation)
+          .where(
+            (call) =>
+                call.memberName == #drawRRect &&
+                (call.positionalArguments[1] as Paint).color.toARGB32() ==
+                    0xFF55958C,
+          );
+      expect(elevators, hasLength(2), reason: 'floor $floor');
+    }
+  });
+
+  testWidgets('floors 3–5 show verified doors', (
     tester,
   ) async {
     final harness = _Harness();
@@ -310,33 +338,28 @@ void main() {
     expect(find.text('Door on scan'), findsOneWidget);
     expect(find.text('Verify with AR'), findsOneWidget);
 
-    final pending = find.text(
-      'Corridors are traced from the building scan. Door pin points for this floor are still coming.',
-    );
-    for (final floor in [5, 4]) {
+    for (final (floor, rooms) in [
+      (4, ['402', '417', '418', '419', '420', '424', '425']),
+      (5, ['501', '514', '515', '516', '518', '519', '523']),
+    ]) {
       await tester.tap(find.text('Floor $floor'));
       await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel(RegExp('^Select room')), findsNothing);
-      expect(find.text('0 pinned · 7 directory-only'), findsOneWidget);
-      expect(pending, findsOneWidget);
-      expect(find.text('Pick a room from the directory.'), findsOneWidget);
-
-      await tester.tap(find.byTooltip('Full-screen map'));
-      await tester.pumpAndSettle();
-      expect(pending, findsOneWidget);
-      expect(find.bySemanticsLabel(RegExp('^Select room')), findsNothing);
-      await tester.tap(find.byTooltip('Exit full-screen map'));
-      await tester.pumpAndSettle();
+      expect(find.text('7 pinned · 0 directory-only'), findsOneWidget);
+      for (final room in rooms) {
+        expect(find.byKey(ValueKey('door-$room')), findsOneWidget);
+      }
     }
-    final chip = find.text('417');
-    await tester.scrollUntilVisible(
-      chip,
-      200,
-      scrollable: find.byType(Scrollable).first,
+    expect(find.byKey(const ValueKey('door-510')), findsNothing);
+    expect(find.text('510'), findsNothing);
+
+    // Floor 4 has door pins but no indoor AR coverage yet.
+    await tester.tap(find.text('Floor 4'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(
+      tester.getCenter(find.byKey(const ValueKey('door-417'))),
     );
     await tester.pumpAndSettle();
-    await tester.tap(chip);
-    await tester.pumpAndSettle();
+    expect(find.text('Door on scan'), findsOneWidget);
     final button = tester.widget<ButtonStyleButton>(
       find.ancestor(
         of: find.text('AR unavailable here'),
@@ -383,7 +406,7 @@ void main() {
 
     final asset =
         jsonDecode(
-              await rootBundle.loadString('assets/indoor/vec_floors123.json'),
+              await rootBundle.loadString('assets/indoor/vec_floors12345.json'),
             )
             as Map<String, dynamic>;
     final floorDoors = (asset['objects'] as List)
@@ -699,39 +722,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.getSemantics(door), isSemantics(isSelected: true));
     }
-  });
-
-  testWidgets('pending notice scrolls without collapsing the full-screen map', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    await _Harness().pump(tester);
-    await tester.tap(find.text('Floor 4'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Full-screen map'));
-    await tester.pumpAndSettle();
-
-    tester.view.physicalSize = const Size(320, 240);
-    tester.platformDispatcher.textScaleFactorTestValue = 2;
-    await tester.pumpAndSettle();
-
-    final viewer = find.byType(InteractiveViewer);
-    final notice = find.ancestor(
-      of: find.textContaining('Corridors are traced from the building scan.'),
-      matching: find.byType(Scrollable),
-    );
-    final viewportHeight = tester.getSize(viewer).height;
-    expect(viewportHeight, greaterThan(0));
-    expect(viewportHeight, greaterThanOrEqualTo(tester.getSize(notice).height));
-    final position = tester.state<ScrollableState>(notice).position;
-    await tester.drag(notice, const Offset(0, -60));
-    await tester.pumpAndSettle();
-    expect(position.pixels, greaterThan(0));
-    expect(tester.getSize(viewer).height, viewportHeight);
   });
 
   testWidgets('short body leaves the map controls reachable at large text', (
