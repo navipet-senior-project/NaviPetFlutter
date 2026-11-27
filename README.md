@@ -23,8 +23,8 @@ includes:
   coordinated separately; end-to-end behavior is unverified. See
   [docs/outdoor-ar-geospatial.md](docs/outdoor-ar-geospatial.md).
 - Calendar, Pet Shop and Pack, and Account screens.
-- Indoor AR for VEC rooms: see [Indoor navigation architecture](#indoor-navigation-architecture).
-  It is a separate subsystem from the outdoor Mapbox navigation above.
+- [VEC floor maps](#vec-floor-maps) for choosing rooms, with indoor AR on
+  supported floors.
 - Ask Elbee about CSULB buildings and rooms from the map. Elbee returns
   verified places that open existing navigation; schedule access requires
   consent for each request. It can also explain official parking rules. Elbee
@@ -84,6 +84,19 @@ phone unless a note says so.
 | [NaviPetUnity](https://github.com/navipet-senior-project/NaviPetUnity) | AR session, MultiSet localization, sign (OCR) recognition, hallway routing and HUD, [floor policy](#sensor-evidence), and height hints in exports that include [Unity PR 39](https://github.com/navipet-senior-project/NaviPetUnity/pull/39) | Place lookup, tokens |
 | [NavipetBackend](https://github.com/navipet-senior-project/NavipetBackend) | Place records with the saved door pose, token minting through `POST /indoor/ar-token`, the MultiSet credentials | Anything on the phone |
 
+### VEC floor maps
+
+Tap **Open VEC indoor map** in campus search, then use the floor tabs to
+browse. Tap a door pin or choose a room from the list. Use the zoom controls
+or pinch to zoom. Open **Full-screen map** for more space, then exit full
+screen to switch floors or use the room list.
+
+Corridor outlines approximate the MultiSet scans as placed in Unity's
+`VEC_Building` scene. Door pins on floors 1–5 come from the bundled
+[Unity export](assets/indoor/vec_floors12345.json). Floor 1 rooms without a
+tagged door appear under **Directory only**. Door pins on every floor use the
+same **Verify with AR** lookup.
+
 ### Launching indoor AR
 
 1. **Entry.** These controls pass a place ID through `/ar?destination=<place id>`.
@@ -94,13 +107,11 @@ phone unless a note says so.
      at most 10 s old within 2 m of that footprint.
    - Outdoor arrival at a room enters `FlowIndoorHandoff`. The handoff sheet
      offers **Scan AR** only for covered VEC floors, regardless of fix age.
-   - **Verify location** on the VEC building map opens AR after resolving the
-     selected room and floor to exactly one backend place ID through search.
-     Floors 1–2 combine drawn floor plans with data from the bundled scan
-     (`assets/indoor/vec_floors1and2.json`). Floors 3–5 use directory plans.
-     The AR door pose comes from the backend place record. If the room cannot
-     be matched to exactly one place or the lookup fails, AR does not open;
-     try search or retry the lookup.
+   - **Verify with AR** on the VEC building map is available for pinned rooms
+     on covered floors. Directory-only rooms show **AR unavailable here**.
+     The map resolves the selected room and floor to exactly one backend place
+     ID through search. If the lookup fails or finds no unique match, try again
+     or search for the room.
 2. **Place and door pose.** `IndoorArLaunchScreen` loads the place from the
    backend. A well-formed `indoor` door pose (nonempty map code, `multiset-mapset`
    frame, door key, floor, position, heading) becomes a destination request.
@@ -214,8 +225,7 @@ Device validation remains open. See
   and [docs/ios-testing.md](docs/ios-testing.md#indoor-ar)).
 - Floor-evidence thresholds come from one iPhone in one building. Android is
   unverified. Whether the height hint helps localization is unknown.
-- VEC floors 4 and 5 are outside indoor AR coverage. Step-free routing is
-  not supported.
+- Step-free routing is not supported.
 - Flutter has no version handshake with Unity, so it cannot tell which Unity
   build is paired.
 
@@ -613,11 +623,10 @@ For barometer floor references, start a recording on floor 1, enter floor
 numbers consistently, and confirm each floor as you arrive. In the positioning
 screen confirm the current starting floor to anchor
 relative pressure for that outing. The floor belief can persist without Wi-Fi;
-Wi-Fi scans refresh the likely landmark when available. The current bundled
-Unity scan provides landmark coordinates for floors 1 and 2 only. Floors 3–5
-can have a floor belief from pressure calibration, but do not yet have surveyed
-Wi-Fi landpoints or coordinates in this build. These estimates are a prototype
-and need on-device VEC survey/validation before being used as navigation truth.
+Wi-Fi scans refresh the likely landmark when available. The Wi-Fi survey uses
+the bundled Unity landmarks on floors 1 and 2. Floors 3–5 can have a floor
+belief from pressure calibration. These estimates are a prototype and need
+on-device VEC survey/validation before being used as navigation truth.
 
 ## Verification
 

@@ -29,18 +29,19 @@ class _IndoorPositioningScreenState extends State<IndoorPositioningScreen> {
   Future<void> _load() async {
     final raw =
         jsonDecode(
-              await rootBundle.loadString('assets/indoor/vec_floors1and2.json'),
+              await rootBundle.loadString('assets/indoor/vec_floors12345.json'),
             )
             as Map<String, dynamic>;
     final objects = raw['objects'] as List<dynamic>;
     final points = objects
-        .map((value) {
-          final item = value as Map<String, dynamic>;
+        .cast<Map<String, dynamic>>()
+        .where((item) => const {'floor_1', 'floor_2'}.contains(item['floorId']))
+        .map((item) {
           final position = item['position'] as Map<String, dynamic>;
           final floorId = item['floorId'] as String;
           return IndoorLandpoint(
             id: item['id'] as String,
-            floor: floorId.endsWith('1') ? '1' : '2',
+            floor: floorId.substring(floorId.lastIndexOf('_') + 1),
             type: item['type'] as String,
             x: (position['x'] as num).toDouble(),
             y: (position['y'] as num).toDouble(),
