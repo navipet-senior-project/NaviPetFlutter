@@ -318,9 +318,7 @@ void main() {
     }
   });
 
-  testWidgets('floors 3–5 show verified doors', (
-    tester,
-  ) async {
+  testWidgets('floors 3–5 show verified doors', (tester) async {
     final harness = _Harness();
     await harness.pump(tester);
     await tester.tap(find.text('Floor 3'));
@@ -352,22 +350,51 @@ void main() {
     expect(find.byKey(const ValueKey('door-510')), findsNothing);
     expect(find.text('510'), findsNothing);
 
-    // Floor 4 has door pins but no indoor AR coverage yet.
-    await tester.tap(find.text('Floor 4'));
-    await tester.pumpAndSettle();
-    await tester.tapAt(
-      tester.getCenter(find.byKey(const ValueKey('door-417'))),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Door on scan'), findsOneWidget);
-    final button = tester.widget<ButtonStyleButton>(
-      find.ancestor(
-        of: find.text('AR unavailable here'),
-        matching: find.bySubtype<ButtonStyleButton>(),
-      ),
-    );
-    expect(button.onPressed, isNull);
+    // Floors 4–5 have door pins but no indoor AR coverage yet.
+    for (final (floor, room) in [(4, '417'), (5, '501')]) {
+      await tester.tap(find.text('Floor $floor'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(tester.getCenter(find.byKey(ValueKey('door-$room'))));
+      await tester.pumpAndSettle();
+      expect(find.text('Room $room'), findsOneWidget);
+      expect(find.text('Door on scan'), findsOneWidget);
+      expect(
+        find.text(
+          'This door position is verified in the building scan, but '
+          "indoor AR doesn't cover Floor $floor yet.",
+        ),
+        findsOneWidget,
+      );
+      final button = tester.widget<ButtonStyleButton>(
+        find.ancestor(
+          of: find.text('AR unavailable here'),
+          matching: find.bySubtype<ButtonStyleButton>(),
+        ),
+      );
+      expect(button.onPressed, isNull);
+    }
     expect(harness.requests, isEmpty);
+
+    // Floor 1 rooms without a tagged door are listed, never placed.
+    await tester.tap(find.text('Floor 1'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('door-104')), findsNothing);
+    final chip104 = find.widgetWithText(InkWell, '104');
+    await tester.scrollUntilVisible(
+      chip104,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(chip104);
+    await tester.pumpAndSettle();
+    expect(find.text('Room 104'), findsOneWidget);
+    expect(find.text('Door on scan'), findsNothing);
+    expect(
+      find.text(
+        "This room has no door in the building scan yet, so AR can't confirm it.",
+      ),
+      findsOneWidget,
+    );
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
   testWidgets('narrow map controls leave door taps and actions available', (

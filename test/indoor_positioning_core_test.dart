@@ -68,7 +68,8 @@ void main() {
     final picker = tester.widget<DropdownButton<IndoorLandpoint>>(
       landpointPicker,
     );
-    expect(picker.value, picker.items!.first.value);
+    // The survey defaults to the export's first floor 1–2 landpoint.
+    expect(picker.value?.id, 'VEC121');
     expect(picker.items!.map((item) => item.value!.floor).toSet(), {'1', '2'});
     await tester.scrollUntilVisible(find.text('Estimated floor 3 · 100%'), 160);
     expect(find.text('Estimated floor 3 · 100%'), findsOneWidget);
