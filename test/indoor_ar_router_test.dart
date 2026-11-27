@@ -473,10 +473,7 @@ void main() {
     expect(exploredDoorAt(near120), const ValueKey('door-120'));
     await tester.tapAt(near120);
     await tester.pumpAndSettle();
-    expect(
-      tester.getSemantics(door('120')),
-      containsSemantics(isSelected: true),
-    );
+    expect(tester.getSemantics(door('120')), isSemantics(isSelected: true));
 
     final accessibilityDoor = tester.getSemantics(door('119'));
     accessibilityDoor.owner!.performAction(
@@ -484,10 +481,7 @@ void main() {
       SemanticsAction.tap,
     );
     await tester.pumpAndSettle();
-    expect(
-      tester.getSemantics(door('119')),
-      containsSemantics(isSelected: true),
-    );
+    expect(tester.getSemantics(door('119')), isSemantics(isSelected: true));
     final controller = tester
         .widget<InteractiveViewer>(viewer)
         .transformationController!;
@@ -503,18 +497,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tapAt(pinAt(pin120) + const Offset(24, 24));
     await tester.pumpAndSettle();
-    expect(
-      tester.getSemantics(door('120')),
-      containsSemantics(isSelected: false),
-    );
+    expect(tester.getSemantics(door('120')), isSemantics(isSelected: false));
     final insideZoomedPin = pinAt(pin120) + const Offset(0, 24);
     expect(exploredDoorAt(insideZoomedPin), const ValueKey('door-120'));
     await tester.tapAt(insideZoomedPin);
     await tester.pumpAndSettle();
-    expect(
-      tester.getSemantics(door('120')),
-      containsSemantics(isSelected: true),
-    );
+    expect(tester.getSemantics(door('120')), isSemantics(isSelected: true));
     await tester.tap(find.byTooltip('Exit full-screen map'));
     await tester.pumpAndSettle();
     expect(find.text('Room 120'), findsOneWidget);
@@ -655,7 +643,7 @@ void main() {
       expect(node.rect.contains(box.globalToLocal(at)), isTrue);
       await tester.tapAt(outside);
       await tester.pumpAndSettle();
-      expect(tester.getSemantics(door), containsSemantics(isSelected: false));
+      expect(tester.getSemantics(door), isSemantics(isSelected: false));
     }
 
     controller.value = Matrix4.identity()
@@ -664,7 +652,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tapAt(viewport.topLeft + const Offset(6, 8));
     await tester.pumpAndSettle();
-    expect(tester.getSemantics(door), containsSemantics(isSelected: true));
+    expect(tester.getSemantics(door), isSemantics(isSelected: true));
   });
 
   testWidgets('partially visible doors keep their own accessibility action', (
@@ -709,7 +697,7 @@ void main() {
 
       node.owner!.performAction(node.id, SemanticsAction.tap);
       await tester.pumpAndSettle();
-      expect(tester.getSemantics(door), containsSemantics(isSelected: true));
+      expect(tester.getSemantics(door), isSemantics(isSelected: true));
     }
   });
 
