@@ -128,7 +128,9 @@ class _IndoorBuildingMapScreenState extends State<IndoorBuildingMapScreen> {
   }
 
   Future<_VecIndoorMap> _loadMap() async {
-    final raw = await rootBundle.loadString('assets/indoor/vec_floors12345.json');
+    final raw = await rootBundle.loadString(
+      'assets/indoor/vec_floors12345.json',
+    );
     final map = _VecIndoorMap.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     if (map.buildingId != IndoorBuildingCatalog.vecBuildingCode) {
       throw const FormatException('Indoor map building ID does not match VEC.');
@@ -1193,8 +1195,7 @@ class _FloorPlanPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _FloorPlanPainter oldDelegate) =>
       // objects is derived from floor, so it needs no separate compare.
-      oldDelegate.floor != floor ||
-      oldDelegate.selectedRoom != selectedRoom;
+      oldDelegate.floor != floor || oldDelegate.selectedRoom != selectedRoom;
 }
 
 class _FloorTab extends StatelessWidget {
